@@ -1,1 +1,3 @@
-# diplomka
+# About
+
+Repository concerning my Masters thesis.
