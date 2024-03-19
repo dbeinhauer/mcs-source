@@ -24,3 +24,42 @@
             (might be the goal of the whole thesis, also good result for the good academic paper)
 
 - final result (not mine) of the project is to merge it together with the simulator
+
+
+
+# 12.2.2024
+- sheet is the layer
+- github1s - VSCOde github
+
+- mozaik experiments - how to convert image to spikes
+- the last 2 folders with 500 have the experiments (one for l2/3 the other for l4 and LGN)
+
+
+# 19.3.2024
+- the mozaik should be used only for data extraction
+- data consist of:
+    - the image
+    - experiment lenght (and blank/stimuli parts)
+    - spike trains for neurons in LGN, L4 and L3/2
+        - we want to split them into smaller bins
+        - each bin has number of spikes inside the bin (typical case might be just changing 0/1)
+
+## Architecture of our RNN
+- step 1: LGN (input) x rest of the neurons (output layer)
+    - completely dismiss the images (just use results from LGN)
+    - neurons inside the output layer has fully recurrent and inter/intra connections
+        - might be too many parameters
+            - solution would be to get rid of long range connections and connect only neurons close to each other
+    - layers based on the architecture + inhibitory/excitatory layers
+        - should correspond to its function (inhibitory should have negative? outputs)
+
+- step 2: Add NN instead of the neurons
+    - probably convolutionary (just one NN for all neurons inside the layer)
+        - the layers should probably have different NN (slightly different function)
+    - because the neurons are in reality much complicated than just some linear (or non-linear function)
+
+- step 3: Simulate real-life situation
+    - try to hide neurons and train the model (simulation of the real data)
+    - should decide how to hide the neurons - probably choose as much uniform distribution as possible
+        - if we let only the neurons close to each other (from one region) it would probably result in loss of significant amount of information
+    - maybe just fine-tune the pre-trained model (decide how to set the rigit neurons etc.)
