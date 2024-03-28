@@ -36,7 +36,7 @@
 
 
 # 19.3.2024
-- the mozaik should be used only for data extraction
+- mozaik should be used only for data extraction
 - data consist of:
     - the image
     - experiment lenght (and blank/stimuli parts)
@@ -63,3 +63,31 @@
     - should decide how to hide the neurons - probably choose as much uniform distribution as possible
         - if we let only the neurons close to each other (from one region) it would probably result in loss of significant amount of information
     - maybe just fine-tune the pre-trained model (decide how to set the rigit neurons etc.)
+
+
+# 26.3.2024
+- the subdirecories in the Luca's dataset are due the memory managment (too large data)
+- each segment is 1 experiment (1 image)
+- I am also interested in blank parts
+- trials are not interesting (they are here in case we have experiments with multiple trials)
+- basicaly what I want is to take the times of each spike train in each neuron
+    - need to manage the order (both experiments and neurons)
+- I want to create from the data multidimensional matrix
+    - neurons matrix architecture:
+        experiment * neurons * time
+            - also, somehow deal with neuron populations
+    - images matrix architecture:
+        images * time
+- I would need to somehow deal with long chunks of information
+    - I also want to interconnect both previous and next blank images after stimuli
+- there should be also information about how the neurons are interconnected
+    - we would like to use it later in the work
+    - now, we are not interested in this
+        
+
+# 28.3.2024
+- stimuli should be in ordered way using command:
+    `segs_stimuli = dsv2.get_segments(ordered=True)`
+- blank image stimuli:
+    `segs_blank = dsv2.get_segments(null=True,ordered=True)`
+- in separe folders there are different experiments (the data are not interconnected between the directories)
