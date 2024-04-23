@@ -91,3 +91,5 @@
 - blank image stimuli:
     `segs_blank = dsv2.get_segments(null=True,ordered=True)`
 - in separe folders there are different experiments (the data are not interconnected between the directories)
+- I have created functions to separate stimuli to blank and images
+- I have created function to sort segment neurons
