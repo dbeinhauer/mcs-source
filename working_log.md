@@ -93,3 +93,13 @@
 - in separe folders there are different experiments (the data are not interconnected between the directories)
 - I have created functions to separate stimuli to blank and images
 - I have created function to sort segment neurons
+
+# 5.5.2024
+- created dataset export
+- I have np.arrays of shape:
+    `(num_imgs, num_neurons, time_duration)`
+    * each `blank` and `image` has separate array (durations 151 and 561)
+- Need to iterate through all directories and all sheets
+    - should be 500 iterations of the function
+- Does not consider the images (asked Luca if needed)
+- Also storing neuron IDs and Image Ids into separate np.arrays
