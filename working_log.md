@@ -103,3 +103,48 @@
     - should be 500 iterations of the function
 - Does not consider the images (asked Luca if needed)
 - Also storing neuron IDs and Image Ids into separate np.arrays
+
+
+# 10.5.2024
+- using sparse representation to drastically reduce size 
+    - from 1.96 GB -> 0.27 MB
+    - need to convert from 3D matrix -> 2D
+        - hopefully not very time consuming (both convertion to sparse and dimensions)
+- assuming we have only 1 trial (got rid of the checking trials and iterating through them)
+- We probably do not need to extract images because Luca has provided them to us (hopefully in correct format)
+- We do not sort the neurons (we assume all of them are in the correct order and the same)
+- We assume that all experiments last the same time (150ms blank -> 560ms image)
+- we would probably want using 10ms time windows
+
+
+# 30.5.2024
+- input data from the LGN layer -> output - rest of layers
+- we should use 10-20ms time windows (for better results and faster training)
+- maybe good idea to somehow spread the digital spike data to surroundings (maybe some normal distribution around the spike?)
+
+
+# 28.6.2024
+- exporting dataset on wintermute
+- trying to create the first prototype of the model
+- I do need neuron IDs
+
+
+# 30.6.2024
+- dataset finalized
+- problem with the size of the dataset and work with it
+    - possible memmory problems to have all the dataset in the RAM
+- solution would be:
+    - prepare the dataset for the given time interval size
+    - cache the preprocessed dataset with the interval size
+        - to not do it repeteadely
+        - might not be a good idea (too large dataset)
+            - in my oppinion in sparse representation it would be ok
+- dataset extraction finished
+- problematic work with the size of 1 data (too large -> won't fit into local memory)
+    - lets try it on metacentrum
+    - approx. 24 GB needed for 1 data
+- working on first version of model
+    - loads each batch from the directory
+        - otherwise won't fit into memory
+    - we do not need any modification of dataset
+    - just need to create acumulated time steps (maybe some caching before run)

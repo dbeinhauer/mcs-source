@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "neural-simulator"
+version = "0.1.0"
+description = ""
+authors = ["David Beinhauer <david.beinhauer@email.cz>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = "*"
+scipy = "*"
+ipython = "*"
+jupyterlab = "*"
+torch = "^2.3.1"
+torchvision = "^0.18.1"
+torchaudio = "^2.3.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
