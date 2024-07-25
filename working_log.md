@@ -148,3 +148,16 @@
         - otherwise won't fit into memory
     - we do not need any modification of dataset
     - just need to create acumulated time steps (maybe some caching before run)
+
+
+# 1.7.2024
+- trying work with time steps 10 ms
+    - succesfully started training -> killed because of memory
+        - possibly might work on metacentrum?
+
+
+# 2.7.2024
+- creating scripts for dataset trimming
+    - for execution on wintermute
+- now it is possible to trim the dataset to arbitrary window size
+- for timesize 20 it is possible to run the model on local
