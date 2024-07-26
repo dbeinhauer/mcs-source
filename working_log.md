@@ -161,3 +161,14 @@
     - for execution on wintermute
 - now it is possible to trim the dataset to arbitrary window size
 - for timesize 20 it is possible to run the model on local
+
+
+# 25.7.2024
+- we want to train the model with architecture:
+    - input (LGN) -> L4 (with residual connections to itself) -> L23 (with residual connections to itself)
+- we do know all the expected values of the model neurons
+- inhibitory vs. excitatory
+    - just clip the values to 0 (if positive/negative)
+
+
+# 26.7.2024

@@ -38,7 +38,7 @@ class CustomRNN(nn.Module):
         # Inhibitory/Excitatory outputs        
         outputs = {}
         for output_layer in self.fcs.keys():
-            fc_results = {}
+            # fc_results = {}
             # for input_layer, output in rnn_outputs.items():
                 # if layer in self.exc_outputs:
                 #     outputs[layer + "_exc"] = self.exc_outputs[layer](output)
@@ -50,3 +50,89 @@ class CustomRNN(nn.Module):
             outputs[output_layer] = self.fcs[output_layer](combined)#torch.cat(fc_results.values(), dim=2)
         
         return outputs
+
+import torch
+import torch.nn as nn
+
+class MyRNN(nn.Module):
+    def __init__(self, layer_sizes, num_layers=1):
+        super(MyRNN, self).__init__()
+
+        self.x_on_size = layer_sizes['X_ON']
+        self.x_off_size = layer_sizes['X_OFF']
+        self.l4_exc_size = layer_sizes['V1_Exc_L4']
+        self.l4_inh_size = layer_sizes['V1_Inh_L4']
+        self.l23_exc_size = layer_sizes['V1_Exc_L23']
+        self.l23_inh_size = layer_sizes['V1_Inh_L23']
+
+        self.L4 = nn.RNN(self.x_on_size + self.x_off_size, self.l4_exc_size + self.l4_inh_size, num_layers, batch_first=True)
+        self.L23 = nn.RNN(self.l4_exc_size + self.l4_inh_size, self.l23_exc_size + self.l23_inh_size, num_layers, batch_first=True)
+
+
+
+    def clip_weights(self):
+        # # Clip the weights of the inhibitory layer
+        # self.L4.weight_hh_l0.clamp_(max=0)
+        # self.L4.weight_ih_l0.clamp_(max=0)
+
+        # # Clip the weights of the excitatory layer
+        # self.L4.weight_hh_l0.clamp_(min=0)
+        # self.L4.weight_ih_l0.clamp_(min=0)
+
+        # # Clip the weights of the inhibitory layer
+        # self.L23.weight_hh_l0.clamp_(max=0)
+        # self.L23.weight_ih_l0.clamp_(max=0)
+
+        # # Clip the weights of the excitatory layer
+        # self.L23.weight_hh_l0.clamp_(min=0)
+        # self.L23.weight_ih_l0.clamp_(min=0)
+
+        # Clone the weights of the L4 layer
+        clipped_L4_weight_hh = self.L4.weight_hh_l0.clone()
+        clipped_L4_weight_ih = self.L4.weight_ih_l0.clone()
+
+        # Clip the weights of the L4 layer
+        clipped_L4_weight_hh[:self.l4_exc_size].clamp_(min=0)  # Clip weights till self.l4_exc_size to minimum 0
+        clipped_L4_weight_ih[:self.l4_exc_size].clamp_(min=0)  # Clip weights till self.l4_exc_size to minimum 0
+        clipped_L4_weight_hh[self.l4_exc_size:].clamp_(max=0)  # Clip weights after self.l4_exc_size to maximum 0
+        clipped_L4_weight_ih[self.l4_exc_size:].clamp_(max=0)  # Clip weights after self.l4_exc_size to maximum 0
+
+        # Copy the clipped weights back to the L4 layer
+        self.L4.weight_hh_l0.data.copy_(clipped_L4_weight_hh)
+        self.L4.weight_ih_l0.data.copy_(clipped_L4_weight_ih)
+
+        # Clone the weights of the L23 layer
+        clipped_L23_weight_hh = self.L23.weight_hh_l0.clone()
+        clipped_L23_weight_ih = self.L23.weight_ih_l0.clone()
+
+        # Clip the weights of the L23 layer
+        clipped_L23_weight_hh[:self.l23_exc_size].clamp_(min=0)  # Clip weights till self.l23_exc_size to minimum 0
+        clipped_L23_weight_ih[:self.l23_exc_size].clamp_(min=0)  # Clip weights till self.l23_exc_size to minimum 0
+        clipped_L23_weight_hh[self.l23_exc_size:].clamp_(max=0)  # Clip weights after self.l23_exc_size to maximum 0
+        clipped_L23_weight_ih[self.l23_exc_size:].clamp_(max=0)  # Clip weights after self.l23_exc_size to maximum 0
+
+        # Copy the clipped weights back to the L23 layer
+        self.L23.weight_hh_l0.data.copy_(clipped_L23_weight_hh)
+        self.L23.weight_ih_l0.data.copy_(clipped_L23_weight_ih)
+
+
+    def forward(self, x_ON, x_OFF):
+
+        L4_output, _ = self.L4(torch.cat((x_ON, x_OFF), dim=2))
+        L23_output, _ = self.L23(L4_output)
+
+        L4_Exc_output = L4_output[:, :, :self.l4_exc_size]
+        L4_Inh_output = L4_output[:, :, self.l4_exc_size:]
+
+        L23_Exc_output = L23_output[:, :, :self.l23_exc_size]
+        L23_Inh_output = L23_output[:, :, self.l23_exc_size:]
+
+        # Clip the weights after the connections to L23 layers
+        self.clip_weights()
+
+        return {
+            'V1_Exc_L4': L4_Exc_output,
+            'V1_Inh_L4': L4_Inh_output,
+            'V1_Exc_L23': L23_Exc_output, 
+            'V1_Inh_L23': L23_Inh_output,
+        }
