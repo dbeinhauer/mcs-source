@@ -172,3 +172,33 @@
 
 
 # 26.7.2024
+- hopefully working architecture using LGN -> L4 -> L23
+
+
+# 27.7.2024
+- used architecture that uses `nn.RNN` with hidden neurons corresponsing to number of neurons in each layer is too large
+- our architecture:
+    - RNNs for each layer (without LGN (it is only input))
+        - RNN layer:
+            input: input size (previous layer size)
+            hidden (output): num_neurons in the layer
+            interlayer connections: in RNN module definition
+            inhibitory/excitatory: constrain weights to non-positive/negative
+- problem:
+    - too large model it does not fit in the GPU memory
+        - too much weights
+        -> we need to design smaller model
+
+
+# 28.7.2024
+- try using `nn.RNNCell` instead
+    - better for custom model definition
+    - we need to define passing sequence information
+    - we can better look at how the information is processed through the network
+    - same architecture as before:
+        - too large -> need to do the model smaller
+        - possible solution:
+            - usage of FC layers from RNN with less hidden neurons
+                - FC created outputs for each layer that will be passed further
+- variant 1:
+    - FC only for generating outputs

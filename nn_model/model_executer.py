@@ -6,22 +6,29 @@ import torch.nn
 import torch.optim as optim
 
 from nn_model.dataset_loader import DataLoader, SparseSpikeDataset
-from nn_model.model import OnlyRNN, RNNCellModel
+from nn_model.model import OnlyRNN, RNNCellModel, RNNCellFCModel
 
 
 X_ON_SIZE = 7200
 X_OFF_SIZE = 7200
-L23_EXC_SIZE = 37500
-L23_INH_SIZE = 9375
 L4_EXC_SIZE = 37500
 L4_INH_SIZE = 9375
+L23_EXC_SIZE = 37500
+L23_INH_SIZE = 9375
 
-# X_ON_SIZE = 72
-# X_OFF_SIZE = 72
-# L23_EXC_SIZE = 375
-# L23_INH_SIZE = 93
-# L4_EXC_SIZE = 375
-# L4_INH_SIZE = 93
+
+# X_ON_SIZE = 70
+# X_OFF_SIZE = 70
+# L4_EXC_SIZE = 370
+# L4_INH_SIZE = 90
+# L23_EXC_SIZE = 370
+# L23_INH_SIZE = 90
+
+
+HIDDEN_L4_EXC_SIZE = 375
+HIDDEN_L4_INH_SIZE = 93
+HIDDEN_L23_EXC_SIZE = 375
+HIDDEN_L23_INH_SIZE = 93
 
 # torch.autograd.set_detect_anomaly(True)
 
@@ -36,10 +43,10 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
 
             batch_size = inputs['X_ON'].size(0)
 
-            h4_exc = torch.zeros(batch_size, model.l4_exc_size)
-            h4_inh = torch.zeros(batch_size, model.l4_inh_size)
-            h23_exc = torch.zeros(batch_size, model.l23_exc_size)
-            h23_inh = torch.zeros(batch_size, model.l23_inh_size)
+            h4_exc = torch.zeros(batch_size, model.hidden_l4_exc_size)
+            h4_inh = torch.zeros(batch_size, model.hidden_l4_inh_size)
+            h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size)
+            h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size)
 
             # Forward pass
             # L1_Inh_outputs, L1_Exc_outputs, L2_Inh_outputs, L2_Exc_outputs = model(x, h1_inh, h1_exc, h2_inh, h2_exc)
@@ -65,10 +72,10 @@ def evaluation(model, train_loader, criterion):
             
             batch_size = inputs['X_ON'].size(0)
 
-            h4_exc = torch.zeros(batch_size, model.l4_exc_size)
-            h4_inh = torch.zeros(batch_size, model.l4_inh_size)
-            h23_exc = torch.zeros(batch_size, model.l23_exc_size)
-            h23_inh = torch.zeros(batch_size, model.l23_inh_size)
+            h4_exc = torch.zeros(batch_size, model.hidden_l4_exc_size)
+            h4_inh = torch.zeros(batch_size, model.hidden_l4_inh_size)
+            h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size)
+            h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size)
 
             # predictions = model(inputs['X_ON'], inputs['X_OFF'])
             predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)
@@ -91,20 +98,26 @@ def main():
     layer_sizes = {
         'X_ON': X_ON_SIZE, 
         'X_OFF': X_OFF_SIZE,
-        'V1_Exc_L23': L23_EXC_SIZE, 
         'V1_Exc_L4': L4_EXC_SIZE,
-        'V1_Inh_L23': L23_INH_SIZE, 
         'V1_Inh_L4': L4_INH_SIZE,
+        'V1_Exc_L23': L23_EXC_SIZE, 
+        'V1_Inh_L23': L23_INH_SIZE, 
     }
     input_layers = {
         'X_ON': X_ON_SIZE, 
         'X_OFF': X_OFF_SIZE,
     }
     output_layers = {
-        'V1_Exc_L23': L23_EXC_SIZE, 
         'V1_Exc_L4': L4_EXC_SIZE,
-        'V1_Inh_L23': L23_INH_SIZE, 
         'V1_Inh_L4': L4_INH_SIZE,
+        'V1_Exc_L23': L23_EXC_SIZE, 
+        'V1_Inh_L23': L23_INH_SIZE, 
+    }
+    hidden_sizes = {
+        'V1_Exc_L4': HIDDEN_L4_EXC_SIZE,
+        'V1_Inh_L4': HIDDEN_L4_INH_SIZE,
+        'V1_Exc_L23': HIDDEN_L23_EXC_SIZE, 
+        'V1_Inh_L23': HIDDEN_L23_INH_SIZE, 
     }
 
     # Create dataset and dataloader
@@ -115,7 +128,8 @@ def main():
     print(device)
     # model = OnlyRNN(layer_sizes).to(device)
 
-    model = RNNCellModel(layer_sizes).to(device)
+    # model = RNNCellModel(layer_sizes).to(device)
+    model = RNNCellFCModel(layer_sizes, hidden_sizes).to(device)
 
 
     # make_dot(model)
