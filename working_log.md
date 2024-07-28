@@ -202,3 +202,8 @@
                 - FC created outputs for each layer that will be passed further
 - variant 1:
     - FC only for generating outputs
+    - problem with memory alocation
+        - problematic part in weights constrains (for Inh/Exc) -> too much memory consuming
+        - after that solved -> still problems with large time intervals
+            - it would be probably necessary to trim the time intervals to smaller chunks
+            - we may try to optimize the memory usage in GPUs

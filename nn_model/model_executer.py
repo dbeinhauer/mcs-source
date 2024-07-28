@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
+import os 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0" # use the second GPU
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import numpy as np
 
 import torch.nn
 import torch.optim as optim
 
 from nn_model.dataset_loader import DataLoader, SparseSpikeDataset
-from nn_model.model import OnlyRNN, RNNCellModel, RNNCellFCModel
+from nn_model.model import OnlyRNN, RNNCellModel, RNNCellFCModel, ConstrainedRNNCell
 
 
 X_ON_SIZE = 7200
@@ -17,12 +21,12 @@ L23_EXC_SIZE = 37500
 L23_INH_SIZE = 9375
 
 
-# X_ON_SIZE = 70
-# X_OFF_SIZE = 70
-# L4_EXC_SIZE = 370
-# L4_INH_SIZE = 90
-# L23_EXC_SIZE = 370
-# L23_INH_SIZE = 90
+X_ON_SIZE = 7000
+X_OFF_SIZE = 7000
+L4_EXC_SIZE = 37000
+L4_INH_SIZE = 9000
+L23_EXC_SIZE = 37000
+L23_INH_SIZE = 9000
 
 
 HIDDEN_L4_EXC_SIZE = 375
@@ -36,29 +40,44 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
     model.train()
     for epoch in range(num_epochs):
         for inputs, targets in train_loader:
-            inputs = {layer: input_data.float() for layer, input_data in inputs.items()}
-            targets = {layer: output_data.float() for layer, output_data in targets.items()}
-            
+            print("I get to training")
+            inputs = {layer: input_data.float().cuda() for layer, input_data in inputs.items()}
+            print("I get to inputs")
+            targets = {layer: output_data.float().cuda() for layer, output_data in targets.items()}
+            # targets = {layer: output_data.float() for layer, output_data in targets.items()}
+            print("I get to outputs")
+
             optimizer.zero_grad()
 
             batch_size = inputs['X_ON'].size(0)
 
-            h4_exc = torch.zeros(batch_size, model.hidden_l4_exc_size)
-            h4_inh = torch.zeros(batch_size, model.hidden_l4_inh_size)
-            h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size)
-            h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size)
+            h4_exc = torch.zeros(batch_size, model.hidden_l4_exc_size).cuda()
+            h4_inh = torch.zeros(batch_size, model.hidden_l4_inh_size).cuda()
+            h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size).cuda()
+            h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size).cuda()
+            
+            print("I get through hidden definition")
 
             # Forward pass
             # L1_Inh_outputs, L1_Exc_outputs, L2_Inh_outputs, L2_Exc_outputs = model(x, h1_inh, h1_exc, h2_inh, h2_exc)
 
+            # input = [inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh]
+            # torch.cuda.empty_cache()
+
             predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)
+            # predictions = model(*input)
             
             loss = 0
             for layer, target in targets.items():
-                loss += criterion(predictions[layer], target)
+                loss += criterion(torch.cat(predictions[layer], dim=1), target)
             
             loss.backward()
             optimizer.step()
+
+            # Apply constraints to all constrained RNN cells
+            for module in model.modules():
+                if isinstance(module, ConstrainedRNNCell):
+                    module.apply_constraints()
         
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
 
@@ -67,22 +86,22 @@ def evaluation(model, train_loader, criterion):
     model.eval()
     with torch.no_grad():
         for inputs, targets in train_loader:
-            inputs = {layer: input_data.float() for layer, input_data in inputs.items()}
-            targets = {layer: output_data.float() for layer, output_data in targets.items()}
+            inputs = {layer: input_data.float().cuda() for layer, input_data in inputs.items()}
+            targets = {layer: output_data.float().cuda() for layer, output_data in targets.items()}
             
             batch_size = inputs['X_ON'].size(0)
 
-            h4_exc = torch.zeros(batch_size, model.hidden_l4_exc_size)
-            h4_inh = torch.zeros(batch_size, model.hidden_l4_inh_size)
-            h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size)
-            h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size)
+            h4_exc = torch.zeros(batch_size, model.hidden_l4_exc_size).cuda()
+            h4_inh = torch.zeros(batch_size, model.hidden_l4_inh_size).cuda()
+            h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size).cuda()
+            h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size).cuda()
 
             # predictions = model(inputs['X_ON'], inputs['X_OFF'])
             predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)
 
             loss = 0
             for layer in targets.keys():
-                loss += criterion(predictions[layer], targets[layer])
+                loss += criterion(torch.cat(predictions[layer], dim=1), targets[layer])
 
             print(f'Test Loss: {loss.item():.4f}')
 
@@ -130,6 +149,8 @@ def main():
 
     # model = RNNCellModel(layer_sizes).to(device)
     model = RNNCellFCModel(layer_sizes, hidden_sizes).to(device)
+    # model = torch.nn.DataParallel(model).to(device)
+
 
 
     # make_dot(model)

@@ -71,15 +71,14 @@ class OnlyRNN(nn.Module):
 
 
 class NonPositiveWeightConstraint:
-    def __call__(self, module):
+    def apply(self, module):
         if hasattr(module, 'weight_hh'):
             module.weight_hh.data = -torch.abs(module.weight_hh.data)
         if hasattr(module, 'weight_ih'):
             module.weight_ih.data = -torch.abs(module.weight_ih.data)
 
-
 class NonNegativeWeightConstraint:
-    def __call__(self, module):
+    def apply(self, module):
         if hasattr(module, 'weight_hh'):
             module.weight_hh.data = torch.abs(module.weight_hh.data)
         if hasattr(module, 'weight_ih'):
@@ -94,9 +93,12 @@ class ConstrainedRNNCell(nn.Module):
         self.constraint = weight_constraint
 
     def forward(self, input, hidden):
-        self.constraint(self.rnn_cell)
+        # self.constraint(self.rnn_cell)
         hidden = self.rnn_cell(input, hidden)
         return hidden
+    
+    def apply_constraints(self):
+        self.constraint.apply(self.rnn_cell)
     
 
 class RNNCellModel(nn.Module):
@@ -205,55 +207,79 @@ class RNNCellFCModel(nn.Module):
         # Layer L4 Inh and Exc
         self.L4_Exc = ConstrainedRNNCell(input_size + self.hidden_l4_inh_size, self.hidden_l4_exc_size, self.non_negative_constraint)
         self.L4_Inh = ConstrainedRNNCell(input_size + self.hidden_l4_exc_size, self.hidden_l4_inh_size, self.non_positive_constraint)
-        
+        print("Got over L4")
         # Layer L23 Inh and Exc
         self.L23_Exc = ConstrainedRNNCell(l4_hidden_size + self.hidden_l23_inh_size, self.hidden_l23_exc_size, self.non_negative_constraint)
         self.L23_Inh = ConstrainedRNNCell(l4_hidden_size + self.hidden_l23_exc_size, self.hidden_l23_inh_size, self.non_positive_constraint)
-
+        print("Got over L23")
         self.fc_L4_Exc = nn.Linear(self.hidden_l4_exc_size, self.l4_exc_size)
         self.fc_L4_Inh = nn.Linear(self.hidden_l4_inh_size, self.l4_inh_size)
         self.fc_L23_Exc = nn.Linear(self.hidden_l23_exc_size, self.l23_exc_size)
         self.fc_L23_Inh = nn.Linear(self.hidden_l23_inh_size, self.l23_inh_size)
-
+        print("Got over FC")
 
     def forward(self, x_on, x_off, h4_exc, h4_inh, h23_exc, h23_inh):
+        # L4_Inh_outputs = torch.zeros((50000, 9000))
+        # L4_Exc_outputs = torch.zeros((50000, 37000))
+        # L23_Inh_outputs = torch.zeros((50000, 9000))
+        # L23_Exc_outputs = torch.zeros((50000, 37000))
+
         L4_Inh_outputs = []
         L4_Exc_outputs = []
         L23_Inh_outputs = []
         L23_Exc_outputs = []
 
+        print("I get to forward")
+
         for t in range(x_on.size(1)):
-            input_t = torch.cat((x_on[:, t, :], x_off[:, t, :]), dim=1)
+            if t % 100 == 0:
+                print(f"Got to iteration: {t}")
+                # del L4_input_exc, L4_input_inh, L4_combined, L23_input_exc, L23_input_inh
+                torch.cuda.empty_cache()
+            # input_t = torch.cat((x_on[:, t, :], x_off[:, t, :]), dim=1)
             
             # Layer L1
-            L4_input_exc = torch.cat((input_t, h4_inh), dim=1)
-            h4_exc = self.L4_Exc(L4_input_exc, h4_exc)
+            # L4_input_exc = torch.cat((input_t, h4_inh), dim=1)
+            # h4_exc = self.L4_Exc(L4_input_exc, h4_exc)
+            h4_exc = self.L4_Exc(torch.cat((torch.cat((x_on[:, t, :], x_off[:, t, :]), dim=1), h4_inh), dim=1), h4_exc)
 
-            L4_input_inh = torch.cat((input_t, h4_exc), dim=1)
-            h4_inh = self.L4_Inh(L4_input_inh, h4_inh)
+
+            # L4_input_inh = torch.cat((input_t, h4_exc), dim=1)
+            # h4_inh = self.L4_Inh(L4_input_inh, h4_inh)
+            h4_inh = self.L4_Inh(torch.cat((torch.cat((x_on[:, t, :], x_off[:, t, :]), dim=1), h4_exc), dim=1), h4_inh)
+
             
             # Collect L4 outputs
             L4_Exc_outputs.append(self.fc_L4_Exc(h4_exc).unsqueeze(1))
             L4_Inh_outputs.append(self.fc_L4_Inh(h4_inh).unsqueeze(1))
             
             # Combine L4 outputs
-            L4_combined = torch.cat((h4_inh, h4_exc), dim=1)
+            # L4_combined = torch.cat((h4_inh, h4_exc), dim=1)
             
             # Layer L23
-            L23_input_exc = torch.cat((L4_combined, h23_inh), dim=1)
-            h23_exc = self.L23_Exc(L23_input_exc, h23_exc)
+            # L23_input_exc = torch.cat((L4_combined, h23_inh), dim=1)
+            # h23_exc = self.L23_Exc(L23_input_exc, h23_exc)
+            h23_exc = self.L23_Exc(torch.cat((torch.cat((h4_inh, h4_exc), dim=1), h23_inh), dim=1), h23_exc)
 
-            L23_input_inh = torch.cat((L4_combined, h23_exc), dim=1)
-            h23_inh = self.L23_Inh(L23_input_inh, h23_inh)
+            # L23_input_inh = torch.cat((L4_combined, h23_exc), dim=1)
+            # h23_inh = self.L23_Inh(L23_input_inh, h23_inh)
+            h23_inh = self.L23_Inh(torch.cat((torch.cat((h4_inh, h4_exc), dim=1), h23_exc), dim=1), h23_inh)
+
+            # if t % 100 == 0:
+            #     print(f"Got to iteration: {t}")
+            #     del L4_input_exc, L4_input_inh, L4_combined, L23_input_exc, L23_input_inh
+            #     torch.cuda.empty_cache()
 
             # Collect L2 outputs
             L23_Exc_outputs.append(self.fc_L23_Exc(h23_exc).unsqueeze(1))
             L23_Inh_outputs.append(self.fc_L23_Inh(h23_inh).unsqueeze(1))
 
-        L4_Exc_outputs = torch.cat(L4_Exc_outputs, dim=1)        
-        L4_Inh_outputs = torch.cat(L4_Inh_outputs, dim=1)
-        L23_Exc_outputs = torch.cat(L23_Exc_outputs, dim=1)
-        L23_Inh_outputs = torch.cat(L23_Inh_outputs, dim=1)
+        print("I get over the timesteps")
+
+        # L4_Exc_outputs = torch.cat(L4_Exc_outputs, dim=1)        
+        # L4_Inh_outputs = torch.cat(L4_Inh_outputs, dim=1)
+        # L23_Exc_outputs = torch.cat(L23_Exc_outputs, dim=1)
+        # L23_Inh_outputs = torch.cat(L23_Inh_outputs, dim=1)
         
     
         return {
