@@ -6,7 +6,7 @@ import torch.nn
 import torch.optim as optim
 
 from nn_model.dataset_loader import DataLoader, SparseSpikeDataset
-from nn_model.model import CustomRNN, MyRNN
+from nn_model.model import OnlyRNN, RNNCellModel
 
 
 X_ON_SIZE = 7200
@@ -33,7 +33,18 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
             targets = {layer: output_data.float() for layer, output_data in targets.items()}
             
             optimizer.zero_grad()
-            predictions = model(inputs['X_ON'], inputs['X_OFF'])
+
+            batch_size = inputs['X_ON'].size(0)
+
+            h4_exc = torch.zeros(batch_size, model.l4_exc_size)
+            h4_inh = torch.zeros(batch_size, model.l4_inh_size)
+            h23_exc = torch.zeros(batch_size, model.l23_exc_size)
+            h23_inh = torch.zeros(batch_size, model.l23_inh_size)
+
+            # Forward pass
+            # L1_Inh_outputs, L1_Exc_outputs, L2_Inh_outputs, L2_Exc_outputs = model(x, h1_inh, h1_exc, h2_inh, h2_exc)
+
+            predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)
             
             loss = 0
             for layer, target in targets.items():
@@ -52,7 +63,16 @@ def evaluation(model, train_loader, criterion):
             inputs = {layer: input_data.float() for layer, input_data in inputs.items()}
             targets = {layer: output_data.float() for layer, output_data in targets.items()}
             
-            predictions = model(inputs['X_ON'], inputs['X_OFF'])
+            batch_size = inputs['X_ON'].size(0)
+
+            h4_exc = torch.zeros(batch_size, model.l4_exc_size)
+            h4_inh = torch.zeros(batch_size, model.l4_inh_size)
+            h23_exc = torch.zeros(batch_size, model.l23_exc_size)
+            h23_inh = torch.zeros(batch_size, model.l23_inh_size)
+
+            # predictions = model(inputs['X_ON'], inputs['X_OFF'])
+            predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)
+
             loss = 0
             for layer in targets.keys():
                 loss += criterion(predictions[layer], targets[layer])
@@ -60,7 +80,7 @@ def evaluation(model, train_loader, criterion):
             print(f'Test Loss: {loss.item():.4f}')
 
 
-from torchviz import make_dot
+# from torchviz import make_dot
 
 def main():
     # Define directories and layers
@@ -93,7 +113,10 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
-    model = MyRNN(layer_sizes).to(device)
+    # model = OnlyRNN(layer_sizes).to(device)
+
+    model = RNNCellModel(layer_sizes).to(device)
+
 
     # make_dot(model)
 
@@ -119,3 +142,33 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+#     # Example usage
+# input_dim = 10   # Input feature dimension
+# L1_inh_units = 15  # Number of units in L1 Inh
+# L1_exc_units = 20  # Number of units in L1 Exc
+# L2_inh_units = 25  # Number of units in L2 Inh
+# L2_exc_units = 30  # Number of units in L2 Exc
+
+# # Initialize the model
+# model = CustomRNNModel(input_dim, L1_inh_units, L1_exc_units, L2_inh_units, L2_exc_units)
+
+# # Example input
+# batch_size = 5
+# seq_length = 15
+# x = torch.randn(batch_size, seq_length, input_dim)
+
+# # Initial hidden states
+# h1_inh = torch.zeros(batch_size, L1_inh_units)
+# h1_exc = torch.zeros(batch_size, L1_exc_units)
+# h2_inh = torch.zeros(batch_size, L2_inh_units)
+# h2_exc = torch.zeros(batch_size, L2_exc_units)
+
+# # Forward pass
+# L1_Inh_outputs, L1_Exc_outputs, L2_Inh_outputs, L2_Exc_outputs = model(x, h1_inh, h1_exc, h2_inh, h2_exc)
+
+# print("L1_Inh_outputs shape:", L1_Inh_outputs.shape)  # Expected output shape: (batch_size, seq_length, L1_inh_units)
+# print("L1_Exc_outputs shape:", L1_Exc_outputs.shape)  # Expected output shape: (batch_size, seq_length, L1_exc_units)
+# print("L2_Inh_outputs shape:", L2_Inh_outputs.shape)  # Expected output shape: (batch_size, seq_length, L2_inh_units)
+# print("L2_Exc_outputs shape:", L2_Exc_outputs.shape)  # Expected output shape: (batch_size, seq_length, L2_exc_units)
