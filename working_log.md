@@ -207,3 +207,11 @@
         - after that solved -> still problems with large time intervals
             - it would be probably necessary to trim the time intervals to smaller chunks
             - we may try to optimize the memory usage in GPUs
+
+# 29.7.2024
+- memory optimization
+    - it is able to run the training on `size_5` dataset
+- iteration per example:
+    ~45s
+- approximate iteration per epoch:
+    ~6 hours and 30 minutes

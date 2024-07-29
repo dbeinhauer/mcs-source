@@ -13,6 +13,8 @@ from nn_model.dataset_loader import DataLoader, SparseSpikeDataset
 from nn_model.model import OnlyRNN, RNNCellModel, RNNCellFCModel, ConstrainedRNNCell
 
 
+from tqdm import tqdm
+
 X_ON_SIZE = 7200
 X_OFF_SIZE = 7200
 L4_EXC_SIZE = 37500
@@ -21,12 +23,12 @@ L23_EXC_SIZE = 37500
 L23_INH_SIZE = 9375
 
 
-X_ON_SIZE = 7000
-X_OFF_SIZE = 7000
-L4_EXC_SIZE = 37000
-L4_INH_SIZE = 9000
-L23_EXC_SIZE = 37000
-L23_INH_SIZE = 9000
+# X_ON_SIZE = 7000
+# X_OFF_SIZE = 7000
+# L4_EXC_SIZE = 37000
+# L4_INH_SIZE = 9000
+# L23_EXC_SIZE = 37000
+# L23_INH_SIZE = 9000
 
 
 HIDDEN_L4_EXC_SIZE = 375
@@ -39,13 +41,14 @@ HIDDEN_L23_INH_SIZE = 93
 def train(model, train_loader, criterion, optimizer, num_epochs):
     model.train()
     for epoch in range(num_epochs):
-        for inputs, targets in train_loader:
-            print("I get to training")
+        for inputs, targets in tqdm(train_loader):
+
+            # print("I get to training")
             inputs = {layer: input_data.float().cuda() for layer, input_data in inputs.items()}
-            print("I get to inputs")
-            targets = {layer: output_data.float().cuda() for layer, output_data in targets.items()}
+            # print("I get to inputs")
+            targets = {layer: output_data.float() for layer, output_data in targets.items()}
             # targets = {layer: output_data.float() for layer, output_data in targets.items()}
-            print("I get to outputs")
+            # print("I get to outputs")
 
             optimizer.zero_grad()
 
@@ -56,7 +59,7 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
             h23_exc = torch.zeros(batch_size, model.hidden_l23_exc_size).cuda()
             h23_inh = torch.zeros(batch_size, model.hidden_l23_inh_size).cuda()
             
-            print("I get through hidden definition")
+            # print("I get through hidden definition")
 
             # Forward pass
             # L1_Inh_outputs, L1_Exc_outputs, L2_Inh_outputs, L2_Exc_outputs = model(x, h1_inh, h1_exc, h2_inh, h2_exc)
@@ -69,8 +72,11 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
             
             loss = 0
             for layer, target in targets.items():
-                loss += criterion(torch.cat(predictions[layer], dim=1), target)
-            
+                loss += criterion(torch.cat(predictions[layer], dim=1).cpu(), target)
+
+            del inputs, targets, predictions, h4_exc, h4_inh, h23_inh, h23_exc
+            torch.cuda.empty_cache()
+
             loss.backward()
             optimizer.step()
 
@@ -85,9 +91,9 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
 def evaluation(model, train_loader, criterion):
     model.eval()
     with torch.no_grad():
-        for inputs, targets in train_loader:
+        for inputs, targets in tqdm(train_loader):
             inputs = {layer: input_data.float().cuda() for layer, input_data in inputs.items()}
-            targets = {layer: output_data.float().cuda() for layer, output_data in targets.items()}
+            targets = {layer: output_data.float() for layer, output_data in targets.items()}
             
             batch_size = inputs['X_ON'].size(0)
 
@@ -101,7 +107,10 @@ def evaluation(model, train_loader, criterion):
 
             loss = 0
             for layer in targets.keys():
-                loss += criterion(torch.cat(predictions[layer], dim=1), targets[layer])
+                loss += criterion(torch.cat(predictions[layer], dim=1).cpu(), targets[layer])
+
+            del inputs, targets, predictions, h4_exc, h4_inh, h23_inh, h23_exc
+
 
             print(f'Test Loss: {loss.item():.4f}')
 
@@ -111,8 +120,8 @@ def evaluation(model, train_loader, criterion):
 def main():
     # Define directories and layers
     # base_dir = "dataset/dataset_raw/dataset/artificial_spikes/"
-    base_dir = "testing_dataset/"
-
+    base_dir = "testing_dataset/size_5"
+    base_dir = "/home/beinhaud/diplomka/dataset_creation/dataset/compressed_data/size_5"
     # inhibitory_layers = ['X_OFF', "V1_Inh_L23", "V1_Inh_L4"]
     layer_sizes = {
         'X_ON': X_ON_SIZE, 
@@ -148,7 +157,8 @@ def main():
     # model = OnlyRNN(layer_sizes).to(device)
 
     # model = RNNCellModel(layer_sizes).to(device)
-    model = RNNCellFCModel(layer_sizes, hidden_sizes).to(device)
+    model = RNNCellFCModel(layer_sizes, hidden_sizes).to(device)            # targets = {layer: output_data.float().cuda() for layer, output_data in targets.items()}
+
     # model = torch.nn.DataParallel(model).to(device)
 
 
