@@ -208,6 +208,7 @@
             - it would be probably necessary to trim the time intervals to smaller chunks
             - we may try to optimize the memory usage in GPUs
 
+
 # 29.7.2024
 - memory optimization
     - it is able to run the training on `size_5` dataset
@@ -215,3 +216,36 @@
     ~45s
 - approximate iteration per epoch:
     ~6 hours and 30 minutes
+
+
+# 30.7.2024
+- Notes from the consultation:
+- I should write an email to try to get the access to the GPUs with large memory (computing clusters)
+    - different from CGI group that has only regular GPUs
+
+## Possibilities how to make the model smaller:
+- converting the tensors from `float32` to `float16`
+    - disadvantage: possible loss of information (not severe)
+- splitting the dataset samples based on the image
+    - needed overlap of the sequences or cut it in the middle of the blank sequence
+    - it would significantly reduce the output size
+        -  the sequences would be only 1 experiment (not 100)
+    - disadvantage: there might be loss of context (not significant)
+        - the majority of the effect of the image should disapear in during the blank sequences (because of that we want to split it in the middle of blank)
+- reducing the layer size
+    - randomly select subset of neurons for the training the model
+    - it should have the largest impact on the size of the model
+    - it should help us in definition using only RNNs (without FC)
+    - try to play with the size till we reach the point where we can use RNNs
+    - disadantages:
+        - significant loss of information (lack of neurons)
+- I should definitely implement variant of using multiple GPUs
+
+## Questions regarding the model
+- the number of epochs should not be probably large
+    - because of the number of sequences
+- to validate that the model is correct
+    - compute the correlation of the model output and targets
+    - if the correlation is above 0.5 it might be the good model
+- also implement the Inh/Exc weights for LGN input layer 
+    - forward connections should always have appropriate weight constraints
