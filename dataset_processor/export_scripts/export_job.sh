@@ -43,7 +43,7 @@ for base_folder in "${base_folders[@]}"; do
     for sheet in "${sheets[@]}"; do 
         # Loop through each directory starting with given name $1
         find "$base_folder" -type d -name $1 | while read folder; do
-            python3 /home/beinhaud/diplomka/dataset_creation/export_dataset.py --input_path=$folder --sheet=$sheet
+            python3 /home/beinhaud/diplomka/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$sheet
         done
     done
 done

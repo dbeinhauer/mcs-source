@@ -3,3 +3,5 @@ __pycache__
 .security_token
 
 TODO.md
+dataset/
+output_dir/

@@ -6,12 +6,12 @@
 
 # Specify dataset directory (to check the existing values and store the rest).
 paths=(
-    # "/home/beinhaud/diplomka/dataset_creation/dataset/spikes/X_ON/"
-    # "/home/beinhaud/diplomka/dataset_creation/dataset/spikes/X_OFF/"
-    "/home/beinhaud/diplomka/dataset_creation/dataset/spikes/V1_Exc_L4/"
-    # "/home/beinhaud/diplomka/dataset_creation/dataset/spikes/V1_Inh_L4/"
-    # "/home/beinhaud/diplomka/dataset_creation/dataset/spikes/V1_Exc_L23/"
-    # "/home/beinhaud/diplomka/dataset_creation/dataset/spikes/V1_Inh_L23/"
+    # "/home/beinhaud/diplomka/mcs-source/dataset/spikes/X_ON/"
+    # "/home/beinhaud/diplomka/mcs-source/dataset/spikes/X_OFF/"
+    "/home/beinhaud/diplomka/mcs-source/dataset/spikes/V1_Exc_L4/"
+    # "/home/beinhaud/diplomka/mcs-source/dataset/spikes/V1_Inh_L4/"
+    # "/home/beinhaud/diplomka/mcs-source/dataset/spikes/V1_Exc_L23/"
+    # "/home/beinhaud/diplomka/mcs-source/dataset/spikes/V1_Inh_L23/"
 )
 
 

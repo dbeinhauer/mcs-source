@@ -32,7 +32,7 @@ def parse_arguments():
                         type=str, 
                         default="/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0", 
                         help="Path to input data.")
-    parser.add_argument("--output_path", type=str, default="/home/beinhaud/diplomka/dataset_creation/dataset", help="Path where to store the output.")
+    parser.add_argument("--output_path", type=str, default="/home/beinhaud/diplomka/mcs-source/dataset", help="Path where to store the output.")
     parser.add_argument("--sheet", type=str, default="V1_Exc_L2/3", help="Name of the sheet.")
     parser.add_argument("--subset", type=int, default=-1, help="How big subset of sheet to take.")
 

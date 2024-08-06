@@ -7,8 +7,8 @@ if [ -z "$1" ]; then
 fi
 
 
-INPUT_DIRECTORY="/home/beinhaud/diplomka/dataset_creation/dataset/spikes"
-OUTPUT_PART="/home/beinhaud/diplomka/dataset_creation/dataset/compressed_data"
+INPUT_DIRECTORY="/home/beinhaud/diplomka/mcs-source/dataset/spikes"
+OUTPUT_PART="/home/beinhaud/diplomka/mcs-source/dataset/compressed_data"
 
 interval_size=$1
 
