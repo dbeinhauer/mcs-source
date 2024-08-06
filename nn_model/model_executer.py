@@ -9,8 +9,8 @@ import numpy as np
 import torch.nn
 import torch.optim as optim
 
-from nn_model.dataset_loader import DataLoader, SparseSpikeDataset
-from nn_model.model import OnlyRNN, RNNCellModel, RNNCellFCModel, ConstrainedRNNCell
+from dataset_loader import DataLoader, SparseSpikeDataset
+from model import OnlyRNN, RNNCellModel, RNNCellFCModel, ConstrainedRNNCell
 
 
 from tqdm import tqdm
