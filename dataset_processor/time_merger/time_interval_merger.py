@@ -1,3 +1,6 @@
+"""
+Loads the dataset and merges spikes for each interval of given spikes.
+"""
 import numpy as np
 import scipy.sparse as sp
 import glob

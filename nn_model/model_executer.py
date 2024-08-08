@@ -119,6 +119,8 @@ def main():
     # base_dir = "dataset/dataset_raw/dataset/artificial_spikes/"
     base_dir = "testing_dataset/size_5"
     base_dir = "/home/beinhaud/diplomka/mcs-source/dataset/compressed_data/size_5"
+    base_dir = "/home/beinhaud/diplomka/mcs-source/testing_dataset/test_out"
+
     # inhibitory_layers = ['X_OFF', "V1_Inh_L23", "V1_Inh_L4"]
     layer_sizes = {
         'X_ON': globals.X_ON_SIZE,

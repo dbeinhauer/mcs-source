@@ -38,26 +38,24 @@ class SparseSpikeDataset(Dataset):
     def __getitem__(self, idx):
         exp_name = self.experiments[idx]
         
-        inputs = {
-            'X_ON': torch.zeros((globals.TIME_STEP, globals.X_ON_SIZE)),
-            'X_OFF': torch.zeros((globals.TIME_STEP, globals.X_OFF_SIZE)),
-        }
+        # inputs = {
+        #     'X_ON': torch.zeros((globals.TIME_STEP, globals.X_ON_SIZE)),
+        #     'X_OFF': torch.zeros((globals.TIME_STEP, globals.X_OFF_SIZE)),
+        # }
 
-        outputs = {
-            'V1_Exc_L4': torch.zeros((globals.TIME_STEP, globals.L4_EXC_SIZE)),
-            'V1_Inh_L4': torch.zeros((globals.TIME_STEP, globals.L4_INH_SIZE)),
-            'V1_Exc_L23': torch.zeros((globals.TIME_STEP, globals.L23_EXC_SIZE)), 
-            'V1_Inh_L23': torch.zeros((globals.TIME_STEP, globals.L23_INH_SIZE)), 
-        }
-
-
+        # outputs = {
+        #     'V1_Exc_L4': torch.zeros((globals.TIME_STEP, globals.L4_EXC_SIZE)),
+        #     'V1_Inh_L4': torch.zeros((globals.TIME_STEP, globals.L4_INH_SIZE)),
+        #     'V1_Exc_L23': torch.zeros((globals.TIME_STEP, globals.L23_EXC_SIZE)), 
+        #     'V1_Inh_L23': torch.zeros((globals.TIME_STEP, globals.L23_INH_SIZE)), 
+        # }
 
 
-        # inputs = {layer: self.load_experiment(exp_name, layer) for layer in self.input_layers}
-        # inputs = {layer: torch.tensor(input_data, dtype=torch.float32) for layer, input_data in inputs.items()}
+        inputs = {layer: self.load_experiment(exp_name, layer) for layer in self.input_layers}
+        inputs = {layer: torch.tensor(input_data, dtype=torch.half) for layer, input_data in inputs.items()}
         
-        # outputs = {layer: self.load_experiment(exp_name, layer) for layer in self.output_layers}
-        # outputs = {layer: torch.tensor(output_data, dtype=torch.float32) for layer, output_data in outputs.items()} 
+        outputs = {layer: self.load_experiment(exp_name, layer) for layer in self.output_layers}
+        outputs = {layer: torch.tensor(output_data, dtype=torch.half) for layer, output_data in outputs.items()} 
         
         return inputs, outputs
 

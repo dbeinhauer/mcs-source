@@ -9,10 +9,10 @@
 #SBATCH --exclude=w[1-2,10-12]
 
 # Ensure the script receives the necessary arguments
-if [ "$#" -ne 4 ]; then
-    echo "Usage: $0 <input_paht> <output_path> <time_interval> <sheet>"
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <input_paht> <output_path> <sheet>"
     exit 1
 fi
 
-python3 /home/beinhaud/diplomka/mcs-source/time_merger/time_interval_merger.py \
-    $1 $2 --time_interval=$3 --sheet=$4
+python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/time_trimmer/time_trimmer.py \
+    $1 $2 --sheet=$3

@@ -249,3 +249,20 @@
     - if the correlation is above 0.5 it might be the good model
 - also implement the Inh/Exc weights for LGN input layer 
     - forward connections should always have appropriate weight constraints
+
+
+# 6.8.2024
+- shared memory - works for small GPUs
+- using half precision - possible only in forward step
+    - optimizer needs to work with float32
+- reducing number of timesteps to 900 (should be 1 example)
+
+
+# 7.8.2024
+- using the GPU with 48 GB memory (largest possible)
+    - after optimizations I am able to run 
+- the model is tested the way that all possible time step sizes will fit (even the 1 ms timestep)
+- we would use only one experiment for data
+    - second part of blank + image + first part of next blank
+        - first example also have first part of the blank
+        - last example have first part of next blank missing
