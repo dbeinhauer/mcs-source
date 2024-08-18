@@ -2,6 +2,5 @@ __pycache__
 .vscode
 .security_token
 
-TODO.md
 dataset/
 output_dir/
