@@ -266,3 +266,13 @@
     - second part of blank + image + first part of next blank
         - first example also have first part of the blank
         - last example have first part of next blank missing
+- finished time_trimmer -> I will have each example in separate file
+
+# 9.8.2024
+- consultation notes:
+- need to change the architecture 
+    - inhibitory should be only in its layer
+    - excitatory should be also from L23 -> L4 (both Inh, Exc)
+    - not sure about LGN (how are the Inh, Exc weights?)
+- for validation:
+    - generate data in multiple trials (for correlation calculation)

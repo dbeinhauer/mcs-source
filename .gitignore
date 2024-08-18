@@ -4,3 +4,4 @@ __pycache__
 
 dataset/
 output_dir/
+testing_dataset/*
