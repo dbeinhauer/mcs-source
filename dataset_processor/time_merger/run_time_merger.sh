@@ -14,5 +14,5 @@ if [ "$#" -ne 4 ]; then
     exit 1
 fi
 
-python3 /home/beinhaud/diplomka/mcs-source/time_merger/time_interval_merger.py \
+python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/time_merger/time_interval_merger.py \
     $1 $2 --time_interval=$3 --sheet=$4

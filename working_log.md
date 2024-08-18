@@ -270,9 +270,17 @@
 
 # 9.8.2024
 - consultation notes:
-- need to change the architecture 
+- need to change the architecture
     - inhibitory should be only in its layer
     - excitatory should be also from L23 -> L4 (both Inh, Exc)
     - not sure about LGN (how are the Inh, Exc weights?)
 - for validation:
     - generate data in multiple trials (for correlation calculation)
+
+# 18.8.2024
+- changed the architecture
+- changed the weights definition
+- created functions for train/test split and model subset generation
+    - for generating the indices (for repeated usage)
+- train/test split done
+- model subset selection done

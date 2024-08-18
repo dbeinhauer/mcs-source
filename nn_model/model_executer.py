@@ -5,28 +5,17 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0" # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import numpy as np
-
+from tqdm import tqdm
 import torch.nn
 import torch.optim as optim
+from torch.amp import autocast
+from torch.utils.data import DataLoader
 
-from dataset_loader import DataLoader, SparseSpikeDataset
-from model import RNNCellModel, RNNCellFCModel, ConstrainedRNNCell
+
+from dataset_loader import SparseSpikeDataset
+from model import RNNCellModel, ConstrainedRNNCell
 import globals
 
-# from model import device0, device1
-
-from torch.amp import autocast, GradScaler
-
-# from dataset_loader import SIZE_MULTIPLIER, X_ON_SIZE, X_OFF_SIZE, L4_EXC_SIZE, L4_INH_SIZE, L23_EXC_SIZE, L23_INH_SIZE
-
-# import gc
-
-from tqdm import tqdm
-
-# device0 = 'cuda:1'
-# device1 = 'cuda:0'
-# device1 = 'cuda'
-# device0 = device1
 
 def train(model, train_loader, criterion, optimizer, num_epochs):
     model.train()
@@ -116,12 +105,15 @@ def evaluation(model, train_loader, criterion):
 
 def main():
     # Define directories and layers
-    # base_dir = "dataset/dataset_raw/dataset/artificial_spikes/"
     base_dir = "testing_dataset/size_5"
-    base_dir = "/home/beinhaud/diplomka/mcs-source/dataset/compressed_data/size_5"
-    base_dir = "/home/beinhaud/diplomka/mcs-source/testing_dataset/test_out"
+    base_dir = "/home/beinhaud/diplomka/mcs-source/dataset/compressed_spikes/trimmed/size_5"
+    # base_dir = "/home/beinhaud/diplomka/mcs-source/testing_dataset/test"
 
-    # inhibitory_layers = ['X_OFF', "V1_Inh_L23", "V1_Inh_L4"]
+    model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_76.pkl"
+    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_10.pkl"
+
+    train_test_path = "/home/beinhaud/diplomka/mcs-source/dataset/train_test_splits/size_10.pkl"
+
     layer_sizes = {
         'X_ON': globals.X_ON_SIZE,
         'X_OFF': globals.X_OFF_SIZE,
@@ -142,14 +134,26 @@ def main():
     }
 
     # Create dataset and dataloader
-    dataset = SparseSpikeDataset(base_dir, input_layers, output_layers)#, inhibitory_layers)
-    train_loader = DataLoader(dataset, batch_size=1, shuffle=True)
-
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # print(device)
+    train_dataset = SparseSpikeDataset(
+            base_dir, 
+            input_layers, 
+            output_layers, 
+            model_subset_path=model_subset_path, 
+            train_test_path=train_test_path, 
+            include_experiments=False,
+        )
+    test = SparseSpikeDataset(
+            base_dir, 
+            input_layers, 
+            output_layers, 
+            model_subset_path=model_subset_path, 
+            train_test_path=train_test_path, 
+            include_experiments=True,
+        )
+    
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
     model = RNNCellModel(layer_sizes).to(globals.device1).half()
-    # model = RNNCellFCModel(layer_sizes, hidden_sizes).to(device)       
 
     print("Criterion")
     criterion = torch.nn.MSELoss()

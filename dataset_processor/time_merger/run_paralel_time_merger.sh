@@ -7,8 +7,8 @@ if [ -z "$1" ]; then
 fi
 
 
-INPUT_DIRECTORY="/home/beinhaud/diplomka/mcs-source/dataset/spikes"
-OUTPUT_PART="/home/beinhaud/diplomka/mcs-source/dataset/compressed_data"
+INPUT_DIRECTORY="/home/beinhaud/diplomka/mcs-source/dataset/trimmed_spikes"
+OUTPUT_PART="/home/beinhaud/diplomka/mcs-source/dataset/compressed_spikes/trimmed"
 
 interval_size=$1
 
@@ -26,6 +26,6 @@ sheets=(
 
 for sheet in "${sheets[@]}"; 
 do
-    sbatch run_time_merger.sh \
+    sbatch /home/beinhaud/diplomka/mcs-source/dataset_processor/time_merger/run_time_merger.sh \
         $INPUT_DIRECTORY $OUTPUT_DIRECTORY $interval_size $sheet
 done
