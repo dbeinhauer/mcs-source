@@ -8,8 +8,10 @@
 
 #SBATCH --exclude=w[1-2,9-12]
 
+
 # Ensure the script receives the necessary arguments
 if [ "$#" -ne 4 ]; then
+    echo "Run wintermute batch job to merge time intervals for the given sheet"
     echo "Usage: $0 <input_paht> <output_path> <time_interval> <sheet>"
     exit 1
 fi
