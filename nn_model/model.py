@@ -146,12 +146,12 @@ class RNNCellModel(nn.Module):
         L4_Exc_outputs = []
         L23_Inh_outputs = []
         L23_Exc_outputs = []
-        print("Got to forward")
+        # print("Got to forward")
 
         for t in range(x_on.size(1)):
-            if t % 100 == 0:
-                print(f"Got to iteration: {t}")
-                torch.cuda.empty_cache()
+            # if t % 100 == 0:
+            #     print(f"Got to iteration: {t}")
+            #     torch.cuda.empty_cache()
 
             # LGN
             input_t = torch.cat((x_on[:, t, :], x_off[:, t, :]), dim=1).to(globals.device0)

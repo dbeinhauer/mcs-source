@@ -45,7 +45,9 @@ class SparseSpikeDataset(Dataset):
         train_test_indices = self._load_train_test_indices(indices_path)
         for filename in self._load_all_spikes_filenames():#self.train_experiments:
             # Create the regex pattern for each number in the numpy array
-            match_found = any(re.match(rf"size_{num}.*\.npz", filename) for num in train_test_indices)
+            testing_match = re.match(rf"^spikes_{train_test_indices[0]}[0-9][0-9]_summed\.npz$", filename)
+            testing_match_full = re.fullmatch(rf"^spikes_{train_test_indices[0]}[0-9][0-9]_summed\.npz$", filename)
+            match_found = any(re.match(rf"^spikes_{num}[0-9][0-9]_summed\.npz$", filename) for num in train_test_indices)
             
             # Check if the current filename should be appended based on the include flag
             if (include and match_found) or (not include and not match_found):
@@ -70,7 +72,7 @@ class SparseSpikeDataset(Dataset):
         return None
 
     def _load_experiment(self, exp_name, layer):
-        print("Got to loading")
+        # print("Got to loading")
         file_path = os.path.join(self.spikes_dir, layer, exp_name)
         data = load_npz(file_path)
         dense_data = data.toarray().transpose(1, 0)
@@ -78,7 +80,7 @@ class SparseSpikeDataset(Dataset):
             # Subset creation.
             dense_data = dense_data[:, self.model_subset_indices[layer]]
 
-        print("I loaded the EXPERIMENT")
+        # print("I loaded the EXPERIMENT")
         return dense_data
     
 

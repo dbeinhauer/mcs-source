@@ -22,14 +22,15 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
     # Initialize GradScaler for mixed precision training
     # scaler = GradScaler()
     for epoch in range(num_epochs):
+        loss = 0
         for i, (inputs, targets) in enumerate(tqdm(train_loader)):
             if i > 5:
                 break
-            print("I get to training")
+            # print("I get to training")
             inputs = {layer: input_data.float().to(globals.device0) for layer, input_data in inputs.items()}
-            print("I get to inputs")
+            # print("I get to inputs")
             targets = {layer: output_data.float() for layer, output_data in targets.items()}
-            print("I get to outputs")
+            # print("I get to outputs")
 
             optimizer.zero_grad()
 
@@ -44,7 +45,7 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
 
             with autocast(device_type="cuda", dtype=torch.float16):
                 predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)            
-                print("Predictions done")
+                # print("Predictions done")
                 del inputs, h4_exc, h4_inh, h23_inh, h23_exc
                 torch.cuda.empty_cache()
 
@@ -52,17 +53,17 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
                 # loss = 0
                 for layer, target in targets.items():
                     loss += criterion(torch.cat(predictions[layer], dim=1).float().cpu(), target.float())
-                print("Loss done")
+                    # print("Loss done")
 
 
-            del targets, predictions
-            torch.cuda.empty_cache()
+                del targets, predictions
+                torch.cuda.empty_cache()
 
 
             loss.float().backward()
-            print("Backward done")
+            # print("Backward done")
             optimizer.step()
-            print("Optimizer step done")
+            # print("Optimizer step done")
 
             # Apply constraints to all constrained RNN cells
             for module in model.modules():
@@ -70,33 +71,43 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
                     module.apply_constraints()
 
             torch.cuda.empty_cache()
+            print(loss.item())
 
         
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
 
 
-def evaluation(model, train_loader, criterion):
+def evaluation(model, data_loader, criterion):
     model.eval()
     with torch.no_grad():
-        for inputs, targets in tqdm(train_loader):
-            inputs = {layer: input_data.float().cuda() for layer, input_data in inputs.items()}
+        for inputs, targets in tqdm(data_loader):
+            # inputs = {layer: input_data.float().cuda() for layer, input_data in inputs.items()}
+            # targets = {layer: output_data.float() for layer, output_data in targets.items()}
+            inputs = {layer: input_data.float().to(globals.device0) for layer, input_data in inputs.items()}
+            # print("I get to inputs")
             targets = {layer: output_data.float() for layer, output_data in targets.items()}
+            # print("I get to outputs")
             
             batch_size = inputs['X_ON'].size(0)
 
-            h4_exc = torch.zeros(batch_size, model.l4_exc_size).cuda()
-            h4_inh = torch.zeros(batch_size, model.l4_inh_size).cuda()
-            h23_exc = torch.zeros(batch_size, model.l23_exc_size).cuda()
-            h23_inh = torch.zeros(batch_size, model.l23_inh_size).cuda()
-
-            predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)
+            h4_exc = torch.zeros(batch_size, model.l4_exc_size).to(globals.device0)#.cuda()
+            h4_inh = torch.zeros(batch_size, model.l4_inh_size).to(globals.device0)#.cuda()
+            h23_exc = torch.zeros(batch_size, model.l23_exc_size).to(globals.device1)#.cuda()
+            h23_inh = torch.zeros(batch_size, model.l23_inh_size).to(globals.device1)#.cuda()
 
             loss = 0
-            for layer in targets.keys():
-                loss += criterion(torch.cat(predictions[layer], dim=1).cpu(), targets[layer])
 
-            del inputs, targets, predictions, h4_exc, h4_inh, h23_inh, h23_exc
+            with autocast(device_type="cuda", dtype=torch.float16):
+                predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)            
+                # print("Predictions done")
+                del inputs, h4_exc, h4_inh, h23_inh, h23_exc
+                torch.cuda.empty_cache()
 
+
+                # loss = 0
+                for layer, target in targets.items():
+                    loss += criterion(torch.cat(predictions[layer], dim=1).float().cpu(), target.float())
+                # print("Loss done")
 
             print(f'Test Loss: {loss.item():.4f}')
 
@@ -109,8 +120,8 @@ def main():
     base_dir = "/home/beinhaud/diplomka/mcs-source/dataset/compressed_spikes/trimmed/size_5"
     # base_dir = "/home/beinhaud/diplomka/mcs-source/testing_dataset/test"
 
-    model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_76.pkl"
-    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_10.pkl"
+    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_76.pkl"
+    model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_10.pkl"
 
     train_test_path = "/home/beinhaud/diplomka/mcs-source/dataset/train_test_splits/size_10.pkl"
 
@@ -142,7 +153,7 @@ def main():
             train_test_path=train_test_path, 
             include_experiments=False,
         )
-    test = SparseSpikeDataset(
+    test_dataset = SparseSpikeDataset(
             base_dir, 
             input_layers, 
             output_layers, 
@@ -152,6 +163,7 @@ def main():
         )
     
     train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=1)
 
     model = RNNCellModel(layer_sizes).to(globals.device1).half()
 
@@ -164,7 +176,7 @@ def main():
     num_epochs = 3
     print("training")
     train(model, train_loader, criterion, optimizer, num_epochs)
-    evaluation(model, train_loader, criterion)
+    evaluation(model, test_loader, criterion)
 
 if __name__ == "__main__":
     main()

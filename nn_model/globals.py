@@ -2,8 +2,8 @@
 # Model Parameters:
 
 # Model Diminishing factor
-SIZE_MULTIPLIER = 0.76
-# SIZE_MULTIPLIER = 0.1
+# SIZE_MULTIPLIER = 0.76
+SIZE_MULTIPLIER = 0.1
 
 # Model time step size
 TIME_STEP = 5
