@@ -52,6 +52,7 @@ def init_wandb(arguments):
         "train_subset_size": arguments.train_subset,
         "gradient_clip": arguments.gradient_clip,
         "optimizer_type": arguments.optimizer_type,
+        "num_backpropagation_time_steps": arguments.num_backpropagation_time_steps,
         "weight_initialization": arguments.weight_initialization,
         "synaptic_adaptation": arguments.synaptic_adaptation,
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
@@ -336,6 +337,22 @@ if __name__ == "__main__":
         help="Number of epochs for training the model.",
     )
     parser.add_argument(
+        "--num_hidden_time_steps",
+        type=int,
+        default=1,
+        help="Number of hidden time steps in RNN of the whole model "
+        "(in case it is set to 1 the the model would just predict the following visible "
+        "time step (without additional hidden steps in between)).",
+    )
+    parser.add_argument(
+        "--num_backpropagation_time_steps",
+        type=int,
+        default=5,
+        help="Number of time steps for the backpropagation through time. It specifies"
+        "how many time steps we want to perform till the next optimizer step.",
+    )
+
+    parser.add_argument(
         "--neuron_num_layers",
         type=int,
         default=1,
@@ -346,7 +363,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
-        default=20,
+        default=10,
         help="Size of the layers of the neuron model.",
     )
     parser.set_defaults(neuron_residual=False)
@@ -362,14 +379,6 @@ if __name__ == "__main__":
         default=NeuronActivationTypes.LEAKYTANH.value,
         choices=[activation_type.value for activation_type in NeuronActivationTypes],
         help="Final activation function of the neuron model.",
-    )
-    parser.add_argument(
-        "--num_hidden_time_steps",
-        type=int,
-        default=1,
-        help="Number of hidden time steps in RNN of the whole model "
-        "(in case it is set to 1 the the model would just predict the following visible "
-        "time step (without additional hidden steps in between)).",
     )
     parser.set_defaults(synaptic_adaptation=False)
     parser.add_argument(

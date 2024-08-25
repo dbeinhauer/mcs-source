@@ -60,6 +60,10 @@ class ModelExecuter:
         # Gradient clipping upper bound.
         self.gradient_clip = arguments.gradient_clip
 
+        # Number of time steps to run till next optimizer step
+        # (truncated backpropagation through time).
+        self.num_backpropagation_time_steps = arguments.num_backpropagation_time_steps
+
         # Evaluation metric.
         self.evaluation_metrics = NormalizedCrossCorrelation()
 
@@ -654,6 +658,63 @@ class ModelExecuter:
                 self.evaluation_results_saver.best_model_path,
             )
 
+    def _model_forward_step(
+        self,
+        inputs,
+        hidden_states,
+        neuron_hidden,
+        synaptic_adaptation_hidden,
+    ):
+        all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
+            inputs,  # input of time t
+            # Hidden states based on the layer (some of them from t, some of them form t-1).
+            # Time step is assigned based on model architecture during the forward function call.
+            hidden_states,
+            neuron_hidden,
+            synaptic_adaptation_hidden,
+        )
+
+        # Take last time step predictions (those are the visible time steps predictions).
+        predictions = self._get_time_step_for_all_layers(
+            # Take time 0 because each prediction predicts data for exactly 1 time step.
+            # We just want to get rid of the time dimension using this trick.
+            0,
+            {layer: predictions[-1] for layer, predictions in all_predictions.items()},
+        )  # Take the last time step prediction (target prediction).
+
+        return predictions, neuron_hidden, synaptic_adaptation_hidden
+
+    def _perform_optimizer_step(
+        self,
+        all_predictions,
+        all_targets,
+    ):
+        total_loss = torch.zeros(1)
+        for predictions, targets in zip(all_predictions, all_targets):
+            for layer in predictions:
+                total_loss += self.criterion(
+                    predictions[layer],
+                    targets[layer],
+                )
+
+        # Backward step.
+        total_loss.backward()
+
+        # # Detach hidden states from the gradient graph.
+        # neuron_hidden, synaptic_adaptation_hidden = (
+        #     ModelExecuter._detach_all_hidden_states(
+        #         neuron_hidden, synaptic_adaptation_hidden
+        #     )
+        # )
+
+        # Gradient clipping to prevent exploding gradients.
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+
+        # Optimizer step
+        self.optimizer.step()
+
+        return total_loss
+
     def _optimizer_step(
         self,
         inputs: Dict[str, torch.Tensor],
@@ -684,33 +745,33 @@ class ModelExecuter:
         :return: Returns tuple of sum of losses for all layers, updated neuron module hidden states
         and synaptic adaptation module hidden states.
         """
-        # We want to zero optimizer gradient before each training step.
-        self.optimizer.zero_grad()
+        # # We want to zero optimizer gradient before each training step.
+        # self.optimizer.zero_grad()
 
-        all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
-            inputs,  # input of time t
-            # Hidden states based on the layer (some of them from t, some of them form t-1).
-            # Time step is assigned based on model architecture during the forward function call.
-            hidden_states,
-            neuron_hidden,
-            synaptic_adaptation_hidden,
-        )
+        # all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
+        #     inputs,  # input of time t
+        #     # Hidden states based on the layer (some of them from t, some of them form t-1).
+        #     # Time step is assigned based on model architecture during the forward function call.
+        #     hidden_states,
+        #     neuron_hidden,
+        #     synaptic_adaptation_hidden,
+        # )
 
-        # Take last time step predictions (those are the visible time steps predictions).
-        predictions = self._get_time_step_for_all_layers(
-            # Take time 0 because each prediction predicts data for exactly 1 time step.
-            # We just want to get rid of the time dimension using this trick.
-            0,
-            {layer: predictions[-1] for layer, predictions in all_predictions.items()},
-        )  # Take the last time step prediction (target prediction).
+        # # Take last time step predictions (those are the visible time steps predictions).
+        # predictions = self._get_time_step_for_all_layers(
+        #     # Take time 0 because each prediction predicts data for exactly 1 time step.
+        #     # We just want to get rid of the time dimension using this trick.
+        #     0,
+        #     {layer: predictions[-1] for layer, predictions in all_predictions.items()},
+        # )  # Take the last time step prediction (target prediction).
 
         # Loss calculation.
         total_loss = torch.zeros(1)
-        for layer in predictions:
-            total_loss += self.criterion(
-                predictions[layer],
-                targets[layer],
-            )
+        # for layer in predictions:
+        #     total_loss += self.criterion(
+        #         predictions[layer],
+        #         targets[layer],
+        #     )
 
         # Backward step.
         total_loss.backward()
@@ -728,7 +789,7 @@ class ModelExecuter:
         # Optimizer step
         self.optimizer.step()
 
-        del all_predictions
+        # del all_predictions
         torch.cuda.empty_cache()
 
         return total_loss.item(), neuron_hidden, synaptic_adaptation_hidden
@@ -758,6 +819,11 @@ class ModelExecuter:
             ModelExecuter._init_modules_hidden_states()
         )
 
+        self.optimizer.zero_grad()
+
+        all_predictions = []
+        all_targets = []
+
         for visible_time in range(
             1, time_length
         ):  # We skip the first time step because we do not have initial hidden values for them.
@@ -766,29 +832,58 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            # Perform the model training step and optimizer step for the time step.
-            current_loss, neuron_hidden, synaptic_adaptation_hidden = (
-                self._optimizer_step(
-                    inputs,
-                    hidden_states,
-                    targets,
-                    neuron_hidden,
-                    synaptic_adaptation_hidden,
+            predictions, neuron_hidden, synaptic_adaptation_hidden = (
+                self._model_forward_step(
+                    inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
 
-            time_loss_sum += current_loss
+            all_predictions.append(predictions)
+            all_targets.append(targets)
 
-            # Save CUDA memory. Delete not needed variables.
-            del (
-                inputs,
-                targets,
-                hidden_states,
-            )
-            torch.cuda.empty_cache()
+            if (
+                visible_time % self.num_backpropagation_time_steps == 0
+                or visible_time == time_length - 1
+            ):
+                current_loss = self._perform_optimizer_step(
+                    all_predictions, all_targets
+                )
 
-            # Apply weight constrains (excitatory/inhibitory) for all the layers.
-            self._apply_model_constraints()
+                # Detach hidden states from the gradient graph.
+                neuron_hidden, synaptic_adaptation_hidden = (
+                    ModelExecuter._detach_all_hidden_states(
+                        neuron_hidden, synaptic_adaptation_hidden
+                    )
+                )
+
+                # # Perform the model training step and optimizer step for the time step.
+                # current_loss, neuron_hidden, synaptic_adaptation_hidden = (
+                #     self._optimizer_step(
+                #         inputs,
+                #         hidden_states,
+                #         targets,
+                #         neuron_hidden,
+                #         synaptic_adaptation_hidden,
+                #     )
+                # )
+
+                time_loss_sum += current_loss.item()
+
+                all_predictions = []
+                all_targets = []
+
+                # # Save CUDA memory. Delete not needed variables.
+                # del (
+                #     inputs,
+                #     targets,
+                #     hidden_states,
+                # )
+                torch.cuda.empty_cache()
+
+                # Apply weight constrains (excitatory/inhibitory) for all the layers.
+                self._apply_model_constraints()
+
+                self.optimizer.zero_grad()
 
         del all_hidden_states
         torch.cuda.empty_cache()
