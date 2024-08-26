@@ -849,11 +849,15 @@ class ModelExecuter:
                     all_predictions, all_targets
                 )
 
-                # Detach hidden states from the gradient graph.
+                # # Detach hidden states from the gradient graph.
+                # neuron_hidden, synaptic_adaptation_hidden = (
+                #     ModelExecuter._detach_all_hidden_states(
+                #         neuron_hidden, synaptic_adaptation_hidden
+                #     )
+                # )
+
                 neuron_hidden, synaptic_adaptation_hidden = (
-                    ModelExecuter._detach_all_hidden_states(
-                        neuron_hidden, synaptic_adaptation_hidden
-                    )
+                    ModelExecuter._init_modules_hidden_states()
                 )
 
                 # # Perform the model training step and optimizer step for the time step.
