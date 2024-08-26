@@ -177,7 +177,8 @@ def main(arguments):
         )
 
         model_executer.evaluation(
-            subset_for_evaluation=execution_setup["final_evaluation_subset"]
+            subset_for_evaluation=execution_setup["final_evaluation_subset"],
+            save_predictions=arguments.save_all_predictions,
         )
     else:
         if arguments.neuron_model_responses:
