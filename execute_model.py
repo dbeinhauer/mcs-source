@@ -93,6 +93,7 @@ def init_model_path(arguments) -> str:
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
+                f"_optim-steps-{arguments.num_backpropagation_time_steps}",
                 "_neuron",
                 f"-layers-{arguments.neuron_num_layers}",
                 f"-size-{arguments.neuron_layer_size}",
