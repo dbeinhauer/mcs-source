@@ -178,8 +178,14 @@ class LSTMNeuron(SharedNeuronBase):
         self.num_layers = num_layers  # Number of hidden time steps
 
         # Model initialization: input layer, LSTM cell (with multiple time steps), output layer
-        self.input_layer = nn.Linear(self.input_size, layer_size)
-        self.lstm_cell = nn.LSTMCell(layer_size, layer_size)
+        # self.input_layer = nn.Linear(self.input_size, layer_size)
+        # self.lstm_cell = nn.LSTMCell(layer_size, layer_size)
+        self.lstm_network = nn.LSTM(
+            self.input_size,
+            layer_size,
+            self.num_layers,
+            # batch_first=True,
+        )
         # Scalar output layer
         self.output_layer = nn.Linear(layer_size, 1)
 
@@ -195,26 +201,39 @@ class LSTMNeuron(SharedNeuronBase):
         :param hidden: Optional hidden state (h_0, c_0) for the LSTM cells.
         :return: Processed output scalar and updated hidden state.
         """
-        batch_size = inputs.size(0)
+        # Add sequence length dimension (For proper working of LSTM)
+        inputs = inputs[None, :, :]
+        batch_size = inputs.size(1)
 
         if hidden is None:
             # Initialize hidden state if not provided.
             hidden = (
-                torch.zeros(batch_size, self.layer_size).to(inputs.device),
-                torch.zeros(batch_size, self.layer_size).to(inputs.device),
+                torch.randn(self.num_layers, batch_size, self.layer_size).to(
+                    inputs.device
+                ),
+                torch.randn(self.num_layers, batch_size, self.layer_size).to(
+                    inputs.device
+                ),
             )
 
-        current_input = self.input_layer(inputs)
-        h, c = hidden
-        for _ in range(self.num_layers):
-            # Apply multiple time steps of the LSTM cell (same cell for all time steps).
-            h, c = self.lstm_cell(current_input, (h, c))
-            current_input = (
-                h  # The output of the current cell is the input to the next cell
-            )
+        # h, c = hidden
+        output, hidden = self.lstm_network(inputs, hidden)
+
+        # Get rid of the artificial time steps dimension
+        inputs = inputs[0, :, :]
+        output = output[0, :, :]
+
+        # current_input = self.input_layer(inputs)
+        # h, c = hidden
+        # for _ in range(self.num_layers):
+        #     # Apply multiple time steps of the LSTM cell (same cell for all time steps).
+        #     h, c = self.lstm_cell(current_input, (h, c))
+        #     current_input = (
+        #         h  # The output of the current cell is the input to the next cell
+        #     )
 
         # Apply the output layer to the last hidden state
-        output = self.output_layer(h)
+        output = self.output_layer(output)
 
         if self.residual:
             # Apply residual connection if enabled
@@ -223,4 +242,4 @@ class LSTMNeuron(SharedNeuronBase):
         # Apply module final non-linearity function
         output = self.custom_activation(output)
 
-        return output, (h, c)
+        return output, hidden

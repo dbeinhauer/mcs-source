@@ -357,7 +357,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=1,
+        default=5,
         help="Number of hidden layers we want to use in the model of the feed-forward neuron "
         "(recommended is 5) or number of hidden time steps we want to use in case of the RNN "
         "neuron variants (recommended is 1).",
