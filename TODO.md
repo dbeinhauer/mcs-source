@@ -6,6 +6,8 @@
 - add documentation for the repository structure
 - look at loss (is still `nan`)
 - fix evaluation step
+- get access to computing cluster and learn how to work with it
+- get validation data from Luca
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
