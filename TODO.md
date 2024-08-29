@@ -6,8 +6,11 @@
 - add documentation for the repository structure
 - look at loss (is still `nan`)
 - fix evaluation step
-- get access to computing cluster and learn how to work with it
 - get validation data from Luca
+- install the model to computational cluster
+    - need to create docker image
+- get access to bioinfo partition
+- find out how to trasnfer training data from wintermute to gpulab
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)

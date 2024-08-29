@@ -285,4 +285,6 @@
 - train/test split done
 - model subset selection done
 
-# 22.8.2024
+# 27.8.2024
+- obtained access to computing cluster
+- need to create docker image in order to run it on the cluster
