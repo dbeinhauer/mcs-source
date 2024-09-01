@@ -2,7 +2,7 @@
 # Model Parameters:
 
 # Model Diminishing factor
-# SIZE_MULTIPLIER = 0.76
+# SIZE_MULTIPLIER = 0.53
 SIZE_MULTIPLIER = 0.1
 
 # Model time step size
@@ -34,3 +34,7 @@ device0 = 'cuda:1'
 device1 = 'cuda:0'
 device1 = 'cuda'
 device0 = device1
+
+# Batch sizes:
+train_batch_size = 10
+test_batch_size = 1

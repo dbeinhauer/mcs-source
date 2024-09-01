@@ -1,16 +1,14 @@
 # Now
-- split the training data to experiments and load them as batches
 - add validation using correlation between samples
 - generate data for test dataset (for correlation validation)
 - add documentation to existing code
 - add documentation for the repository structure
-- look at loss (is still `nan`)
 - fix evaluation step
 - get validation data from Luca
 - install the model to computational cluster
     - need to create docker image
-- get access to bioinfo partition
-- find out how to trasnfer training data from wintermute to gpulab
+- study multitrial validation
+
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
@@ -20,3 +18,4 @@
 
 # Notes for the meeting
 - assure LGN needs Inh/Exc weights
+- change to float32 (loss is othervise `nan`)

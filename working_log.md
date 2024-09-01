@@ -288,3 +288,24 @@
 # 27.8.2024
 - obtained access to computing cluster
 - need to create docker image in order to run it on the cluster
+
+# 29.8.2024
+- obtained access to bionformatics cluster partition
+- will need to debug and work with the paralelism of the GPUs probably
+- discussed the multitrial data with Luca and we agreed that he might generate some data for me
+- we should use normalized cross-correlation for the data evaluation
+- we agreed with Luca that he will generate new 1000 images with 10 trials for test dataset till I come back from vaccation
+
+# 30.8.2024
+- work on the evaluation computation
+
+# 31.8.2024
+- have to change from float16 back to float32
+    - othervise there are `nan`
+
+# 1.9.2024
+- working variant using batches 
+    - much faster than just 1 example
+    - also no memory problems
+    - can easily apply evaluation
+- evaluation still returns `nan` -> need to be corrected
