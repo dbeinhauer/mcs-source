@@ -11,6 +11,13 @@
 
 # Job for srun command which runs dataset extractions in loop for specified interval of data and sheets.
 
+# Ensure the script receives the necessary arguments
+if [ "$#" -ne 3 ]; then
+    echo "Run the wintermute batch job to export dataset from raw data for specific sheet."
+    echo "Usage: $0 <base_folder> <output_path> <sheet>"
+    exit 1
+fi
+
 
 # Define an array of base folders
 base_folders=(
@@ -43,7 +50,7 @@ for base_folder in "${base_folders[@]}"; do
     for sheet in "${sheets[@]}"; do 
         # Loop through each directory starting with given name $1
         find "$base_folder" -type d -name $1 | while read folder; do
-            python3 /home/beinhaud/diplomka/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$sheet
+            python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$sheet
         done
     done
 done

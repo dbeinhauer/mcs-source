@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # Script that runs dataset extraction for the missing part of dataset 
 # (parts that failed during proper extraction)
 

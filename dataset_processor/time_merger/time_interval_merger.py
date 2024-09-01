@@ -71,7 +71,8 @@ def process_and_save_matrices(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process sparse matrices by summing over specified time intervals.")
+    parser = argparse.ArgumentParser(
+        description="Process sparse matrices by summing over specified time intervals.")
     parser.add_argument("input_directory", type=str, 
         help="Path to the input directory containing sheets subdirectories with .npz files with appropriate neurons.")
     parser.add_argument("output_directory", type=str, 

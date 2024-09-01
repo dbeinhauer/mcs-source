@@ -309,3 +309,5 @@
     - also no memory problems
     - can easily apply evaluation
 - evaluation still returns `nan` -> need to be corrected
+- changes of the raw extraction and dataset tools to work with also with the mutliple trials
+    - not completed yet

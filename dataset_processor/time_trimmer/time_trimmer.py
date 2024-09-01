@@ -14,7 +14,7 @@ import argparse
 from tqdm import tqdm
 import scipy.sparse as sp
 
-FILE_PREFIX = "spikes_"
+# FILE_PREFIX = "spikes_"
 FILE_POSTFIX = ".npz"
 
 
@@ -68,6 +68,9 @@ def process_directory(input_dir: str, output_dir: str, interval_size: int=712):
             # (shoud be in format: 'spikes_{number}.npz').
             matrix_base_number = int(os.path.splitext(filename)[0].split("_")[-1])
 
+            # Get rid of the image number and posfix.
+            file_prefix = filename.split("/")[-1].split(f"_{matrix_base_number}.{FILE_POSTFIX}")[0]
+
             trimmed_matrices = trim_sparse_matrix(matrix, interval_size)
 
             # Save each trimmed matrix
@@ -78,14 +81,15 @@ def process_directory(input_dir: str, output_dir: str, interval_size: int=712):
                 # matrices should be 100).
                 output_filename = os.path.join(
                         output_dir + "/", 
-                        FILE_PREFIX + str(matrix_base_number + i) + FILE_POSTFIX,
+                        file_prefix + str(matrix_base_number + i) + FILE_POSTFIX,
                     )
                 sp.save_npz(output_filename, sp.csr_matrix(trimmed_matrix))
 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Split the given matrices to smaller ones in the time interval dimension.")
+    parser = argparse.ArgumentParser(
+        description="Split the given matrices to smaller ones in the time interval dimension.")
     parser.add_argument("input_directory", type=str, 
         help="Path to the input directory containing sheets subdirectories with .npz files with appropriate neurons.")
     parser.add_argument("output_directory", type=str, 
