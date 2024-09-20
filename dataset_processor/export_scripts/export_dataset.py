@@ -56,11 +56,9 @@ class DatasetExporter:
         self.num_images = 0
         self.blank_duration = 0
         self.image_duration = 0
-        # self.spikes = None
 
-        # self.trials_spikes = []
-        self.segs_blank = None
-        self.segs_images = None
+        # self.segs_blank = None
+        # self.segs_images = None
 
     def _get_datastore(self, root: str):
         """
@@ -276,22 +274,14 @@ class DatasetExporter:
             spikes[img_id, neuron_id, spikes_blank.times.magnitude.astype(int)] += 1
             spikes[img_id, neuron_id, spikes_image.times.magnitude.astype(int) + blank_offset] += 1
 
-    def _prealocate_spikes(self, segs_blank, segs_images):
+    def _prealocate_spikes(self):#, segs_blank, segs_images):
         """
         Creates spikes `np.array` (prealocates the array).
         :param segs_blank: all blank segments.
         :param segs_images: all stimuli (image) segments.
         :return: returns `np.array` of zeros in the shape 
         (num_images, num_neurons, blank_and_image_duration).
-        # """
-        # num_images = len(segs_blank)
-        # # TODO: save to class parameters
-        # num_neurons = get_neurons_info(segs_blank[0])
-        # blank_duration = get_segment_duration(segs_blank[0])
-        # image_duration = get_segment_duration(segs_images[0])
-
-        # Prealocate memory for the dataset at the begining (for faster extraction).
-
+        """
         return np.zeros(
             (self.num_images, self.num_neurons, self.blank_duration + self.image_duration), 
             dtype=np.uint8,
@@ -352,12 +342,22 @@ class DatasetExporter:
         ))
 
     def _init_experiment_parameters(self):
+        """
+        Initializes experiment parameters (number of images, neurons, and blank and image duration).
+        """
         self.num_images = len(self.segs_blank)
         self.num_neurons = self._get_number_neurons(self.segs_blank[0])
         self.blank_duration = self._get_segment_duration(self.segs_blank[0])
         self.image_duration = self._get_segment_duration(self.segs_images[0])
 
-    def _trials_iteration(self, args, dsv, trials):#, num_trials: int, sheet: str):
+    def _trials_iteration(self, args, dsv, trials) -> list:#, num_trials: int, sheet: str):
+        """
+        Iterates through trials and obtains all spikes from all trials.
+        :param args: command line arguments.
+        :param dsv: datastore view object containing the dataset. 
+        :param trials: all trials object of the experiment.
+        :return: Returns list of spikes for each trials (1 item corresponds to 1 trial).
+        """
         trials_spikes = []
         for i, trial in enumerate(trials):
             if args.num_trials != -1 and i > args.num_trials:
@@ -368,22 +368,25 @@ class DatasetExporter:
             segs_blank, segs_images = self._get_all_segments(dsv, trial, args.sheet)
 
             if i == 0:
-                # Initialization of parameters and neuron and images information storage in first iteration.
+                # Initialization of parameters and neuron and images information storage in the first iteration.
                 self._init_experiment_parameters()
-                self.save_experiment_parameters(segs_blank, args)
+                self.save_experiment_parameters(args, segs_blank)
 
             if args.subset != -1:    
                 # Take just subset of the segments (for testing).
                 segs_blank = segs_blank[0:args.subset]
                 segs_images = segs_images[0:args.subset]
 
-            spikes = self._prealocate_spikes(segs_blank, segs_images)
+            # Prealocate spikes array.
+            spikes = self._prealocate_spikes()#segs_blank, segs_images)
 
-            # Save and extract the spike trains.
+            # Extract the spike trains for the trial.
             self._image_iteration(segs_blank, segs_images, spikes, logs=False)
             trials_spikes.append(spikes)
 
-        return trials_spikes    def save_image_ids(self, segs, filename: str):
+        return trials_spikes    
+    
+    def save_image_ids(self, segs, filename: str):        
         """
         Saves image IDs into file of `np.array` object.
         :param segs: segments object to get the IDs from.
@@ -405,7 +408,6 @@ class DatasetExporter:
             self,
             args,
             trial_spikes: list,
-            #num_neurons: int, 
             spikes_subdirectory: str=SPIKES_SUBDIR, 
             spikes_prefix: str=SPIKES_PREFIX,
             trials_prefix: str=TRIALS_PREFIX,
@@ -415,10 +417,9 @@ class DatasetExporter:
         converts it to sparse representation and stores it into the .npz file. 
         The output filename format is: 
             `output_path/spike_subdirectory/sheet/spikes_[trial_{trial_ID}]_{sheet}_{ID}.npz`
-        Where `trial_{trial_ID}` is optional and is present only for multiple trials processing.
-        :param trial_spikes: list of `np.array` objects of spikes for all trials.
-        :param num_neurons: number of neurons in the given sheet.
+        Where `trial_{trial_ID}` is optional and is present only for multiple trials processing.\
         :param args: command line arguments.
+        :param trial_spikes: list of `np.array` objects of spikes for all trials.
         :param spikes_subdirectory: where to store the spikes.
         :param spikes_prefix: prefix of the file containing spikes.
         :param trials_prefix: part of the prefix when multiple trials processing.
@@ -439,7 +440,12 @@ class DatasetExporter:
                 sparse_spikes,
             )
 
-    def save_experiment_parameters(self, segs_blank, args):
+    def save_experiment_parameters(self, args, segs_blank):
+        """
+        Saves image and neuron IDs for of the experiment.
+        :param args: command line arguments.
+        :param segs_blank: segments of arbitrary blank period of the experiment.
+        """
         self.save_image_ids(
             segs_blank, 
             args.output_path + IMAGES_IDS_SUBDIR + self._create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
@@ -448,16 +454,22 @@ class DatasetExporter:
             segs_blank, 
             args.output_path + NEURONS_IDS_SUBDIR + self._create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
         )
-        # self.save_spiketrains()
-
 
     def run_extraction(self, args):
+        """
+        Extracts the spiketrains for the provided experiment.
+        :param args: command line arguments with extraction settings.
+        """
+        setup_logging()
+        logger = mozaik.getMozaikLogger()
+
         self._print_experiment_header(args.sheet, args.input_path)
         dsv, trials = self._get_modified_datastore(args.input_path)
+        # Iterate through all trials and retrieve the spikes from them.
         trials_spikes = self._trials_iteration(dsv, trials, args.num_trials, args.sheet)
-        self.save_spiketrains(args, trials_spikes)#, num_neurons)
-
-        # self._save_experiment_parameters(args)
+        # Save the extracted spiketrains.
+        self.save_spiketrains(args, trials_spikes)
+        print()
 
 
 
@@ -477,8 +489,8 @@ def main(args):
     # print(f"EXPERIMENT_SETTING: sheet-{get_sheetname(args.sheet)}, ID-{get_dataset_part_id(args.input_path)}")
     # print("----------------------------------")
 
-    setup_logging()
-    logger = mozaik.getMozaikLogger()
+    # setup_logging()
+    # logger = mozaik.getMozaikLogger()
 
 
     # dsv, trials = get_modified_datastore(args.input_path)
@@ -486,34 +498,43 @@ def main(args):
     # trials_spikes = []
     # segs_blank, segs_images = None, None
     # Process all the trials.
-    for i, trial in enumerate(trials):
-        if args.num_trials != -1 and i > args.num_trials:
-            # All wanted trials extracted (do not extract the rest).
-            break
+    # for i, trial in enumerate(trials):
+    #     if args.num_trials != -1 and i > args.num_trials:
+    #         # All wanted trials extracted (do not extract the rest).
+    #         break
 
-        # Get segments for the 
-        segs_blank, segs_images = get_all_segments(dsv, trial, args.sheet)
+    #     # Get segments for the 
+    #     segs_blank, segs_images = get_all_segments(dsv, trial, args.sheet)
 
-        if i == 0:
-            num_images = len(segs_blank)
-            # Prealocate memory for the dataset at the begining (for faster extraction).
-            num_neurons = get_neurons_info(segs_blank[0])
-            blank_duration = get_segment_duration(segs_blank[0])
-            image_duration = get_segment_duration(segs_images[0])
+    #     if i == 0:
+    #         num_images = len(segs_blank)
+    #         # Prealocate memory for the dataset at the begining (for faster extraction).
+    #         num_neurons = get_neurons_info(segs_blank[0])
+    #         blank_duration = get_segment_duration(segs_blank[0])
+    #         image_duration = get_segment_duration(segs_images[0])
 
 
-        if args.subset != -1:    
-            # Take just subset of the segments (for testing).
-            segs_blank = segs_blank[0:args.subset]
-            segs_images = segs_images[0:args.subset]
+    #     if args.subset != -1:    
+    #         # Take just subset of the segments (for testing).
+    #         segs_blank = segs_blank[0:args.subset]
+    #         segs_images = segs_images[0:args.subset]
 
-        spikes = prealocate_spikes(segs_blank, segs_images)
+    #     spikes = prealocate_spikes(segs_blank, segs_images)
 
-        # Save and extract the spike trains.
-        image_iteration(segs_blank, segs_images, spikes, blank_duration, logs=False)
-        trials_spikes.append(spikes)            
+    #     # Save and extract the spike trains.
+    #     image_iteration(segs_blank, segs_images, spikes, blank_duration, logs=False)
+    #     trials_spikes.append(spikes)            
     
-    # # Save Image IDs and Neuron IDs
+    # # # Save Image IDs and Neuron IDs
+    # # save_image_ids(
+    # #     segs_blank, 
+    # #     args.output_path + IMAGES_IDS_SUBDIR + create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
+    # # )
+    # # save_neuron_ids(
+    # #     segs_blank, 
+    # #     args.output_path + NEURONS_IDS_SUBDIR + create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
+    # # )
+    # # Save the spike trains.
     # save_image_ids(
     #     segs_blank, 
     #     args.output_path + IMAGES_IDS_SUBDIR + create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
@@ -522,19 +543,10 @@ def main(args):
     #     segs_blank, 
     #     args.output_path + NEURONS_IDS_SUBDIR + create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
     # )
-    # Save the spike trains.
-    save_image_ids(
-        segs_blank, 
-        args.output_path + IMAGES_IDS_SUBDIR + create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
-    )
-    save_neuron_ids(
-        segs_blank, 
-        args.output_path + NEURONS_IDS_SUBDIR + create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
-    )
 
-    save_spiketrains(args, trials_spikes, num_neurons)
+    # save_spiketrains(args, trials_spikes, num_neurons)
 
-    print()
+    # print()
 
 
 if __name__ == "__main__":
