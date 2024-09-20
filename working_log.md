@@ -311,3 +311,8 @@
 - evaluation still returns `nan` -> need to be corrected
 - changes of the raw extraction and dataset tools to work with also with the mutliple trials
     - not completed yet
+
+# 19.9.2024
+- Meeting notes:
+    - evaluation through whole vector concatenized through the timestaps
+    - there are techniques how to prevent `nan` during the training (using smaller learning rate)
