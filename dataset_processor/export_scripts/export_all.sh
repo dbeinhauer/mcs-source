@@ -12,9 +12,6 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-# sheet=$1
-# dataset_variant=$2
-
 # Variables for train/test selection.
 train_index=0   # Train dataset subdirectory.
 test_index=1    # Test dataset subdirectory.
@@ -53,9 +50,7 @@ step_sizes=(
 
 for (( i=${start_indices[$variant_index]}; i<${end_indices[$variant_index]}; i+=${step_sizes[$variant_index]} )); do
     # Form the string with the current number
-    # echo "$i"
     filename="NewDataset_Images_from_${i}*"
-    # echo $filename
     # sbatch export_job.sh $filename $sheet $dataset_variant
     source export_job.sh $filename $1 $2
 done

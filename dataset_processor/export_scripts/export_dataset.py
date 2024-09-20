@@ -37,8 +37,8 @@ SPIKES_PREFIX = "spikes_"
 TRIALS_PREFIX = "trial_"
 
 # Input directories:
-INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-# INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
+# INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
+INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
 INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300000_to_300050_ParameterSearch_____baseline:300000_trial:0"
 
 # Default output directory:
@@ -47,18 +47,18 @@ OUTPUT_DIR_TEST = "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset"
 
 DEBUG_DIR = "/home/beinhaud/diplomka/mcs-source/dataset/debug"
 
-POSSIBLE_SHEETS = {'X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4'}
+POSSIBLE_SHEETS = ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4']
 
 
 class DatasetExporter:
     def __init__(self):
+        """
+        Initalizes the experiment parameters variables.
+        """
         self.num_neurons = 0
         self.num_images = 0
         self.blank_duration = 0
         self.image_duration = 0
-
-        # self.segs_blank = None
-        # self.segs_images = None
 
     def _get_datastore(self, root: str):
         """
@@ -146,7 +146,7 @@ class DatasetExporter:
         :return: returns the tuple of modified datastore and 
         list of trials sorted by ID (used mainly in test dataset).
         """
-        dsv = self.get_datastore(path)
+        dsv = self._get_datastore(path)
         dsv = param_filter_query(dsv, st_name='NaturalImage')
         # Trials list necessary for selecting specific trials stimuli (mainly for test dataset).
         trials = sorted(list(set( MozaikParametrized.idd(s).trial for s in dsv.get_stimuli())))
@@ -222,7 +222,6 @@ class DatasetExporter:
             segs_blank, 
             segs_images, 
             spikes: np.array, 
-            # blank_duration: int, 
             logs: bool=False,
         ):
         """
@@ -233,7 +232,6 @@ class DatasetExporter:
         for stimulus period (images presented).
         :param spikes: array of spikes for all images and neurons. 
         (shape: num_images*num_neurons*blank_and_image_duration), blank is always before image.    
-        :param blank_duration: duration of the blank segment during the experiment.
         :param logs: `True` if we want to print logs.
         """
         for img_id, (seg_blank, seg_image) in enumerate(tqdm(zip(segs_blank, segs_images))):
@@ -274,11 +272,9 @@ class DatasetExporter:
             spikes[img_id, neuron_id, spikes_blank.times.magnitude.astype(int)] += 1
             spikes[img_id, neuron_id, spikes_image.times.magnitude.astype(int) + blank_offset] += 1
 
-    def _prealocate_spikes(self):#, segs_blank, segs_images):
+    def _prealocate_spikes(self) -> np.array:
         """
         Creates spikes `np.array` (prealocates the array).
-        :param segs_blank: all blank segments.
-        :param segs_images: all stimuli (image) segments.
         :return: returns `np.array` of zeros in the shape 
         (num_images, num_neurons, blank_and_image_duration).
         """
@@ -304,13 +300,13 @@ class DatasetExporter:
         otherwise `False` store 'npz' object.
         :return: filename in format '{variant}_{sheet_name}_{part_id}.npz'.
         """
-        part_id = self.get_dataset_part_id(args.input_path)
+        part_id = self._get_dataset_part_id(args.input_path)
         print(f"Part id: {part_id}")
         postfix = ".npz"
         if np_postfix:
             # Numpy object filename.
             postfix = ".npy"
-        return variant + self.get_sheetname(args.sheet) + "_" + part_id + postfix
+        return variant + self._get_sheetname(args.sheet) + "_" + part_id + postfix
 
     def _create_spikes_filename(self, args, spikes_prefix: str, trials_prefix: str, single_trial: bool) -> str:
         """
@@ -335,22 +331,22 @@ class DatasetExporter:
         :param sheet: sheet to be extracted.
         :param input_path: path to the raw data.
         """
-        print("\n".join(
+        print("\n".join([
             "----------NEW EXPERIMENT---------------",
             f"EXPERIMENT_SETTING: sheet-{self._get_sheetname(sheet)}, ID-{self._get_dataset_part_id(input_path)}",
             "----------------------------------",
-        ))
+        ]))
 
-    def _init_experiment_parameters(self):
+    def _init_experiment_parameters(self, segs_blank, segs_images):
         """
         Initializes experiment parameters (number of images, neurons, and blank and image duration).
         """
-        self.num_images = len(self.segs_blank)
-        self.num_neurons = self._get_number_neurons(self.segs_blank[0])
-        self.blank_duration = self._get_segment_duration(self.segs_blank[0])
-        self.image_duration = self._get_segment_duration(self.segs_images[0])
+        self.num_images = len(segs_blank)
+        self.num_neurons = self._get_number_neurons(segs_blank[0])
+        self.blank_duration = self._get_segment_duration(segs_blank[0])
+        self.image_duration = self._get_segment_duration(segs_images[0])
 
-    def _trials_iteration(self, args, dsv, trials) -> list:#, num_trials: int, sheet: str):
+    def _trials_iteration(self, args, dsv, trials) -> list:
         """
         Iterates through trials and obtains all spikes from all trials.
         :param args: command line arguments.
@@ -369,7 +365,7 @@ class DatasetExporter:
 
             if i == 0:
                 # Initialization of parameters and neuron and images information storage in the first iteration.
-                self._init_experiment_parameters()
+                self._init_experiment_parameters(segs_blank, segs_images)
                 self.save_experiment_parameters(args, segs_blank)
 
             if args.subset != -1:    
@@ -378,7 +374,7 @@ class DatasetExporter:
                 segs_images = segs_images[0:args.subset]
 
             # Prealocate spikes array.
-            spikes = self._prealocate_spikes()#segs_blank, segs_images)
+            spikes = self._prealocate_spikes()
 
             # Extract the spike trains for the trial.
             self._image_iteration(segs_blank, segs_images, spikes, logs=False)
@@ -428,8 +424,8 @@ class DatasetExporter:
             # Reshape to 2D matrix (num_neurons * (images*time_slots)) and convert to sparse representation.
             sparse_spikes = csr_matrix(spikes.transpose(1, 0, 2).reshape(self.num_neurons, -1))
             print(f"Saving spike trains for trial: {i}")
-            base_path = args.output_path + spikes_subdirectory + self.get_sheetname(args.sheet) + "/"
-            filename = self.create_spikes_filename(
+            base_path = args.output_path + spikes_subdirectory + self._get_sheetname(args.sheet) + "/"
+            filename = self._create_spikes_filename(
                     args, 
                     spikes_prefix, 
                     f"{trials_prefix}_{i}_", # Specify trial ID in the filename. 
@@ -462,11 +458,12 @@ class DatasetExporter:
         """
         setup_logging()
         logger = mozaik.getMozaikLogger()
-
         self._print_experiment_header(args.sheet, args.input_path)
         dsv, trials = self._get_modified_datastore(args.input_path)
+
         # Iterate through all trials and retrieve the spikes from them.
-        trials_spikes = self._trials_iteration(dsv, trials, args.num_trials, args.sheet)
+        trials_spikes = self._trials_iteration(args, dsv, trials)
+
         # Save the extracted spiketrains.
         self.save_spiketrains(args, trials_spikes)
         print()
@@ -474,79 +471,9 @@ class DatasetExporter:
 
 
 def main(args):
-    # num_neurons = 0
-    # num_images = 0
-    # blank_duration = 0
-    # image_duration = 0
-    # spikes = None
 
     dataset_exporter = DatasetExporter()
-
-    dataset_exporter.run_extraction()
-    
-    # dataset_exporter._print_experiment_header(args.sheet, args.input_path)
-    # print("----------NEW TRIAL---------------")
-    # print(f"EXPERIMENT_SETTING: sheet-{get_sheetname(args.sheet)}, ID-{get_dataset_part_id(args.input_path)}")
-    # print("----------------------------------")
-
-    # setup_logging()
-    # logger = mozaik.getMozaikLogger()
-
-
-    # dsv, trials = get_modified_datastore(args.input_path)
-    
-    # trials_spikes = []
-    # segs_blank, segs_images = None, None
-    # Process all the trials.
-    # for i, trial in enumerate(trials):
-    #     if args.num_trials != -1 and i > args.num_trials:
-    #         # All wanted trials extracted (do not extract the rest).
-    #         break
-
-    #     # Get segments for the 
-    #     segs_blank, segs_images = get_all_segments(dsv, trial, args.sheet)
-
-    #     if i == 0:
-    #         num_images = len(segs_blank)
-    #         # Prealocate memory for the dataset at the begining (for faster extraction).
-    #         num_neurons = get_neurons_info(segs_blank[0])
-    #         blank_duration = get_segment_duration(segs_blank[0])
-    #         image_duration = get_segment_duration(segs_images[0])
-
-
-    #     if args.subset != -1:    
-    #         # Take just subset of the segments (for testing).
-    #         segs_blank = segs_blank[0:args.subset]
-    #         segs_images = segs_images[0:args.subset]
-
-    #     spikes = prealocate_spikes(segs_blank, segs_images)
-
-    #     # Save and extract the spike trains.
-    #     image_iteration(segs_blank, segs_images, spikes, blank_duration, logs=False)
-    #     trials_spikes.append(spikes)            
-    
-    # # # Save Image IDs and Neuron IDs
-    # # save_image_ids(
-    # #     segs_blank, 
-    # #     args.output_path + IMAGES_IDS_SUBDIR + create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
-    # # )
-    # # save_neuron_ids(
-    # #     segs_blank, 
-    # #     args.output_path + NEURONS_IDS_SUBDIR + create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
-    # # )
-    # # Save the spike trains.
-    # save_image_ids(
-    #     segs_blank, 
-    #     args.output_path + IMAGES_IDS_SUBDIR + create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
-    # )
-    # save_neuron_ids(
-    #     segs_blank, 
-    #     args.output_path + NEURONS_IDS_SUBDIR + create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
-    # )
-
-    # save_spiketrains(args, trials_spikes, num_neurons)
-
-    # print()
+    dataset_exporter.run_extraction(args)
 
 
 if __name__ == "__main__":
@@ -558,7 +485,7 @@ if __name__ == "__main__":
         help="Path where to store the output.")
     parser.add_argument("--test_dataset", type=bool, default=False,
         help="Flag whether generate test dataset.")
-    parser.add_argument("--sheet", type=str, choices=['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4'],
+    parser.add_argument("--sheet", type=str, choices=POSSIBLE_SHEETS,
         help="Name of the sheet. Possibilities: ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4']")
     parser.add_argument("--subset", type=int, default=-1, 
         help="How big subset of the sheet to take (if `-1` then whole sheet).")
@@ -567,8 +494,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.input_path = INPUT_DIR_TEST
-    # args.input_path = INPUT_DIR_TRAIN
+    # args.input_path = INPUT_DIR_TEST
+    args.input_path = INPUT_DIR_TRAIN
     # args.test_dataset = True
 
     if args.output_path == None:
@@ -578,10 +505,12 @@ if __name__ == "__main__":
             # Generating test dataset (multiple trials) -> set default path to test dataset.
             args.output_path = OUTPUT_DIR_TEST
 
-    args.output_path = OUTPUT_DIR_TEST
+    # args.output_path = OUTPUT_DIR_TEST
+    args.output_path = DEBUG_DIR
 
-    if args.sheet not in POSSIBLE_SHEETS:
-        print("Wrong sheet identifier")
+
+    # if args.sheet not in POSSIBLE_SHEETS:
+    #     print("Wrong sheet identifier")
         
 
     main(args)
