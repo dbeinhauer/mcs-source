@@ -4,7 +4,6 @@
 - add documentation to existing code
 - add documentation for the repository structure
 - fix evaluation step
-- get validation data from Luca
 - install the model to computational cluster
     - need to create docker image
 - study multitrial validation
@@ -16,6 +15,12 @@
     - it should be ok with the new variant for multitrials
     - there should be only additional tool to concatenate multitrials to one array
     - in the trimmer I only changed the filename prefix (merger not changed)
+- correct weights for LGN (should be only positive)
+    - all LGN neurons are excitatory
+- start the job for test dataset creation
+- check trimming works fine with multiple trials
+- check merging works fine with multiple trials
+- check model can load multiple trials data for evaluation
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)

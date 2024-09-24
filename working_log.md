@@ -316,3 +316,7 @@
 - Meeting notes:
     - evaluation through whole vector concatenized through the timestaps
     - there are techniques how to prevent `nan` during the training (using smaller learning rate)
+    - correlation should be for the vectors of all neurons in all timesteps
+    - from LGN it is all positive weights
+
+# 24.9.2024

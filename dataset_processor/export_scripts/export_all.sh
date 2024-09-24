@@ -23,34 +23,25 @@ if [[ "$2" == "test" ]]; then
 fi
 
 # Start, end and steps for the train/test variants.
-# start_indices=(
-#     500
-#     30000
-# )
-# end_indices=(
-#     1000
-#     30100
-# )
 start_indices=(
     500
-    30000
+    30005
 )
 end_indices=(
-    502
+    1000
     30100
 )
-
 step_sizes=(
     1
     5
 )
 
-
-# echo $filename $sheet $dataset_variant
-
 for (( i=${start_indices[$variant_index]}; i<${end_indices[$variant_index]}; i+=${step_sizes[$variant_index]} )); do
+    if [ $i -eq 30015 ]; then
+        # Skip dataset part 300150-300200, because the data are corrupted.
+        continue
+    fi
     # Form the string with the current number
     filename="NewDataset_Images_from_${i}*"
-    # sbatch export_job.sh $filename $sheet $dataset_variant
-    source export_job.sh $filename $1 $2
+    sbatch export_job.sh $filename $1 $2
 done

@@ -35,7 +35,7 @@ dataset_variants=(
 # Start, end and steps for the train/test variants.
 start_indices=(
     50000
-    300000
+    300050
 )
 end_indices=(
     100000
@@ -66,6 +66,10 @@ path="$base_path${dataset_variant[$variant_index]}$spikes_dir$sheet/"
 # for path in "${paths[@]}"; do
 # for (( i=50000; i<100000; i+=100 ));  do
 for (( i=${start_indices[$variant_index]}; i<${end_indices[$variant_index]}; i+=${step_sizes[$variant_index]} ))
+    if [ $i -eq 300150]; then
+        # Skip the part 300150-300200 as it is corrupted.
+        continue
+    fi
     # Part of dataset already exists -> skip it
     if ls "${path}"*"${i}"* 1> /dev/null 2>&1; then
         continue

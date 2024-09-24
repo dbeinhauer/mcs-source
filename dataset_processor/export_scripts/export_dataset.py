@@ -39,7 +39,7 @@ TRIALS_PREFIX = "trial_"
 # Input directories:
 # INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
 INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300000_to_300050_ParameterSearch_____baseline:300000_trial:0"
+INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300050_to_300100_ParameterSearch_____baseline:300050_trial:0"
 
 # Default output directory:
 OUTPUT_DIR_TRAIN = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset"
@@ -237,14 +237,14 @@ class DatasetExporter:
         for img_id, (seg_blank, seg_image) in enumerate(tqdm(zip(segs_blank, segs_images))):
             if logs:
                 # Get Image Index
-                print("NEW TRIAL")
+                print("NEW Image")
                 print("-------------------------------------------")
-                print(f"Trial number: {img_id}")
+                print(f"Image number: {img_id}")
                 print()
                 
             self._neuron_iteration(img_id, seg_blank, seg_image, spikes, self.blank_duration)
 
-        print("Iteration finished!")
+        # print("Iteration finished!")
 
 
     def _neuron_iteration(
@@ -356,6 +356,7 @@ class DatasetExporter:
         """
         trials_spikes = []
         for i, trial in enumerate(trials):
+            print(f"Trial: {i}")
             if args.num_trials != -1 and i > args.num_trials:
                 # All wanted trials extracted (do not extract the rest).
                 break
@@ -428,7 +429,7 @@ class DatasetExporter:
             filename = self._create_spikes_filename(
                     args, 
                     spikes_prefix, 
-                    f"{trials_prefix}_{i}_", # Specify trial ID in the filename. 
+                    f"{trials_prefix}{i}_", # Specify trial ID in the filename. 
                     len(trial_spikes) == 1,
                 )
             save_npz(
@@ -494,8 +495,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # args.input_path = INPUT_DIR_TEST
-    args.input_path = INPUT_DIR_TRAIN
+    args.input_path = INPUT_DIR_TEST
+    # args.input_path = INPUT_DIR_TRAIN
     # args.test_dataset = True
 
     if args.output_path == None:
@@ -505,8 +506,8 @@ if __name__ == "__main__":
             # Generating test dataset (multiple trials) -> set default path to test dataset.
             args.output_path = OUTPUT_DIR_TEST
 
-    # args.output_path = OUTPUT_DIR_TEST
-    args.output_path = DEBUG_DIR
+    args.output_path = OUTPUT_DIR_TEST
+    # args.output_path = DEBUG_DIR
 
 
     # if args.sheet not in POSSIBLE_SHEETS:

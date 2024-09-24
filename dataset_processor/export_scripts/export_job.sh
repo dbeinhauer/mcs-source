@@ -67,5 +67,5 @@ echo
 
 # Loop through each directory starting with given name $1
 find "$base_folder" -type d -name $1 | while read folder; do
-    python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$2 --subset=3
+    python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$2
 done
