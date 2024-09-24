@@ -3,7 +3,7 @@
 # Script to copy selected subset of the dataset into the given directory.
 # Used mainly for testing tools for modifying the dataset.
 
-# Directory to copy the subset of files to
+# Directory to copy the subset of files to testing directory.
 destination_directory="dataset/dataset_raw/artificial_spikes_50_examples/"
 
 path_to_files="dataset/spikes/"

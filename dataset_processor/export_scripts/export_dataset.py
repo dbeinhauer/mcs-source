@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Python script containg definition of the class used for extraction of raw 
+data to target dataset. Additionally, it contains script for running the 
+single extraction.
+"""
 
 import os
 import gc
@@ -38,8 +43,8 @@ TRIALS_PREFIX = "trial_"
 
 # Input directories:
 # INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300050_to_300100_ParameterSearch_____baseline:300050_trial:0"
+# INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
+# INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300050_to_300100_ParameterSearch_____baseline:300050_trial:0"
 
 # Default output directory:
 OUTPUT_DIR_TRAIN = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset"
@@ -51,6 +56,10 @@ POSSIBLE_SHEETS = ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', '
 
 
 class DatasetExporter:
+    """
+    Class used for exporting target data (image and neuron IDs and spikes) 
+    from raw datastore to representation that can be used for training the model.
+    """
     def __init__(self):
         """
         Initalizes the experiment parameters variables.
@@ -127,8 +136,8 @@ class DatasetExporter:
     def _get_sheetname(self, sheet: str) -> str:
         """
         Renames the sheet name to format that can be used in the filename.
-        It is needed because some functions need format with '/' symbol and some of 
-        them need them without it.
+        Note: It is needed because some functions need format with '/' symbol and 
+        some of them need them without it.
         :param sheet: original sheet name provided to program.
         :return: returns modified sheetname to format without '/' symbols.
         """
@@ -244,9 +253,6 @@ class DatasetExporter:
                 
             self._neuron_iteration(img_id, seg_blank, seg_image, spikes, self.blank_duration)
 
-        # print("Iteration finished!")
-
-
     def _neuron_iteration(
             self,
             img_id: int, 
@@ -296,8 +302,8 @@ class DatasetExporter:
         Creates filename based on the provided parameters.
         :param args: command line arguments.
         :param variant: what to store (variants: 'images_ids', 'neurons_ids', 'spikes_[trial_{trial_ID}]').
-        :param np_postfix: `True` if we want to store numpy array (postfix 'npy'), 
-        otherwise `False` store 'npz' object.
+        :param np_postfix: `True` if we want to store numpy array (postfix '.npy'), 
+        otherwise `False` store '.npz' object.
         :return: filename in format '{variant}_{sheet_name}_{part_id}.npz'.
         """
         part_id = self._get_dataset_part_id(args.input_path)
@@ -308,7 +314,13 @@ class DatasetExporter:
             postfix = ".npy"
         return variant + self._get_sheetname(args.sheet) + "_" + part_id + postfix
 
-    def _create_spikes_filename(self, args, spikes_prefix: str, trials_prefix: str, single_trial: bool) -> str:
+    def _create_spikes_filename(
+            self, 
+            args, 
+            spikes_prefix: str, 
+            trials_prefix: str, 
+            single_trial: bool
+        ) -> str:
         """
         Creates filename for the spikes file.
         :param args: command line arguments.    
@@ -439,9 +451,9 @@ class DatasetExporter:
 
     def save_experiment_parameters(self, args, segs_blank):
         """
-        Saves image and neuron IDs for of the experiment.
+        Saves images and neurons IDs of the experiment.
         :param args: command line arguments.
-        :param segs_blank: segments of arbitrary blank period of the experiment.
+        :param segs_blank: segments of arbitrary blank period of the experiment (the IDs are in each segments same).
         """
         self.save_image_ids(
             segs_blank, 
@@ -459,6 +471,8 @@ class DatasetExporter:
         """
         setup_logging()
         logger = mozaik.getMozaikLogger()
+
+        # Initialize the extraction.
         self._print_experiment_header(args.sheet, args.input_path)
         dsv, trials = self._get_modified_datastore(args.input_path)
 
@@ -480,14 +494,14 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Export the dataset from the provided raw data for the given sheet.")
-    parser.add_argument("--input_path", type=str, default=None,#/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0", 
+    parser.add_argument("--input_path", type=str,
         help="Path to input data.")
-    parser.add_argument("--output_path", type=str, default=None,# default="/home/beinhaud/diplomka/mcs-source/dataset", 
-        help="Path where to store the output.")
+    parser.add_argument("--output_path", type=str, default=None,
+        help="Path where to store the output (If empty then use the default predifined path based on the dataset type (train/test)).")
     parser.add_argument("--test_dataset", type=bool, default=False,
         help="Flag whether generate test dataset.")
     parser.add_argument("--sheet", type=str, choices=POSSIBLE_SHEETS,
-        help="Name of the sheet. Possibilities: ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4']")
+        help="Name of the sheet. Possibilities: ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4'].")
     parser.add_argument("--subset", type=int, default=-1, 
         help="How big subset of the sheet to take (if `-1` then whole sheet).")
     parser.add_argument("--num_trials", type=int, default=-1,
@@ -495,23 +509,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.input_path = INPUT_DIR_TEST
-    # args.input_path = INPUT_DIR_TRAIN
-    # args.test_dataset = True
-
     if args.output_path == None:
-        # Output path not defined -> set default path
+        # Output path not defined -> set default path.
         args.output_path = OUTPUT_DIR_TRAIN
         if args.test_dataset:
             # Generating test dataset (multiple trials) -> set default path to test dataset.
             args.output_path = OUTPUT_DIR_TEST
-
-    args.output_path = OUTPUT_DIR_TEST
-    # args.output_path = DEBUG_DIR
-
-
-    # if args.sheet not in POSSIBLE_SHEETS:
-    #     print("Wrong sheet identifier")
-        
 
     main(args)

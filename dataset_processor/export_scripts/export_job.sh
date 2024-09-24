@@ -29,14 +29,7 @@ base_folders=(
     "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}"
     )
 
-# Define an array of sheets to export
-# other_sheets=(
-#     "V1_Exc_L4"
-#     "V1_Inh_L4"
-#     "X_ON"
-#     "X_OFF"
-#     )
-
+# L2/3 sheet identifiers (they are stored in the different directory).
 l23_sheets=( 
     "V1_Exc_L2/3"
     "V1_Inh_L2/3"
@@ -58,12 +51,12 @@ else
     done
 fi
 
+# Print the header of the extraction.
 echo "New experiment"
 echo $base_folder
 echo $2
 echo "---------------------------------"
 echo
-
 
 # Loop through each directory starting with given name $1
 find "$base_folder" -type d -name $1 | while read folder; do

@@ -25,7 +25,7 @@ fi
 # Start, end and steps for the train/test variants.
 start_indices=(
     500
-    30005
+    30005   # First variant is corrupted (300000-300050)
 )
 end_indices=(
     1000
