@@ -44,7 +44,7 @@ TRIALS_PREFIX = "trial_"
 # Input directories:
 # INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
 # INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-# INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300050_to_300100_ParameterSearch_____baseline:300050_trial:0"
+INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300050_to_300100_ParameterSearch_____baseline:300050_trial:0"
 
 # Default output directory:
 OUTPUT_DIR_TRAIN = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset"
@@ -486,7 +486,7 @@ class DatasetExporter:
 
 
 def main(args):
-
+    print(f"Input dataset path: {args.input_path}")
     dataset_exporter = DatasetExporter()
     dataset_exporter.run_extraction(args)
 
@@ -494,12 +494,13 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Export the dataset from the provided raw data for the given sheet.")
-    parser.add_argument("--input_path", type=str,
+    parser.add_argument("--input_path", type=str, default=None,
         help="Path to input data.")
     parser.add_argument("--output_path", type=str, default=None,
         help="Path where to store the output (If empty then use the default predifined path based on the dataset type (train/test)).")
-    parser.add_argument("--test_dataset", type=bool, default=False,
-        help="Flag whether generate test dataset.")
+    parser.add_argument('--dataset_variant', type= str, choices=['train', 'test'],
+        help="Variant of the dataset: ['train', 'test']")
+    parser.set_defaults(test_dataset=False)
     parser.add_argument("--sheet", type=str, choices=POSSIBLE_SHEETS,
         help="Name of the sheet. Possibilities: ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4'].")
     parser.add_argument("--subset", type=int, default=-1, 
@@ -509,10 +510,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # args.input_path = INPUT_DIR_TEST
+
     if args.output_path == None:
         # Output path not defined -> set default path.
         args.output_path = OUTPUT_DIR_TRAIN
-        if args.test_dataset:
+        if args.dataset_variant == "test":
             # Generating test dataset (multiple trials) -> set default path to test dataset.
             args.output_path = OUTPUT_DIR_TEST
 

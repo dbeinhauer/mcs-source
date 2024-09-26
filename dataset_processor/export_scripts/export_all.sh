@@ -43,5 +43,5 @@ for (( i=${start_indices[$variant_index]}; i<${end_indices[$variant_index]}; i+=
     fi
     # Form the string with the current number
     filename="NewDataset_Images_from_${i}*"
-    sbatch export_job.sh $filename $1 $2
+    sbatch /home/beinhaud/diplomka/mcs-source/dataset_processor/export_scripts/export_job.sh $filename $1 $2
 done

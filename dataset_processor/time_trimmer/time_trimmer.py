@@ -69,7 +69,7 @@ def process_directory(input_dir: str, output_dir: str, interval_size: int=712):
             matrix_base_number = int(os.path.splitext(filename)[0].split("_")[-1])
 
             # Get rid of the image number and posfix.
-            file_prefix = filename.split("/")[-1].split(f"_{matrix_base_number}.{FILE_POSTFIX}")[0]
+            file_prefix = filename.split("/")[-1].split(f"_{matrix_base_number}{FILE_POSTFIX}")[0]
 
             trimmed_matrices = trim_sparse_matrix(matrix, interval_size)
 
@@ -81,7 +81,7 @@ def process_directory(input_dir: str, output_dir: str, interval_size: int=712):
                 # matrices should be 100).
                 output_filename = os.path.join(
                         output_dir + "/", 
-                        file_prefix + str(matrix_base_number + i) + FILE_POSTFIX,
+                        file_prefix + "_" + str(matrix_base_number + i) + FILE_POSTFIX,
                     )
                 sp.save_npz(output_filename, sp.csr_matrix(trimmed_matrix))
 
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("--interval_size", type=int, default=712, 
         help="Size of new time interval.")
     parser.add_argument("--sheet", type=str, default=None, 
-        help="Extract only 1 sheet from: [V1_Exc_L23,V1_Exc_L4, V1_Inh_L23, V1_Inh_L4, X_OFF, X_ON]")
+        help="Extract only 1 sheet from: [V1_Exc_L23, V1_Exc_L4, V1_Inh_L23, V1_Inh_L4, X_OFF, X_ON]")
 
     args = parser.parse_args()
 

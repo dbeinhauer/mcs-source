@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --hint=nomultithread
 
-#SBATCH --exclude=w[1-2,9-12]
+#SBATCH --exclude=w[1-2,9-17]
 
 # Ensure the script receives the necessary arguments
 if [ "$#" -ne 3 ]; then

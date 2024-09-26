@@ -1,25 +1,13 @@
 # Now
 - add validation using correlation between samples
-- generate data for test dataset (for correlation validation)
-- add documentation to existing code
-- add documentation for the repository structure
 - fix evaluation step
-- install the model to computational cluster
-    - need to create docker image
 - study multitrial validation
-- check multiple trials in extraction tools (I should be sure it detect number of neurons and trials).
-    - now we have the solution that for each trial creates file:
-        `spikes_trial_{trial_id}_{layer}_{image_id}.npz`
-- maybe spikes prefixes to some globals python file (to share between the sources)
-- check multitrial for trimmer and merger
-    - it should be ok with the new variant for multitrials
-    - there should be only additional tool to concatenate multitrials to one array
-    - in the trimmer I only changed the filename prefix (merger not changed)
 - correct weights for LGN (should be only positive)
     - all LGN neurons are excitatory
 - start the job for test dataset creation
-- check trimming works fine with multiple trials
-- check merging works fine with multiple trials
+    - after that:
+        - trimming
+        - merging
 - check model can load multiple trials data for evaluation
 
 # Future steps
@@ -27,7 +15,14 @@
     - might be better than some small NN instead of simple neuron
     - need to share the weights (othewise it would not be sufficient to run it (too large model))
 
+# In longer time period:
+- install the model to computational cluster
+    - need to create docker image
+
+# When is time:
+- add documentation to existing code
+- add documentation for the repository structure
+- add globals for common paths and prefixes for extraction tools 
+
 
 # Notes for the meeting
-- assure LGN needs Inh/Exc weights
-- change to float32 (loss is othervise `nan`)

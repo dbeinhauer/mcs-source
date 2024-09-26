@@ -2,11 +2,13 @@
 
 #SBATCH --job-name=export_dataset
 #SBATCH --output=output_dir/output_%j.txt   
-#SBATCH --ntasks=4  # Requesting n processors
+#SBATCH --ntasks=8  # Requesting n processors
 #SBATCH --nodes=1
 #SBATCH --hint=nomultithread
 
-#SBATCH --exclude=w[1-2,10-12]
+#SBATCH --exclude=w[1-9,9-12]
+
+# #SBATCH --begin=20:00       # Job will start at 8 PM
 
 
 # Job for srun command which runs dataset extractions in loop for specified interval of data and sheets.
@@ -16,8 +18,7 @@ if [ "$#" -ne 3 ]; then
     echo "Run the wintermute batch job to export dataset from specific raw data for specific sheet and dataset variant (train/test)."
     echo "Usage: $0 <input_subdirectory> <sheet> <dataset_variant>"
     exit 1
-fi
-
+fi    
 
 # Define an array of base folders
 base_folders=(
@@ -60,5 +61,5 @@ echo
 
 # Loop through each directory starting with given name $1
 find "$base_folder" -type d -name $1 | while read folder; do
-    python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$2
+    python3 /home/beinhaud/diplomka/mcs-source/dataset_processor/export_scripts/export_dataset.py --input_path=$folder --sheet=$2 --dataset_variant=$3
 done
