@@ -8,6 +8,9 @@
 
 #SBATCH --exclude=w[1-2,9-12]
 
+# #SBATCH --begin=22:00       # Job will start at 8 PM
+
+
 
 # Ensure the script receives the necessary arguments
 if [ "$#" -ne 4 ]; then

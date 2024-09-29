@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=export_dataset
 #SBATCH --output=output_dir/output_%j.txt   
-#SBATCH --ntasks=8  # Requesting n processors
+#SBATCH --ntasks=16  # Requesting n processors
 #SBATCH --nodes=1
 #SBATCH --hint=nomultithread
 

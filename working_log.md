@@ -319,4 +319,8 @@
     - correlation should be for the vectors of all neurons in all timesteps
     - from LGN it is all positive weights
 
-# 24.9.2024
+# 29.9.2024
+- LGN weights are corrected (all are excitatory)
+- loading of multitrials corrected
+    - training loads always single trial
+    - testing loads all available trials

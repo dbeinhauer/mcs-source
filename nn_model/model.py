@@ -87,13 +87,13 @@ class RNNCellModel(nn.Module):
     def _init_weights_constraints(self):
         l4_exc_args = [
             {'part_size': self.x_on_size, 'part_type': 'exc'},
-            {'part_size': self.x_off_size, 'part_type': 'inh'},
+            {'part_size': self.x_off_size, 'part_type': 'exc'},
             {'part_size': self.l4_inh_size, 'part_type': 'inh'},
             {'part_size': self.l23_exc_size, 'part_type': 'exc'},
         ]
         l4_inh_args = [
             {'part_size': self.x_on_size, 'part_type': 'exc'},
-            {'part_size': self.x_off_size, 'part_type': 'inh'},
+            {'part_size': self.x_off_size, 'part_type': 'exc'},
             {'part_size': self.l4_exc_size, 'part_type': 'exc'},
             {'part_size': self.l23_exc_size, 'part_type': 'exc'},
         ]

@@ -1,19 +1,15 @@
 # Now
 - add validation using correlation between samples
 - fix evaluation step
+    - looks like problem is in V1_Inh_
 - study multitrial validation
-- correct weights for LGN (should be only positive)
-    - all LGN neurons are excitatory
-- start the job for test dataset creation
-    - after that:
-        - trimming
-        - merging
-- check model can load multiple trials data for evaluation
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
     - might be better than some small NN instead of simple neuron
     - need to share the weights (othewise it would not be sufficient to run it (too large model))
+- for the training with smaller numbers (float16)
+    - it might be good idea to lower the training step
 
 # In longer time period:
 - install the model to computational cluster
@@ -22,7 +18,8 @@
 # When is time:
 - add documentation to existing code
 - add documentation for the repository structure
-- add globals for common paths and prefixes for extraction tools 
+- add globals for common paths and prefixes for extraction tools
+- refine the model code 
 
 
 # Notes for the meeting

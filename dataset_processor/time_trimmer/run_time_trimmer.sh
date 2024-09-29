@@ -11,7 +11,7 @@
 # Ensure the script receives the necessary arguments
 if [ "$#" -ne 3 ]; then
     echo "Run wintermute batch job to trim the given sheet"
-    echo "Usage: $0 <input_paht> <output_path> <sheet>"
+    echo "Usage: $0 <input_path> <output_path> <sheet>"
     exit 1
 fi
 
