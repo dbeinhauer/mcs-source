@@ -21,8 +21,8 @@ class SparseSpikeDataset(Dataset):
             output_layers,
             is_test: bool=False,
             model_subset_path=None, 
-            train_test_path=None, 
-            include_experiments=True,
+            # train_test_path=None, 
+            # include_experiments=True,
         ):
         self.spikes_dir = spikes_dir
         self.input_layers = input_layers
@@ -31,14 +31,8 @@ class SparseSpikeDataset(Dataset):
         self.is_test = is_test
 
         self.model_subset_indices = self._load_model_subset_indices(model_subset_path)       
-        # self.experiments = self._load_experiment_paths(train_test_path, include_experiments)
         
         self.experiments = self._load_all_spikes_filenames()
-
-        # print(self.experiments)
-
-        # self.experiment_batch = None
-        # self.experiment_offset = 0
     
     def __len__(self):
         return len(self.experiments)
@@ -66,44 +60,10 @@ class SparseSpikeDataset(Dataset):
         # Convert the dictionary values (lists of files) to a list of lists
         return list(coupled_files.values())
 
-    
-    # def _load_all_spikes_filenames(self, subdir="X_ON"):
-        
-    #     return os.listdir(os.path.join(self.spikes_dir, subdir))
-
     def _load_train_test_indices(self, path):
         with open(path, 'rb') as pickle_file:
             return pickle.load(pickle_file)
-            
-    # def _select_experiments_subset(self, indices_path, include=True):
-    #     subset = []
-    #     # Iterate through each filename
-    #     train_test_indices = self._load_train_test_indices(indices_path)
-    #     for filename in self._load_all_spikes_filenames():
-    #         # Create the regex pattern for each number in the numpy array
-    #         match_found = any(re.match(rf"^spikes_{num}[0-9][0-9]_summed\.npz$", filename) for num in train_test_indices)
-            
-    #         # Check if the current filename should be appended based on the include flag
-    #         if (include and match_found) or (not include and not match_found):
-    #             subset.append(filename)
-
-    #     return subset
-    
-    # def _load_experiment_paths(self, train_test_path, include_experiments):
-    #     # if train_test_path is None:
-    #     #     # Load all experiments.
-    #     #     return self._load_all_spikes_filenames()
-
-    #     if self.is_test:
-    #         # TODO: add trials coupling
-
-    #     # Not testing -> return all filenames
-    #     return self._load_all_spikes_filenames()
-
-        
-        # Load only subset of experiments.
-        # return self._select_experiments_subset(train_test_path, include_experiments)
-    
+     
     def _load_model_subset_indices(self, model_subset_path):
         if model_subset_path is not None:
             # Load indices of subset.
@@ -148,29 +108,6 @@ class SparseSpikeDataset(Dataset):
         
         # Return the combined data
         return combined_data
-
-
-
-    # def _load_experiment(self, exp_name, layer):
-    #     # print("Got to loading")
-    #     file_path = os.path.join(self.spikes_dir, layer, exp_name)
-    #     data = load_npz(file_path)
-
-    #     dense_data = data.toarray()
-    #     # Step for training set (we want to have the trials dimension too)
-    #     if dense_data.ndim == 2:
-    #         dense_data = np.expand_dims(dense_data, axis=0)
-        
-    #     # We want to have the shape: (trials, time, neurons)
-    #     dense_data = dense_data.transpose(0, 2, 1)
-    #     if self.model_subset_indices is not None:
-    #         # Subset creation.
-    #         dense_data = dense_data[:, :, self.model_subset_indices[layer]]
-
-    #     # print("I loaded the EXPERIMENT")
-    #     return dense_data
-
-    # def get_experiment(self, )
     
     def __getitem__(self, idx):
         # print(f"IDX: {idx}")
@@ -200,9 +137,6 @@ class SparseSpikeDataset(Dataset):
 
 def custom_collate_fn(batch):
     # Find the maximum size in the second dimension
-    # for item in batch:
-    #     # print(next(iter(item[0].values())))
-    #     # print(item)
     max_size = max([next(iter(item[0].values())).size(1) for item in batch])
     
     padded_batch_0 = {}
@@ -225,25 +159,18 @@ def custom_collate_fn(batch):
         
         # For each key, concatenate the tensors from all dictionaries at the current index
         for key in keys:
-            # padding = (0, max_size - next(iter(item[0].values())).size(1))
-            # padded_item_0 = {
-            #     layer: torch.nn.functional.pad(value, padding, "constant", 0) 
-            #     for layer, value in item[0].items()
-            # }
 
             # Collect all tensors associated with the current key
             tensors_to_concat = [
                 torch.nn.functional.pad(
-                    d[key],#.transpose(0, 2, 1), 
+                    d[key], 
                     (0, 0, 0, max_size - d[key].size(1)), 
                     "constant", 
                     0,
-                )#.transpose(0, 2, 1)
+                )
                 for d in dicts_at_index
             ]
-
-            # tensors_to_concat = [d[key] for d in dicts_at_index]
-            
+                        
             # Concatenate tensors along a new dimension (e.g., dimension 0)
             result[i][key] = torch.stack(tensors_to_concat, dim=0)
     

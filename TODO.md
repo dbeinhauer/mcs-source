@@ -1,8 +1,11 @@
 # Now
-- add validation using correlation between samples
 - fix evaluation step
-    - looks like problem is in V1_Inh_
-- study multitrial validation
+    - looks like problem is in V1_Inh_L23
+- try to find better measure
+    - something for correlation of binary values
+- think about model hyperparameters
+- inspect the training works fine (it looks like some the predicting the time series does not work fine) 
+- add evaluation step for few examples between each epoch (for better checking how the model trains)
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
@@ -23,3 +26,4 @@
 
 
 # Notes for the meeting
+- does it make sense to comput Pearson's CC for itegers (or can predictions stay floats)

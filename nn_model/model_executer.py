@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0" # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -53,8 +54,18 @@ def compute_cc_max(target, num_trials, var_trial_mean_tar):
 
 
 def normalized_cross_correlation_trials(prediction, target):
+    """
+    prediction should be in silico response (`r` from the paper)
+    target should be in vivo response (`y` from the paper)
+
+    Inspired by the model testing in the paper:
+    https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
+    """
     # Assuming prediction and target are PyTorch tensors
     batch_size, num_trials, time_duration, num_neurons = prediction.shape
+
+    # Round the prediction to closest integer.
+    prediction = prediction.round()
 
     # Reshape to have time and neurons in one dimension
     prediction = prediction.view(batch_size, num_trials, time_duration * num_neurons)
@@ -104,99 +115,15 @@ def normalized_cross_correlation_trials(prediction, target):
 
     return cc_norm_batch_mean
 
-
-
-
-# def normalized_cross_correlation_trials(prediction, target):
-#     """
-#     prediction should be in silico response (`r` from the paper)
-#     target should be in vivo response (`y` from the paper)
-
-#     Inspired by the model testing in the paper:
-#     https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
-#     """
-#     # Ensure the input sets are tensors of shape (trials, neurons, time)
-#     # print(prediction)
-#     batch_size, num_trials, time_duration, num_neurons = prediction.shape
-#     # Reshape to have time and neurons in one dimension 
-#     # (it does not very depend which corresponds to which because we 
-#     # compute the correlation of the whole vector (it just needs 
-#     # to be in reshaped in the same order)).
-#     prediction = prediction.reshape(batch_size, num_trials, time_duration*num_neurons)
-#     target = target.reshape(batch_size, num_trials, time_duration*num_neurons)
-
-#     # prediction = prediction.float() 
-#     # target = target.float()
-
-#     # Averages across the trials
-#     prediction_avg = np.mean(prediction, axis=1)
-#     target_avg = np.mean(target, axis=1)
-
-#     # Reshape to combine all vectors together for batch processing
-#     pred_flat = prediction_avg.reshape(batch_size, -1)  # Shape: (batch_size, time_duration * num_neurons)
-#     target_flat = target_avg.reshape(batch_size, -1)  # Same shape
-
-#     # Calculate means
-#     mean_pred = np.mean(pred_flat, axis=1, keepdims=True)
-#     mean_target = np.mean(target_flat, axis=1, keepdims=True)
-
-#     # Calculate covariance between prediction and target
-#     cov = np.mean((pred_flat - mean_pred) * (target_flat - mean_target), axis=1)
-
-#     # Calculate standard deviations
-#     std_pred = np.std(pred_flat, axis=1)
-#     std_target = np.std(target_flat, axis=1)
-
-#     # Calculate correlation coefficients
-#     cc_abs = cov / (std_pred * std_target)
-
-
-#     # CC_MAX CALCULATION
-
-#     std_target_original = np.std(target_flat, axis=2)
-
-#     var_target_original = var_target_original * var_target_original
-
-#     var_target_original_mean = np.mean(var_target_original, axis=1)
-    
-#     numerator = (std_target*std_target)*num_trials - var_target_original
-#     denominator = (num_trials - 1) * (std_target*std_target)
-
-#     cc_max = np.sqrt(numerator/denominator)
-
-#     cc_norm = cc_abs/cc_max
-
-#     cc_norm_batch_mean = np.mean(cc_norm, axis=0)
-
-#     return cc_norm_batch_mean
-
-
-    # for i in range(batch_size):
-    #     for j in range(num_trials):
-    #         corr_abs = np.corrcoef(prediction[i, j, :], target[i, j, :])[0,1]
-
-    # trial_mean_pred, trial_mean_tar = compute_trial_means(prediction, target)
-
-    # var_trial_mean_pred, var_trial_mean_tar = compute_var_across_time(trial_mean_pred, trial_mean_tar)
-
-    # cov = compute_covariance(trial_mean_pred, trial_mean_tar, time_duration)
-    # cc_abs = compute_cc_abs(cov, var_trial_mean_pred, var_trial_mean_tar)
-    # cc_max = compute_cc_max(target, num_trials, var_trial_mean_tar)
-
-    # cc_norm = cc_abs / cc_max
-    
-    # return cc_norm.mean(dim=0)    
-
-
-def train(model, train_loader, criterion, optimizer, num_epochs):
+def train(model, train_loader, criterion, optimizer, num_epochs, test_loader):
     model.train()
     # Initialize GradScaler for mixed precision training
     # scaler = GradScaler()
     for epoch in range(num_epochs):
         loss = 0
         for i, (inputs, targets) in enumerate(tqdm(train_loader)):
-            if i > 2:
-                break
+            # if i > 2:
+            #     break
             # print("I get to training")
             inputs = {layer: input_data[:, 0, :, :].float().to(globals.device0) for layer, input_data in inputs.items()}
             # print("I get to inputs")
@@ -243,6 +170,8 @@ def train(model, train_loader, criterion, optimizer, num_epochs):
             # print(loss.item())
         
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        evaluation(model, test_loader, criterion)
+        model.train()
 
 
 def evaluation(model, data_loader, criterion):
@@ -250,7 +179,9 @@ def evaluation(model, data_loader, criterion):
     correlation_sum = 0
     num_examples = 0
     with torch.no_grad():
-        for inputs, targets in tqdm(data_loader):
+        for i, (inputs, targets) in enumerate(tqdm(data_loader)):
+            if i > 2:
+                break
             inputs = {layer: input_data.float().to(globals.device0) for layer, input_data in inputs.items()}
             # print("I get to inputs")
             targets = {layer: output_data.float() for layer, output_data in targets.items()}
@@ -286,36 +217,13 @@ def evaluation(model, data_loader, criterion):
             del inputs, h4_exc, h4_inh, h23_inh, h23_exc
             torch.cuda.empty_cache()
 
-
-            # for key, list in dict_predictions.items():
-            #     print(key)
-            #     for arr in list:
-            #         print(arr.shape)
-            
-            # # Step 2: Stack the lists into 4D arrays for each key
-            # stacked_arrays_by_key = {key: np.stack(value_list, axis=0) for key, value_list in dict_predictions.items()}
-
-            # # Step 3: Move the new axis to the 2nd position
-            # reshaped_arrays_by_key = {key: np.moveaxis(array, 0, 1) for key, array in stacked_arrays_by_key.items()}
+           # reshaped_arrays_by_key = {key: np.moveaxis(array, 0, 1) for key, array in stacked_arrays_by_key.items()}
             stacked_arrays_by_key = {key: torch.stack(value_list, dim=0) for key, value_list in dict_predictions.items()}
 
             # Step 2: Move the new axis to the 2nd position
             reshaped_arrays_by_key = {key: array.permute(1, 0, 2, 3) for key, array in stacked_arrays_by_key.items()}
 
-                
-            # predictions = np.stack(predictions, axis=0)
-
-            # predictions = np.moveaxis(predictions, 0, 1)
-
             cross_correlation = 0
-            # for i in range(len(predictions)):
-            #     # print(predictions)
-            #     # for prediction in predictions[i]:
-            #     for layer, target in targets.items():
-            #         # print(target)
-            #         cross_correlation += normalized_cross_correlation_trials(torch.cat(predictions[i][layer], dim=1).float().cpu(), target[i, :, :])
-            
-            # # cross_correlation /= (len(predictions) * 4)
 
             for layer, target in targets.items():
                 # print(target)
@@ -325,28 +233,27 @@ def evaluation(model, data_loader, criterion):
                 del target, reshaped_arrays_by_key[layer]
                 torch.cuda.empty_cache()
 
-            
-            # # cross_correlation /= (len(predictions) * 4)
             print(f"Test cross correlation {cross_correlation}")
             correlation_sum += cross_correlation
             num_examples += 1
-            # print(f'Test Loss: {loss.item():.4f}')
+
     print(f"Total cross correlation {correlation_sum / num_examples}")
 
 # from torchviz import make_dot
 
-def main():
+def main(args):
     # Define directories and layers
     # base_dir = "testing_dataset/size_5"
-    train_dir = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_5"
-    test_dir = "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_5"
-
+    # train_dir = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_5"
+    # test_dir = "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_5"
+    train_dir = args.train_dir
+    test_dir = args.test_dir
     # base_dir = "/home/beinhaud/diplomka/mcs-source/testing_dataset/test"
 
-    model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_76.pkl"
-    model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_10.pkl"
-    model_subset_path = f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(globals.SIZE_MULTIPLIER*100)}.pkl"
-
+    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_76.pkl"
+    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_10.pkl"
+    # model_subset_path = f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(globals.SIZE_MULTIPLIER*100)}.pkl"
+    model_subset_path = args.subset_dir
 
     train_test_path = "/home/beinhaud/diplomka/mcs-source/dataset/train_test_splits/size_10.pkl"
 
@@ -397,16 +304,36 @@ def main():
 
     model = RNNCellModel(layer_sizes).to(globals.device1)#.half()
 
+    print("Running with parameters:")
+    print(f"Learning rate: {args.learnin_rate}")
+    print(f"Num epochs: {args.num_epochs}")
+
+
     print("Criterion")
     criterion = torch.nn.MSELoss()
     print("optimizer")
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # Training loop
-    num_epochs = 1
+    num_epochs = args.num_epochs
     print("training")
-    train(model, train_loader, criterion, optimizer, num_epochs)
+    train(model, train_loader, criterion, optimizer, num_epochs, test_loader)
     evaluation(model, test_loader, criterion)
+    print("")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="")
+    parser.add_argument("--train_dir", type=str, default=f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}", 
+        help="")
+    parser.add_argument("--test_dir", type=str, default=f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}", 
+        help="")
+    parser.add_argument("--subset_dir", type=str, default=f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(globals.SIZE_MULTIPLIER*100)}.pkl", 
+        help="")
+    parser.add_argument("--learning_rate", type=float, default=0.001, 
+        help="")
+    parser.add_argument("--num_epochs", type=int, default=10,
+        help="")
+
+    args = parser.parse_args()
+    main(args)

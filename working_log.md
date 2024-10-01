@@ -324,3 +324,53 @@
 - loading of multitrials corrected
     - training loads always single trial
     - testing loads all available trials
+
+# 30.9.2024
+- all training on:
+    - `original_model_size=0.1`
+- training 1:
+    - `learning_rate=0.001`
+    - `batch_size=50`
+    - `epochs=1`
+    - the CC was equal to approx:   `-0.02`
+- training 2:
+    - `learning_rate=0.001`
+    - `batch_size=50`
+    - `epochs=2`
+    - the CC was equal to approx:   `0.03`
+- training 3:
+    - `learning_rate=0.0001`
+    - `batch_size=50`
+    - `epochs=2`
+    - the CC was equal to approx:   `-0.02`
+
+- conclusion:
+    - maybe increase learning rate
+    - probably more epochs
+    - might be good idea to change the metrics (better correlation coeficient)
+
+
+# 1.10.2024
+--learning_rate=0.005 --num_epochs=10
+Process ID: 3435082
+
+--learning_rate=0.003 --num_epochs=10
+Process ID: 3435091
+
+--learning_rate=0.001 --num_epochs=10
+Process ID: 3435124
+
+--learning_rate=0.00075 --num_epochs=10   
+Process ID: 3435162
+
+--learning_rate=0.0005 --num_epochs=10
+Process ID: 3435190
+
+--learning_rate=0.0003 --num_epochs=10
+Process ID: 3435196
+
+--learning_rate=0.0001 --num_epochs=10
+mv: nelze získat informace o 'output_dir/test_1//output_temp.log': Adresář nebo soubor neexistuje
+Process ID: 3435228
+
+
