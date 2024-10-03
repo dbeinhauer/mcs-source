@@ -14,65 +14,69 @@ from torch.utils.data import DataLoader
 
 from dataset_loader import SparseSpikeDataset, custom_collate_fn
 from model import RNNCellModel, ConstrainedRNNCell
+from evaluation_metrics import NormalizedCrossCorrelation
 import globals
 
-def normalized_cross_correlation_trials(prediction, target):
-    """
-    prediction should be in silico response (`r` from the paper)
-    target should be in vivo response (`y` from the paper)
+# def normalized_cross_correlation_trials(prediction, target):
+#     """
+#     Expected input in format of 4D pytorch tensor of shape:
+#         (batch_size, num_trials, time_duration, num_neurons)
 
-    Inspired by the model testing in the paper:
-    https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
-    """
-    # Assuming prediction and target are PyTorch tensors
-    batch_size, num_trials, time_duration, num_neurons = prediction.shape
+#     prediction should be in silico response (`r` from the paper)
+#     target should be in vivo response (`y` from the paper)
 
-    # Round the prediction to closest integer.
-    prediction = prediction.round()
+#     Inspired by the model testing in the paper:
+#     https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
+#     """
+#     # Assuming prediction and target are PyTorch tensors
+#     batch_size, num_trials, time_duration, num_neurons = prediction.shape
 
-    # Reshape to have time and neurons in one dimension
-    prediction = prediction.view(batch_size, num_trials, time_duration * num_neurons)
-    target = target.view(batch_size, num_trials, time_duration * num_neurons)
+#     # Round the prediction to closest integer.
+#     prediction = prediction.round()
 
-    # Averages across the trials
-    prediction_avg = prediction.mean(dim=1)
-    target_avg = target.mean(dim=1)
+#     # Reshape to have time and neurons in one dimension
+#     prediction = prediction.view(batch_size, num_trials, time_duration * num_neurons)
+#     target = target.view(batch_size, num_trials, time_duration * num_neurons)
 
-    pred_flat = prediction_avg
-    target_flat = target_avg
+#     # Averages across the trials
+#     prediction_avg = prediction.mean(dim=1)
+#     target_avg = target.mean(dim=1)
 
-    # Calculate means
-    mean_pred = pred_flat.mean(dim=1, keepdim=True)
-    mean_target = target_flat.mean(dim=1, keepdim=True)
+#     pred_flat = prediction_avg
+#     target_flat = target_avg
 
-    # Calculate covariance between prediction and target
-    cov = ((pred_flat - mean_pred) * (target_flat - mean_target)).mean(dim=1)
+#     # Calculate means
+#     mean_pred = pred_flat.mean(dim=1, keepdim=True)
+#     mean_target = target_flat.mean(dim=1, keepdim=True)
 
-    # Calculate standard deviations
-    std_pred = pred_flat.std(dim=1, unbiased=False)
-    std_target = target_flat.std(dim=1, unbiased=False)
+#     # Calculate covariance between prediction and target
+#     cov = ((pred_flat - mean_pred) * (target_flat - mean_target)).mean(dim=1)
 
-    # Calculate correlation coefficients
-    cc_abs = cov / (std_pred * std_target + 0.00000001)
+#     # Calculate standard deviations
+#     std_pred = pred_flat.std(dim=1, unbiased=False)
+#     std_target = target_flat.std(dim=1, unbiased=False)
 
-    # CC_MAX CALCULATION
-    std_target_original = target.std(dim=1, unbiased=False)
+#     # Calculate correlation coefficients
+#     cc_abs = cov / (std_pred * std_target + 0.00000001)
 
-    var_target_original = std_target_original * std_target_original
+#     # CC_MAX CALCULATION
+#     std_target_original = target.std(dim=1, unbiased=False)
 
-    var_target_original_mean = var_target_original.mean(dim=1)
+#     var_target_original = std_target_original * std_target_original
 
-    numerator = (std_target * std_target) * num_trials - var_target_original_mean
-    denominator = (num_trials - 1) * (std_target * std_target) + 0.000000001
+#     var_target_original_mean = var_target_original.mean(dim=1)
 
-    cc_max = torch.sqrt(numerator / denominator)
+#     numerator = (std_target * std_target) * num_trials - var_target_original_mean
+#     denominator = (num_trials - 1) * (std_target * std_target) + 0.000000001
 
-    cc_norm = cc_abs / cc_max
+#     cc_max = torch.sqrt(numerator / denominator)
 
-    cc_norm_batch_mean = cc_norm.mean(dim=0).item()
-    # print(cc_norm_batch_mean)
+#     cc_norm = cc_abs / cc_max
 
-    return cc_norm_batch_mean
+#     cc_norm_batch_mean = cc_norm.mean(dim=0).item()
+#     # print(cc_norm_batch_mean)
+
+#     return cc_norm_batch_mean
 
 class ModelExecuter():
     # Input layer keys (LGN).
@@ -94,6 +98,8 @@ class ModelExecuter():
 
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(args.learning_rate)
+
+        self.evaluation_metrics = NormalizedCrossCorrelation()
 
         self.num_epochs = args.num_epochs
 
@@ -209,7 +215,7 @@ class ModelExecuter():
         for epoch in range(self.num_epochs):
             loss = 0
             for i, (inputs, targets) in enumerate(tqdm(self.train_loader)):
-                # if i > 10:
+                # if i > 1:
                 #     break
                 inputs, targets = self._get_data(inputs, targets)
 
@@ -301,10 +307,10 @@ class ModelExecuter():
         cross_correlation = 0
 
         for layer, target in targets.items():
-            print(target)
-            if layer == "V1_Inh_L23":
-                print("problematic part")
-            cross_correlation += normalized_cross_correlation_trials(
+            # print(target)
+            # if layer == "V1_Inh_L23":
+            #     print("problematic part")
+            cross_correlation += self.evaluation_metrics.calculate(
                     predictions[layer].to(globals.device0), 
                     target.to(globals.device0)
                 )
