@@ -5,7 +5,9 @@
     - something for correlation of binary values
 - think about model hyperparameters
 - inspect the training works fine (it looks like some the predicting the time series does not work fine) 
-- add evaluation step for few examples between each epoch (for better checking how the model trains)
+- tools for summarizing training results
+- improve output of the training to facilitate follow-up work with it
+- class for different metrics
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
@@ -22,7 +24,8 @@
 - add documentation to existing code
 - add documentation for the repository structure
 - add globals for common paths and prefixes for extraction tools
-- refine the model code 
+- refine the model code
+- documentation for random subset selector
 
 
 # Notes for the meeting

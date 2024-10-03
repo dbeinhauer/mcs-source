@@ -16,43 +16,6 @@ from dataset_loader import SparseSpikeDataset, custom_collate_fn
 from model import RNNCellModel, ConstrainedRNNCell
 import globals
 
-def compute_trial_means(prediction, target):
-    # Ensure the input sets are tensors of shape (trials, neurons, time)
-    # num_trials, time_duration, num_neurons = prediction.shape
-
-    # Means across trials.
-    # Those should be the `r^{dash}` and `y^{dash}`.
-    return prediction.mean(dim=0), target.mean(dim=0)
-
-def compute_var_across_time(trial_mean_pred, trial_mean_tar):
-    return torch.var(trial_mean_pred, dim=0), torch.var(trial_mean_tar, dim=0)
-
-def compute_covariance(trial_mean_pred, trial_mean_tar, time_duration):
-    # Means across time (for covariance calculation).
-    time_mean_pred = trial_mean_pred.mean(dim=0)
-    time_mean_tar = trial_mean_tar.mean(dim=0)
-
-    # Centered matrices
-    pred_centered = trial_mean_pred - time_mean_pred
-    Y_centered = trial_mean_tar- time_mean_tar
-
-    # Cov(X, Y)
-    return (pred_centered * Y_centered).sum(dim=0) / (time_duration - 1)    
-
-def compute_cc_abs(cov, var_trial_mean_pred, var_trial_mean_tar):
-    return cov / torch.sqrt(var_trial_mean_pred * var_trial_mean_tar)
-
-def compute_cc_max(target, num_trials, var_trial_mean_tar):
-    all_time_var_tar = torch.var(target, dim=1)
-
-    mean_var_tar = all_time_var_tar.mean(dim=0)
-
-    cc_max_numerator = num_trials*var_trial_mean_tar - mean_var_tar 
-    cc_max_denominator = (num_trials - 1) * var_trial_mean_tar
-
-    return torch.sqrt(cc_max_numerator / cc_max_denominator)
-
-
 def normalized_cross_correlation_trials(prediction, target):
     """
     prediction should be in silico response (`r` from the paper)
@@ -74,10 +37,6 @@ def normalized_cross_correlation_trials(prediction, target):
     # Averages across the trials
     prediction_avg = prediction.mean(dim=1)
     target_avg = target.mean(dim=1)
-
-    # Reshape to combine all vectors together for batch processing
-    # pred_flat = prediction_avg.view(batch_size, -1)  # Shape: (batch_size, time_duration * num_neurons)
-    # target_flat = target_avg.view(batch_size, -1)    # Same shape
 
     pred_flat = prediction_avg
     target_flat = target_avg
@@ -115,211 +74,273 @@ def normalized_cross_correlation_trials(prediction, target):
 
     return cc_norm_batch_mean
 
-def train(model, train_loader, criterion, optimizer, num_epochs, test_loader):
-    model.train()
-    # Initialize GradScaler for mixed precision training
-    # scaler = GradScaler()
-    for epoch in range(num_epochs):
-        loss = 0
-        for i, (inputs, targets) in enumerate(tqdm(train_loader)):
-            # if i > 2:
-            #     break
-            # print("I get to training")
-            inputs = {layer: input_data[:, 0, :, :].float().to(globals.device0) for layer, input_data in inputs.items()}
-            # print("I get to inputs")
-            targets = {layer: output_data[:, 0, :, :].float() for layer, output_data in targets.items()}
-            # print("I get to outputs")
+class ModelExecuter():
+    # Input layer keys (LGN).
+    input_layers = ['X_ON', 'X_OFF']
 
-            optimizer.zero_grad()
+    def __init__(self, args):
+        self.layer_sizes = {
+            'X_ON': globals.X_ON_SIZE,
+            'X_OFF': globals.X_OFF_SIZE,
+            'V1_Exc_L4': globals.L4_EXC_SIZE,
+            'V1_Inh_L4': globals.L4_INH_SIZE,
+            'V1_Exc_L23': globals.L23_EXC_SIZE, 
+            'V1_Inh_L23': globals.L23_INH_SIZE, 
+        }
 
-            batch_size = globals.train_batch_size#inputs['X_ON'].size(0)
+        self.train_dataset, self.test_dataset = self._init_datasets(args)
+        self.train_loader, self.test_loader = self._init_data_loaders()
+        self.model = self._init_model()
 
-            h4_exc = torch.zeros(batch_size, model.l4_exc_size).to(globals.device0)#.cuda()
-            h4_inh = torch.zeros(batch_size, model.l4_inh_size).to(globals.device0)#.cuda()
-            h23_exc = torch.zeros(batch_size, model.l23_exc_size).to(globals.device1)#.cuda()
-            h23_inh = torch.zeros(batch_size, model.l23_inh_size).to(globals.device1)#.cuda()
+        self.criterion = self._init_criterion()
+        self.optimizer = self._init_optimizer(args.learning_rate)
 
-            loss = 0
+        self.num_epochs = args.num_epochs
 
-            # with autocast(device_type="cuda", dtype=torch.float16):
-            predictions = model(inputs['X_ON'], inputs['X_OFF'], h4_exc, h4_inh, h23_exc, h23_inh)            
-            # print("Predictions done")
-            del inputs, h4_exc, h4_inh, h23_inh, h23_exc
-            torch.cuda.empty_cache()
-
-            # loss = 0
-            for layer, target in targets.items():
-                loss += criterion(torch.cat(predictions[layer], dim=1).float().cpu(), target.float())
-                # print("Loss done")
-
-            del targets, predictions
-            torch.cuda.empty_cache()
+        self._print_experiment_info(args)
 
 
-            loss.float().backward()
-            # print("Backward done")
-            optimizer.step()
-            # print("Optimizer step done")
+    def _split_input_output_layers(self):# -> tuple[dict[str, int], dict[str, int]]:
+        input_layers = {
+            key: self.layer_sizes[key] for key in ModelExecuter.input_layers
+        }
+        output_layers = {
+            key: value for key, value in self.layer_sizes.items() if key not in input_layers
+        }
 
-            # Apply constraints to all constrained RNN cells
-            for module in model.modules():
-                if isinstance(module, ConstrainedRNNCell):
-                    module.apply_constraints()
+        return input_layers, output_layers
+    
+    def _init_datasets(self, args):# -> tuple[SparseSpikeDataset, SparseSpikeDataset]:
+        input_layers, output_layers = self._split_input_output_layers()
 
-            torch.cuda.empty_cache()
-            # print(loss.item())
+        train_dataset = SparseSpikeDataset(
+                args.train_dir, 
+                input_layers, 
+                output_layers,
+                is_test=False,
+                model_subset_path=args.subset_dir, 
+            )
+        test_dataset = SparseSpikeDataset(
+                args.test_dir, 
+                input_layers, 
+                output_layers, 
+                is_test=True,
+                model_subset_path=args.subset_dir, 
+            )
         
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-        evaluation(model, test_loader, criterion)
-        model.train()
+        return train_dataset, test_dataset
 
+    def _init_data_loaders(self):# -> tuple[DataLoader, DataLoader]:
+        train_loader = DataLoader(
+            self.train_dataset, 
+            batch_size=globals.train_batch_size, 
+            shuffle=True, 
+            collate_fn=custom_collate_fn
+        )
+        test_loader = DataLoader(
+            self.test_dataset, 
+            batch_size=globals.test_batch_size, 
+            collate_fn=custom_collate_fn
+        )
 
-def evaluation(model, data_loader, criterion):
-    model.eval()
-    correlation_sum = 0
-    num_examples = 0
-    with torch.no_grad():
-        for i, (inputs, targets) in enumerate(tqdm(data_loader)):
-            if i > 2:
-                break
-            inputs = {layer: input_data.float().to(globals.device0) for layer, input_data in inputs.items()}
-            # print("I get to inputs")
-            targets = {layer: output_data.float() for layer, output_data in targets.items()}
-            # print("I get to outputs")
-            
-            batch_size = globals.test_batch_size#inputs['X_ON'].size(1)
+        return train_loader, test_loader
 
-            h4_exc = torch.zeros(batch_size, model.l4_exc_size).to(globals.device0)
-            h4_inh = torch.zeros(batch_size, model.l4_inh_size).to(globals.device0)
-            h23_exc = torch.zeros(batch_size, model.l23_exc_size).to(globals.device1)
-            h23_inh = torch.zeros(batch_size, model.l23_inh_size).to(globals.device1)
+    def _init_model(self) -> RNNCellModel:
+        return RNNCellModel(self.layer_sizes).to(globals.device1)
+    
+    def _init_criterion(self):
+        return torch.nn.MSELoss()
+    
+    def _init_optimizer(self, learning_rate):
+        return optim.Adam(self.model.parameters(), lr=learning_rate)
 
-            # loss = 0
-            predictions = []
+    def _print_experiment_info(self, args):
+        print("\n".join([
+                "NEW EXPERIMENT",
+                "---------------------------------",
+                "Running with parameters:",
+                f"Batch size: {globals.train_batch_size}",
+                f"Learning rate: {args.learning_rate}",
+                f"Num epochs: {args.num_epochs}",
+            ])
+        )
 
-            dict_predictions = {}
+    def _get_data(self, inputs, targets, test: bool=False):
+        # Define what part of trials dimension we want to take.
+        # Take `0` for train or all trials `slice(None) == :` for test.
+        slice_ = slice(None) if test else 0
 
-            # with autocast(device_type="cuda", dtype=torch.float16):
-            for i in range(inputs['X_ON'].shape[1]):
-                trial_predictions = model(inputs['X_ON'][:, i, :, :], inputs['X_OFF'][:, i, :, :], h4_exc, h4_inh, h23_exc, h23_inh)       
-                # predictions.append(trial_predictions)
-                for key, prediction in trial_predictions.items():
-                    prediction = torch.cat(prediction, dim=1)
-                    if key not in dict_predictions.keys():
-                        dict_predictions[key] = [prediction]
-                    else:
-                        dict_predictions[key].append(prediction)
-                    # dict_predictions[key]
-                del trial_predictions
+        inputs = {
+            layer: input_data[:, slice_, :, :].float().to(globals.device0) 
+            for layer, input_data in inputs.items()
+        }
+        targets = {
+            layer: output_data[:, slice_, :, :].float() 
+            for layer, output_data in targets.items()
+        }
+
+        return inputs, targets
+
+    def _init_model_weights(self, batch_size):
+        h4_exc = torch.zeros(batch_size, self.model.l4_exc_size).to(globals.device0)
+        h4_inh = torch.zeros(batch_size, self.model.l4_inh_size).to(globals.device0)
+        h23_exc = torch.zeros(batch_size, self.model.l23_exc_size).to(globals.device1)
+        h23_inh = torch.zeros(batch_size, self.model.l23_inh_size).to(globals.device1)
+
+        return h4_exc, h4_inh, h23_exc, h23_inh
+
+    def _compute_loss(self, predictions, targets):
+        loss = 0
+        for layer, target in targets.items():
+            loss += self.criterion(
+                    torch.cat(predictions[layer], dim=1).float().cpu(),
+                    target.float(),
+                )
+        
+        return loss
+    
+    def _apply_model_constraints(self):
+        for module in self.model.modules():
+            if isinstance(module, ConstrainedRNNCell):
+                module.apply_constraints()
+
+    def train(self, evaluation_step: int=-1):
+        self.model.train()
+        for epoch in range(self.num_epochs):
+            loss = 0
+            for i, (inputs, targets) in enumerate(tqdm(self.train_loader)):
+                # if i > 10:
+                #     break
+                inputs, targets = self._get_data(inputs, targets)
+
+                self.optimizer.zero_grad()
+
+                h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
+                        globals.train_batch_size,
+                    )
+
+                predictions = self.model(
+                    inputs['X_ON'], 
+                    inputs['X_OFF'], 
+                    h4_exc, 
+                    h4_inh, 
+                    h23_exc, 
+                    h23_inh,
+                )            
+                # print("Predictions done")
+                del inputs, h4_exc, h4_inh, h23_inh, h23_exc
                 torch.cuda.empty_cache()
 
+                loss = self._compute_loss(predictions, targets)
 
-            del inputs, h4_exc, h4_inh, h23_inh, h23_exc
+                del targets, predictions
+                torch.cuda.empty_cache()
+
+                loss.float().backward()
+                self.optimizer.step()
+
+                # Apply weight constrains for all the layers.
+                self._apply_model_constraints()
+
+                torch.cuda.empty_cache()
+            
+            print(f'Epoch [{epoch+1}/{self.num_epochs}], Loss: {loss.item():.4f}')
+            if evaluation_step != -1 and epoch % evaluation_step == 0:
+                # Do control evaluation after this step.
+                self.evaluation(subset=10)
+                self.model.train()
+
+    def _get_all_trials_predictions(self, inputs, num_trials):
+        dict_predictions = {}
+        h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
+                globals.test_batch_size,
+            )
+        for i in range(num_trials):
+            trial_predictions = self.model(
+                    inputs['X_ON'][:, i, :, :], 
+                    inputs['X_OFF'][:, i, :, :], 
+                    h4_exc, 
+                    h4_inh, 
+                    h23_exc, 
+                    h23_inh,
+                )
+            # predictions.append(trial_predictions)
+            for key, prediction in trial_predictions.items():
+                prediction = torch.cat(prediction, dim=1)
+                if key not in dict_predictions.keys():
+                    dict_predictions[key] = [prediction]
+                else:
+                    dict_predictions[key].append(prediction)
+                # dict_predictions[key]
+            # del trial_predictions
+            # torch.cuda.empty_cache()
+
+        return dict_predictions
+
+    def _prepare_predictions_for_evaluation(self, inputs, num_trials):
+
+        # Get predictions for all trials.
+        dict_predictions = self._get_all_trials_predictions(inputs, num_trials)
+        torch.cuda.empty_cache()
+
+        # Stack all predictions into one torch array.
+        dict_predictions = {
+            key: torch.stack(value_list, dim=0) 
+            for key, value_list in dict_predictions.items()
+        }
+
+        # Reshape the prediction to shape:  (num_trials, batch_size, time, num_neurons)
+        dict_predictions = {
+            key: array.permute(1, 0, 2, 3) 
+            for key, array in dict_predictions.items()
+        }
+
+        return dict_predictions
+    
+    def compute_evaluation_score(self, targets, predictions):
+        cross_correlation = 0
+
+        for layer, target in targets.items():
+            print(target)
+            if layer == "V1_Inh_L23":
+                print("problematic part")
+            cross_correlation += normalized_cross_correlation_trials(
+                    predictions[layer].to(globals.device0), 
+                    target.to(globals.device0)
+                )
+            del target, predictions[layer]
             torch.cuda.empty_cache()
 
-           # reshaped_arrays_by_key = {key: np.moveaxis(array, 0, 1) for key, array in stacked_arrays_by_key.items()}
-            stacked_arrays_by_key = {key: torch.stack(value_list, dim=0) for key, value_list in dict_predictions.items()}
+        return cross_correlation
 
-            # Step 2: Move the new axis to the 2nd position
-            reshaped_arrays_by_key = {key: array.permute(1, 0, 2, 3) for key, array in stacked_arrays_by_key.items()}
+    def evaluation(self, subset: int=-1, print_each_step: int=10):
+        self.model.eval()
+        correlation_sum = 0
+        num_examples = 0
+        with torch.no_grad():
+            for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
+                if i != -1 and i > subset:
+                    # Evaluate only subset of test data.
+                    break
 
-            cross_correlation = 0
+                inputs, targets = self._get_data(inputs, targets, test=True)
+                predictions = self._prepare_predictions_for_evaluation(inputs, inputs['X_ON'].shape[1])
+                correlation_sum += self.compute_evaluation_score(targets, predictions)
+                num_examples += 1
 
-            for layer, target in targets.items():
-                # print(target)
-                # if layer == "V1_Inh_L23":
-                #     print("problematic part")
-                cross_correlation += normalized_cross_correlation_trials(reshaped_arrays_by_key[layer].to(globals.device0), target.to(globals.device0))
-                del target, reshaped_arrays_by_key[layer]
-                torch.cuda.empty_cache()
+                if i % print_each_step == 0:
+                    print(f"Cross correlation after step {i+1} is: {correlation_sum / num_examples}")
 
-            print(f"Test cross correlation {cross_correlation}")
-            correlation_sum += cross_correlation
-            num_examples += 1
-
-    print(f"Total cross correlation {correlation_sum / num_examples}")
+        print(f"Total cross correlation {correlation_sum / num_examples}")
 
 # from torchviz import make_dot
 
 def main(args):
-    # Define directories and layers
-    # base_dir = "testing_dataset/size_5"
-    # train_dir = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_5"
-    # test_dir = "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_5"
-    train_dir = args.train_dir
-    test_dir = args.test_dir
-    # base_dir = "/home/beinhaud/diplomka/mcs-source/testing_dataset/test"
 
-    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_76.pkl"
-    # model_subset_path = "/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_10.pkl"
-    # model_subset_path = f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(globals.SIZE_MULTIPLIER*100)}.pkl"
-    model_subset_path = args.subset_dir
+    model_executer = ModelExecuter(args)
 
-    train_test_path = "/home/beinhaud/diplomka/mcs-source/dataset/train_test_splits/size_10.pkl"
-
-    layer_sizes = {
-        'X_ON': globals.X_ON_SIZE,
-        'X_OFF': globals.X_OFF_SIZE,
-        'V1_Exc_L4': globals.L4_EXC_SIZE,
-        'V1_Inh_L4': globals.L4_INH_SIZE,
-        'V1_Exc_L23': globals.L23_EXC_SIZE, 
-        'V1_Inh_L23': globals.L23_INH_SIZE, 
-    }
-    input_layers = {
-        'X_ON': globals.X_ON_SIZE, 
-        'X_OFF': globals.X_OFF_SIZE,
-    }
-    output_layers = {
-        'V1_Exc_L4': globals.L4_EXC_SIZE,
-        'V1_Inh_L4': globals.L4_INH_SIZE,
-        'V1_Exc_L23': globals.L23_EXC_SIZE, 
-        'V1_Inh_L23': globals.L23_INH_SIZE, 
-    }
-
-    # Create dataset and dataloader
-    train_dataset = SparseSpikeDataset(
-            train_dir, 
-            input_layers, 
-            output_layers,
-            is_test=False,
-            model_subset_path=model_subset_path, 
-            # train_test_path=train_test_path, 
-            # include_experiments=False,
-        )
-    test_dataset = SparseSpikeDataset(
-            test_dir, 
-            input_layers, 
-            output_layers, 
-            is_test=True,
-            model_subset_path=model_subset_path, 
-            # train_test_path=train_test_path, 
-            # include_experiments=True,
-        )
-
-    # train_batch_size = 10
-    # test_batch_size = 1
-    
-    train_loader = DataLoader(train_dataset, batch_size=globals.train_batch_size, shuffle=True, collate_fn=custom_collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=globals.test_batch_size, collate_fn=custom_collate_fn)
-
-    model = RNNCellModel(layer_sizes).to(globals.device1)#.half()
-
-    print("Running with parameters:")
-    print(f"Learning rate: {args.learnin_rate}")
-    print(f"Num epochs: {args.num_epochs}")
-
-
-    print("Criterion")
-    criterion = torch.nn.MSELoss()
-    print("optimizer")
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-
-    # Training loop
-    num_epochs = args.num_epochs
-    print("training")
-    train(model, train_loader, criterion, optimizer, num_epochs, test_loader)
-    evaluation(model, test_loader, criterion)
-    print("")
+    model_executer.train(evaluation_step=1)
+    model_executer.evaluation(subset=1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

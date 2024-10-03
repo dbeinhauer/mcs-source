@@ -4,6 +4,7 @@
 # Model Diminishing factor
 # SIZE_MULTIPLIER = 0.53
 SIZE_MULTIPLIER = 0.1
+# SIZE_MULTIPLIER = 0.25
 
 # Model time step size
 TIME_STEP = 5
@@ -28,7 +29,6 @@ L4_INH_SIZE = int(ORIGINAL_L4_INH_SIZE * SIZE_MULTIPLIER)
 L23_EXC_SIZE = int(ORIGINAL_L23_EXC_SIZE * SIZE_MULTIPLIER)
 L23_INH_SIZE = int(ORIGINAL_L23_INH_SIZE * SIZE_MULTIPLIER)
 
-
 # GPU Devices:
 device0 = 'cuda:1'
 device1 = 'cuda:0'
@@ -37,4 +37,4 @@ device0 = device1
 
 # Batch sizes:
 train_batch_size = 50
-test_batch_size = 10
+test_batch_size = 20

@@ -3,6 +3,7 @@ Generates random subset of either all neuronal layers of the model
 with the current setup (defined in globals). Or does random train-test 
 split for the given data range.
 """
+import os
 import random
 import argparse
 import pickle
@@ -28,27 +29,63 @@ def random_model_layers():
 def generate_model_subset(args):
     if args.filename is None:
         args.filename = f"size_{int(globals.SIZE_MULTIPLIER*100)}.pkl"
+
+    file_path = os.path.join(args.output_directory, args.filename)
+    
+    # Check if the file already exists
+    if os.path.exists(file_path):
+        if args.rewrite:
+            print(f"File {args.filename} exists, rewriting...")
+        else:
+            print(f"File {args.filename} exists, skipping creation.")
+            return
+    else:
+        print(f"File {args.filename} does not exist, creating a new one...")
+
     # Save dictionary to a pickle file
-    with open(args.output_directory + args.filename, 'wb') as pickle_file:
+    with open(file_path, 'wb') as pickle_file:
         pickle.dump(random_model_layers(), pickle_file)
 
 def train_test_split(args):
     if args.filename is None:
         args.filename = f"size_{int(args.test_ratio*100)}.pkl"
+
+    file_path = os.path.join(args.output_directory, args.filename)
+    
+    # Check if the file already exists
+    if os.path.exists(file_path):
+        if args.rewrite:
+            print(f"File {args.filename} exists, rewriting...")
+        else:
+            print(f"File {args.filename} exists, skipping creation.")
+            return
+    else:
+        print(f"File {args.filename} does not exist, creating a new one...")
+
     # Save dictionary to a pickle file
-    with open(args.output_directory + args.filename, 'wb') as pickle_file:
+    with open(file_path, 'wb') as pickle_file:
         test_examples_indices = random_subset(args.num_examples, int(args.test_ratio*100)) + args.offset
         pickle.dump(test_examples_indices, pickle_file)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Randomly select subset of either layer or dataset examples.")
-    parser.add_argument("output_directory", type=str, help="Path to the output directory where processed files will be saved.")
-    parser.add_argument("--task", type=str, help="Type of the task ('layer_subset' or 'train_test').")
-    parser.add_argument("--filename", type=str, default=None, help="Filename of the result.")
-    parser.add_argument("--num_examples", type=int, default=500, help="Number of examples for train-test split.")
-    parser.add_argument("--test_ratio", type=float, default=0.1, help="Ratio of the test set.")
-    parser.add_argument("--offset", type=int, default=500, help="Offset of the generated numbers.")
+    parser = argparse.ArgumentParser(
+        description="Randomly select subset of either layer or dataset examples.")
+    parser.add_argument("output_directory", type=str, 
+        help="Path to the output directory where processed files will be saved.")
+    parser.add_argument("--task", type=str, default='layer_subset', choices=['layer_subset', 'train_test'],
+        help="Type of the task ('layer_subset' or 'train_test').")
+    parser.add_argument('--rewrite', action='store_true',
+        help="If the old file should be rewriten in case the new one is of the same filename (otherwise skip the creation of new subset).")
+    parser.set_defaults(rewrite=False)
+    parser.add_argument("--filename", type=str, default=None, 
+        help="Filename of the result.")
+    parser.add_argument("--num_examples", type=int, default=500, 
+        help="Number of examples for train-test split.")
+    parser.add_argument("--test_ratio", type=float, default=0.1, 
+        help="Ratio of the test set.")
+    parser.add_argument("--offset", type=int, default=500, 
+        help="Offset of the generated numbers.")
 
     args = parser.parse_args()
 

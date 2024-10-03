@@ -22,7 +22,8 @@ class WeightConstraint:
         if hasattr(module, 'weight_ih'):
             end_index = 0
             for item in self.layer_parameters:
-                part_size, part_kwargs = item['part_size'], WeightConstraint.layer_kwargs[item['part_type']]
+                part_size = item['part_size']
+                part_kwargs = WeightConstraint.layer_kwargs[item['part_type']]
                 start_index = end_index
                 end_index += part_size
                 # Apply non-negative constraint to the first part
@@ -113,7 +114,7 @@ class RNNCellModel(nn.Module):
         
 
     def _init_model_architecture(self):
-
+        
         input_size = self.x_on_size + self.x_off_size
 
         # Layer L4 Inh and Exc
@@ -146,7 +147,6 @@ class RNNCellModel(nn.Module):
         L4_Exc_outputs = []
         L23_Inh_outputs = []
         L23_Exc_outputs = []
-        # print("Got to forward")
 
         for t in range(x_on.size(1)):
             # if t % 100 == 0:

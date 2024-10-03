@@ -351,26 +351,13 @@
 
 
 # 1.10.2024
---learning_rate=0.005 --num_epochs=10
-Process ID: 3435082
+- another testing on size 0.10 of original size
+- it looks that reasonable learning rate is between `0.00075-0.003`
+- reasonable number of trials is around `6-10`
+- the best result was only 0.25 correlation
 
---learning_rate=0.003 --num_epochs=10
-Process ID: 3435091
 
---learning_rate=0.001 --num_epochs=10
-Process ID: 3435124
-
---learning_rate=0.00075 --num_epochs=10   
-Process ID: 3435162
-
---learning_rate=0.0005 --num_epochs=10
-Process ID: 3435190
-
---learning_rate=0.0003 --num_epochs=10
-Process ID: 3435196
-
---learning_rate=0.0001 --num_epochs=10
-mv: nelze získat informace o 'output_dir/test_1//output_temp.log': Adresář nebo soubor neexistuje
-Process ID: 3435228
-
+# 3.10.2024
+- restructure of the model code for better and easier work
+- testing training on size 0.25
 
