@@ -361,3 +361,10 @@
 - restructure of the model code for better and easier work
 - testing training on size 0.25
 
+# 4.10.2024
+- adding small shared NN instead of simple neuron in RNNCell
+    - for each layer its own
+    - were not able to implement LSTM layer (might do manually)
+- finished results of 0.25
+    - looks like the best is of the learning rate 0.00075
+- testing training of complex NN (with NN instead of neuron)
