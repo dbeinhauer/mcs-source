@@ -29,4 +29,4 @@
 
 
 # Notes for the meeting
-- does it make sense to comput Pearson's CC for itegers (or can predictions stay floats)
+- does it make sense to comput Pearson's CC for integers (or can predictions stay floats)

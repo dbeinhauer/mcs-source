@@ -1,6 +1,5 @@
 import torch
 
-
 class NormalizedCrossCorrelation():
     """
     Class for computation Normalized Cross Correlation defined in paper:
@@ -29,6 +28,11 @@ class NormalizedCrossCorrelation():
         return prediction.round()
     
     def _merge_neuron_time_dim(self, data_tensor):
+        """
+        Merges (reshapes) time and neuron dimension for metrics computation.
+        :param data_tensor: tensor to be reshaped.
+        :return: Returns reshaped tensor.
+        """
         return data_tensor.view(
             self.batch_size, 
             self.num_trials, 

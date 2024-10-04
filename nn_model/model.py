@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 
@@ -33,7 +32,6 @@ class WeightConstraint:
                     )
 
 
-
 class ExcitatoryWeightConstraint(WeightConstraint):
     def __init__(self, layer_parameters):
         super().__init__(layer_parameters)
@@ -47,14 +45,27 @@ class InhibitoryWeightConstraint(WeightConstraint):
     def __init__(self, layer_parameters):
         super().__init__(layer_parameters)
 
-
     def apply(self, module):
         self.hidden_constraint(module, WeightConstraint.layer_kwargs['inh'])
         self.input_constraint(module)
 
 
+# Shared complexity module
+class SharedComplexity(nn.Module):
+    def __init__(self, hidden_size, complexity_size: int=64):
+        super(SharedComplexity, self).__init__()
+        # Small neural network for shared complexity
+        self.complex_layer = nn.Sequential(
+            nn.Linear(hidden_size, complexity_size),
+            nn.ReLU(),
+            nn.Linear(complexity_size, hidden_size)
+        )
+
+    def forward(self, hidden):
+        return self.complex_layer(hidden)
+
 class ConstrainedRNNCell(nn.Module):
-    def __init__(self, input_size, hidden_size, weight_constraint):
+    def __init__(self, input_size, hidden_size, weight_constraint, shared_complexity=None):
         super(ConstrainedRNNCell, self).__init__()
         self.hidden_size = hidden_size
         self.rnn_cell = nn.RNNCell(input_size, hidden_size)
@@ -66,16 +77,43 @@ class ConstrainedRNNCell(nn.Module):
     
     def apply_constraints(self):
         self.constraint.apply(self.rnn_cell)
+
+# Child class inheriting from ConstrainedRNNCell
+class ComplexConstrainedRNNCell(ConstrainedRNNCell):
+    def __init__(self, input_size, hidden_size, weight_constraint, shared_complexity):
+        # Inherit from ConstrainedRNNCell
+        super(ComplexConstrainedRNNCell, self).__init__(input_size, hidden_size, weight_constraint)
+        self.shared_complexity = shared_complexity  # Shared complexity module
+
+    def forward(self, input, hidden):
+        # Apply the RNN operation
+        hidden = self.rnn_cell(input, hidden)
+
+        # Apply the shared complexity transformation
+        complex_hidden = self.shared_complexity(hidden)
+
+        # Combine the original hidden state and the transformed one
+        combined_hidden = hidden + complex_hidden
+
+        return combined_hidden
+
+    def apply_constraints(self):
+        # Apply weight constraints inherited from ConstrainedRNNCell
+        self.constraint.apply(self.rnn_cell)
+
     
 
 class RNNCellModel(nn.Module):
-    def __init__(self, layer_sizes):
+    # def __init__(self, layer_sizes):
+    def __init__(self, layer_sizes, rnn_cell_cls=ConstrainedRNNCell, complexity_size: int=64):
         super(RNNCellModel, self).__init__()
-                
+
+        self.rnn_cell_cls = rnn_cell_cls  # Store the RNN cell class
+        self.complexity_size = complexity_size  # For complex RNN cells
+        
         self._init_layer_sizes(layer_sizes)
         self._init_weights_constraints()
         self._init_model_architecture()
-    
     
     def _init_layer_sizes(self, layer_sizes):
         self.x_on_size = layer_sizes['X_ON']
@@ -111,36 +149,50 @@ class RNNCellModel(nn.Module):
         self.l4_inhibitory_constraint = InhibitoryWeightConstraint(l4_inh_args)
         self.l23_excitatory_constraint = ExcitatoryWeightConstraint(l23_exc_args)
         self.l23_inhibitory_constraint = InhibitoryWeightConstraint(l23_inh_args)
-        
 
     def _init_model_architecture(self):
         
         input_size = self.x_on_size + self.x_off_size
 
+        # If using a complex RNN cell, provide shared complexity
+        if self.rnn_cell_cls == ComplexConstrainedRNNCell:
+            shared_complexity_l4_exc = SharedComplexity(self.l4_exc_size, self.complexity_size)
+            shared_complexity_l4_inh = SharedComplexity(self.l4_inh_size, self.complexity_size)
+            shared_complexity_l23_exc = SharedComplexity(self.l23_exc_size, self.complexity_size)
+            shared_complexity_l23_inh = SharedComplexity(self.l23_inh_size, self.complexity_size)
+        else:
+            shared_complexity_l4_exc = None
+            shared_complexity_l4_inh = None
+            shared_complexity_l23_exc = None
+            shared_complexity_l23_inh = None
+
         # Layer L4 Inh and Exc
-        self.L4_Exc = ConstrainedRNNCell(
+        self.L4_Exc = self.rnn_cell_cls(
                 input_size + self.l4_inh_size + self.l23_exc_size,
                 self.l4_exc_size, 
                 self.l4_excitatory_constraint,
+                shared_complexity_l4_exc,
             )
-        self.L4_Inh = ConstrainedRNNCell(
+        self.L4_Inh = self.rnn_cell_cls(
                 input_size + self.l4_exc_size + self.l23_exc_size,
                 self.l4_inh_size, 
-                self.l4_inhibitory_constraint
+                self.l4_inhibitory_constraint,
+                shared_complexity_l4_inh,
             )
         
         # Layer L23 Inh and Exc
-        self.L23_Exc = ConstrainedRNNCell(
+        self.L23_Exc = self.rnn_cell_cls(
                 self.l4_exc_size + self.l23_inh_size, 
                 self.l23_exc_size, 
-                self.l23_excitatory_constraint
+                self.l23_excitatory_constraint,
+                shared_complexity_l23_exc,
             )
-        self.L23_Inh = ConstrainedRNNCell(
+        self.L23_Inh = self.rnn_cell_cls(
                 self.l4_exc_size + self.l23_exc_size, 
                 self.l23_inh_size, 
-                self.l23_inhibitory_constraint
-            )        
-        
+                self.l23_inhibitory_constraint,
+                shared_complexity_l23_inh,
+            )         
 
     def forward(self, x_on, x_off, h4_exc, h4_inh, h23_exc, h23_inh):
         L4_Inh_outputs = []

@@ -13,70 +13,10 @@ from torch.amp import autocast
 from torch.utils.data import DataLoader
 
 from dataset_loader import SparseSpikeDataset, custom_collate_fn
-from model import RNNCellModel, ConstrainedRNNCell
+from model import RNNCellModel, ConstrainedRNNCell, ComplexConstrainedRNNCell
 from evaluation_metrics import NormalizedCrossCorrelation
 import globals
 
-# def normalized_cross_correlation_trials(prediction, target):
-#     """
-#     Expected input in format of 4D pytorch tensor of shape:
-#         (batch_size, num_trials, time_duration, num_neurons)
-
-#     prediction should be in silico response (`r` from the paper)
-#     target should be in vivo response (`y` from the paper)
-
-#     Inspired by the model testing in the paper:
-#     https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
-#     """
-#     # Assuming prediction and target are PyTorch tensors
-#     batch_size, num_trials, time_duration, num_neurons = prediction.shape
-
-#     # Round the prediction to closest integer.
-#     prediction = prediction.round()
-
-#     # Reshape to have time and neurons in one dimension
-#     prediction = prediction.view(batch_size, num_trials, time_duration * num_neurons)
-#     target = target.view(batch_size, num_trials, time_duration * num_neurons)
-
-#     # Averages across the trials
-#     prediction_avg = prediction.mean(dim=1)
-#     target_avg = target.mean(dim=1)
-
-#     pred_flat = prediction_avg
-#     target_flat = target_avg
-
-#     # Calculate means
-#     mean_pred = pred_flat.mean(dim=1, keepdim=True)
-#     mean_target = target_flat.mean(dim=1, keepdim=True)
-
-#     # Calculate covariance between prediction and target
-#     cov = ((pred_flat - mean_pred) * (target_flat - mean_target)).mean(dim=1)
-
-#     # Calculate standard deviations
-#     std_pred = pred_flat.std(dim=1, unbiased=False)
-#     std_target = target_flat.std(dim=1, unbiased=False)
-
-#     # Calculate correlation coefficients
-#     cc_abs = cov / (std_pred * std_target + 0.00000001)
-
-#     # CC_MAX CALCULATION
-#     std_target_original = target.std(dim=1, unbiased=False)
-
-#     var_target_original = std_target_original * std_target_original
-
-#     var_target_original_mean = var_target_original.mean(dim=1)
-
-#     numerator = (std_target * std_target) * num_trials - var_target_original_mean
-#     denominator = (num_trials - 1) * (std_target * std_target) + 0.000000001
-
-#     cc_max = torch.sqrt(numerator / denominator)
-
-#     cc_norm = cc_abs / cc_max
-
-#     cc_norm_batch_mean = cc_norm.mean(dim=0).item()
-#     # print(cc_norm_batch_mean)
-
-#     return cc_norm_batch_mean
 
 class ModelExecuter():
     # Input layer keys (LGN).
@@ -94,7 +34,8 @@ class ModelExecuter():
 
         self.train_dataset, self.test_dataset = self._init_datasets(args)
         self.train_loader, self.test_loader = self._init_data_loaders()
-        self.model = self._init_model()
+        
+        self.model = self._init_model(args)
 
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(args.learning_rate)
@@ -105,8 +46,13 @@ class ModelExecuter():
 
         self._print_experiment_info(args)
 
+    def _get_model_type(self, model_identifier: str):
+        if model_identifier == 'simple':
+            return ConstrainedRNNCell
+        if model_identifier == 'complex':
+            return ComplexConstrainedRNNCell
 
-    def _split_input_output_layers(self):# -> tuple[dict[str, int], dict[str, int]]:
+    def _split_input_output_layers(self):
         input_layers = {
             key: self.layer_sizes[key] for key in ModelExecuter.input_layers
         }
@@ -116,7 +62,7 @@ class ModelExecuter():
 
         return input_layers, output_layers
     
-    def _init_datasets(self, args):# -> tuple[SparseSpikeDataset, SparseSpikeDataset]:
+    def _init_datasets(self, args):
         input_layers, output_layers = self._split_input_output_layers()
 
         train_dataset = SparseSpikeDataset(
@@ -151,8 +97,18 @@ class ModelExecuter():
 
         return train_loader, test_loader
 
-    def _init_model(self) -> RNNCellModel:
-        return RNNCellModel(self.layer_sizes).to(globals.device1)
+    def _init_model(self, args):# -> RNNCellModel:
+        if args.model == 'simple':
+            return RNNCellModel(self.layer_sizes).to(globals.device1)
+        if args.model == 'complex':
+            return RNNCellModel(
+                    self.layer_sizes, 
+                    ComplexConstrainedRNNCell, 
+                    complexity_size=args.complexity_size
+                ).to(globals.device1)
+        
+        # return RNNCellModel
+        # return RNNCellModel(self.layer_sizes).to(globals.device1)
     
     def _init_criterion(self):
         return torch.nn.MSELoss()
@@ -165,6 +121,8 @@ class ModelExecuter():
                 "NEW EXPERIMENT",
                 "---------------------------------",
                 "Running with parameters:",
+                f"Model variant: {args.model}",
+                f"Complexity model size: {args.complexity_size}",
                 f"Batch size: {globals.train_batch_size}",
                 f"Learning rate: {args.learning_rate}",
                 f"Num epochs: {args.num_epochs}",
@@ -277,9 +235,6 @@ class ModelExecuter():
                     dict_predictions[key] = [prediction]
                 else:
                     dict_predictions[key].append(prediction)
-                # dict_predictions[key]
-            # del trial_predictions
-            # torch.cuda.empty_cache()
 
         return dict_predictions
 
@@ -307,9 +262,6 @@ class ModelExecuter():
         cross_correlation = 0
 
         for layer, target in targets.items():
-            # print(target)
-            # if layer == "V1_Inh_L23":
-            #     print("problematic part")
             cross_correlation += self.evaluation_metrics.calculate(
                     predictions[layer].to(globals.device0), 
                     target.to(globals.device0)
@@ -342,11 +294,10 @@ class ModelExecuter():
 # from torchviz import make_dot
 
 def main(args):
-
     model_executer = ModelExecuter(args)
 
     model_executer.train(evaluation_step=1)
-    model_executer.evaluation(subset=1)
+    model_executer.evaluation()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -356,6 +307,10 @@ if __name__ == "__main__":
     parser.add_argument("--test_dir", type=str, default=f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}", 
         help="")
     parser.add_argument("--subset_dir", type=str, default=f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(globals.SIZE_MULTIPLIER*100)}.pkl", 
+        help="")
+    parser.add_argument("--model", type=str, default="simple", choices=['simple', 'complex'],
+        help="")
+    parser.add_argument("--complexity_size", type=int, default=64,
         help="")
     parser.add_argument("--learning_rate", type=float, default=0.001, 
         help="")

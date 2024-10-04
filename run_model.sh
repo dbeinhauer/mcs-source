@@ -1,21 +1,21 @@
 #!/bin/bash
 
 # Check if the correct number of arguments is passed
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <output_dir> <learning_rate> <num_epochs>"
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <output_dir> <model> <learning_rate> <num_epochs>"
     exit 1
 fi
 
 # Assign command-line arguments to variables
-LEARNING_RATE=$2
-NUM_EPOCHS=$3
+MODEL=$2
+LEARNING_RATE=$3
+NUM_EPOCHS=$4
 
 # Directory to store the output log
-# OUTPUT_DIR="output_dir/$1"
 OUTPUT_DIR=$1
 
 # Command to execute, including the learning rate and number of epochs
-COMMAND="python nn_model/model_executer.py --learning_rate=$LEARNING_RATE --num_epochs=$NUM_EPOCHS"
+COMMAND="python nn_model/model_executer.py --model=$MODEL --learning_rate=$LEARNING_RATE --num_epochs=$NUM_EPOCHS"
 
 # Print the command to be run
 echo "Running command: $COMMAND"
