@@ -4,7 +4,8 @@
 # Model Diminishing factor
 # SIZE_MULTIPLIER = 0.53
 # SIZE_MULTIPLIER = 0.1
-SIZE_MULTIPLIER = 0.25
+# SIZE_MULTIPLIER = 0.25
+SIZE_MULTIPLIER = 0.5
 
 # Model time step size
 TIME_STEP = 5
@@ -37,4 +38,4 @@ device0 = device1
 
 # Batch sizes:
 train_batch_size = 50
-test_batch_size = 20
+test_batch_size = 10

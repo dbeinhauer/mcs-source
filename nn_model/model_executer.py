@@ -173,7 +173,7 @@ class ModelExecuter():
         for epoch in range(self.num_epochs):
             loss = 0
             for i, (inputs, targets) in enumerate(tqdm(self.train_loader)):
-                # if i > 1:
+                # if i > 3:
                 #     break
                 inputs, targets = self._get_data(inputs, targets)
 
