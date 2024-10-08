@@ -1,4 +1,8 @@
-
+"""
+This source code contains definition of all global variables that
+are used accorss multiple source files. Typically information
+about the layer and model parameters.
+"""
 # Model Parameters:
 
 # Model Diminishing factor

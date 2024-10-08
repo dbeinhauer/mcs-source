@@ -13,6 +13,11 @@ def rename_files(args):
     """
     Iterates through the directory and renames all files containing the spikes 
     based on the given template.
+
+    Note: Default template and also expected variant in further operations 
+    with the dataset is:
+        `spikes_[trial_{trial_id}]_{experiment_id}.npz
+    Where `[]` means that this part is optional (only when multitrial experiments).
     :param args: command line arguments specifying the renaming process.
     """
     # Regular expression to match filenames containing numbers.

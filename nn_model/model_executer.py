@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.amp import autocast
 from torch.utils.data import DataLoader
 
-from dataset_loader import SparseSpikeDataset, custom_collate_fn
+from dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from model import RNNCellModel, ConstrainedRNNCell, ComplexConstrainedRNNCell
 from evaluation_metrics import NormalizedCrossCorrelation
 import globals
@@ -87,12 +87,12 @@ class ModelExecuter():
             self.train_dataset, 
             batch_size=globals.train_batch_size, 
             shuffle=True, 
-            collate_fn=custom_collate_fn
+            collate_fn=different_times_collate_fn
         )
         test_loader = DataLoader(
             self.test_dataset, 
             batch_size=globals.test_batch_size, 
-            collate_fn=custom_collate_fn
+            collate_fn=different_times_collate_fn
         )
 
         return train_loader, test_loader

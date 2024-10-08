@@ -1,3 +1,7 @@
+"""
+This source code contains implementations of all evaluation metrics used
+in our model.
+"""
 import torch
 
 class NormalizedCrossCorrelation():

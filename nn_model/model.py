@@ -1,3 +1,6 @@
+"""
+This source code contains definition of all models used in our experiments.
+"""
 import torch
 import torch.nn as nn
 
@@ -5,27 +8,71 @@ import globals
 
 
 class WeightConstraint:
+    """
+    Parent class used for applying weight constraints for 
+    excitatory/inhibitory layers.
+    """
+    # kwargs of the excitatory/inhibitory layers.
     layer_kwargs = {
         'exc': {"min": 0},
         'inh': {'max': 0},
     }
 
-    def __init__(self, layer_parameters):
-        self.layer_parameters = layer_parameters
+    def __init__(self, input_parameters):
+        """
+        Assigns information used for weight application.
+        :param input_parameters: list of dictionaries that describes the
+        input constitution of the layer based on which we can select correct 
+        constraints. 
+        
+        The list is sorted in ascending order. It means that 
+        the first item of the list defines first part of the layer 
+        (the lowest indices of the layer). Then follows the next neurons in the 
+        layer till it reaches the end of the input. 
+        
+        In the directory there should be keys `part_type` specifying which 
+        type of neurons belongs to corresponding partition (excitatory/inhibitory), 
+        possible values are keys from `layer_kwargs` (it means `['inh', 'exc']`),
+        and `part_size` defining number of neurons that belongs to such part.
+        The sum of `part_size` values should be equal to input size of this layer.
+        """
+        # List of dictionaries of each input layer of this layer information.
+        self.input_parameters = input_parameters
 
     def hidden_constraint(self, module, kwargs):
+        """
+        Applies constraints on the `weight_hh` (hidden) parameters 
+        of the provided layer. Aplying excitatory/inhibitory constraint.
+        :param module: module (layer) to which we want to apply the constraint to.
+        :param kwargs: kwargs of the `torch.clamp` function specifying the
+        operation on the weights.
+        """
         if hasattr(module, 'weight_hh'):
             module.weight_hh.data = torch.clamp(module.weight_hh.data, **kwargs)
 
     def input_constraint(self, module):
+        """
+        Applies constraint on the `weight_ih` (input) parameters of the provided
+        layer. Applying excitatory/inhibitory constraint on the given 
+        part of the input of the layer.
+
+        Applies the constrain in ascending order to the parts of the weights
+        based on the properties of the input of the layer specified in the
+        attribute `self.input_parameters`.
+        :param module: module (layer) to which we want to apply the constraint to.
+        """
         if hasattr(module, 'weight_ih'):
             end_index = 0
-            for item in self.layer_parameters:
+            for item in self.input_parameters:
+                # Iterate each input layer part (input neuron layers).
                 part_size = item['part_size']
                 part_kwargs = WeightConstraint.layer_kwargs[item['part_type']]
+
+                # Define the section where the constraint should be applied.
                 start_index = end_index
                 end_index += part_size
-                # Apply non-negative constraint to the first part
+
+                # Apply constraint to the selected section of input weights.
                 module.weight_ih.data[start_index:end_index] = torch.clamp(
                         module.weight_ih.data[start_index:end_index], 
                         **part_kwargs,
@@ -33,26 +80,56 @@ class WeightConstraint:
 
 
 class ExcitatoryWeightConstraint(WeightConstraint):
-    def __init__(self, layer_parameters):
-        super().__init__(layer_parameters)
+    """
+    Class used for applying weight constraints for excitatory layers.
+    """
+    def __init__(self, input_parameters):
+        """
+        :param input_parameters: input parameters for the parent 
+        `WeightConstraint` class.
+        """
+        super().__init__(input_parameters)
 
     def apply(self, module):
+        """
+        Applies the constraints on the given module.
+        :param module: module (layer) to which we want to apply the constraint to.
+        """
+        # Apply excitatory condition to all hidden neurons.
         self.hidden_constraint(module, WeightConstraint.layer_kwargs['exc'])
         self.input_constraint(module)
 
 
 class InhibitoryWeightConstraint(WeightConstraint):
-    def __init__(self, layer_parameters):
-        super().__init__(layer_parameters)
+    """
+    Class used for applying weight constraints for excitatory layers.
+    """
+    def __init__(self, input_parameters):
+        """
+        :param input_parameters: input parameters for the parent 
+        `WeightConstraint` class.
+        """
+        super().__init__(input_parameters)
 
     def apply(self, module):
+        """
+        Applies the constraints on the given module.
+        :param module: module (layer) to which we want to apply the constraint to.
+        """
+        # Apply inhibitory condition to all hidden neurons.
         self.hidden_constraint(module, WeightConstraint.layer_kwargs['inh'])
         self.input_constraint(module)
 
 
 # Shared complexity module
 class SharedComplexity(nn.Module):
+    """
+    TODO:
+    Class defining shared complexity of the layer that should represent
+    one neuron (more complex neuron than just one operation).
+    """
     def __init__(self, hidden_size, complexity_size: int=64):
+
         super(SharedComplexity, self).__init__()
         # Small neural network for shared complexity
         self.complex_layer = nn.Sequential(
@@ -64,22 +141,54 @@ class SharedComplexity(nn.Module):
     def forward(self, hidden):
         return self.complex_layer(hidden)
 
+
 class ConstrainedRNNCell(nn.Module):
-    def __init__(self, input_size, hidden_size, weight_constraint, shared_complexity=None):
+    """
+    Class defining RNNCell (model layer) constrained with 
+    model assumptions (inhibitory/excitatory layers).
+    """
+    def __init__(
+            self, 
+            input_size, 
+            hidden_size, 
+            weight_constraint, 
+            shared_complexity=None
+        ):
+        """
+        Initializes layer parameters and constraints.
+        :param input_size: input size of the layer.
+        :param hidden_size: hidden (output) size of the layer.
+        :param weight_constraint: constraints of the layer.
+        :param shared_complexity: placeholder for shared complexity
+        model used in more complex models. Here only for proper header
+        definintion. 
+        """
         super(ConstrainedRNNCell, self).__init__()
         self.hidden_size = hidden_size
         self.rnn_cell = nn.RNNCell(input_size, hidden_size)
         self.constraint = weight_constraint
 
     def forward(self, input, hidden):
+        """
+        Forward step the cell. One time step.
+        :param input: input data.
+        :param hidden: output data of the previous step (or zeros if first step).
+        :return: Returns the output of the forward step.
+        """
         hidden = self.rnn_cell(input, hidden)
         return hidden
     
     def apply_constraints(self):
+        """
+        Applies the layer constraint on the weights.
+        """
         self.constraint.apply(self.rnn_cell)
 
-# Child class inheriting from ConstrainedRNNCell
+
 class ComplexConstrainedRNNCell(ConstrainedRNNCell):
+    """
+    TODO: Applying shared complexity.
+    """
     def __init__(self, input_size, hidden_size, weight_constraint, shared_complexity):
         # Inherit from ConstrainedRNNCell
         super(ComplexConstrainedRNNCell, self).__init__(input_size, hidden_size, weight_constraint)
@@ -104,8 +213,15 @@ class ComplexConstrainedRNNCell(ConstrainedRNNCell):
     
 
 class RNNCellModel(nn.Module):
-    # def __init__(self, layer_sizes):
-    def __init__(self, layer_sizes, rnn_cell_cls=ConstrainedRNNCell, complexity_size: int=64):
+    """
+    
+    """
+    def __init__(
+            self, 
+            layer_sizes, 
+            rnn_cell_cls=ConstrainedRNNCell, 
+            complexity_size: int=64
+        ):
         super(RNNCellModel, self).__init__()
 
         self.rnn_cell_cls = rnn_cell_cls  # Store the RNN cell class
