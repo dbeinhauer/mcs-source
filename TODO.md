@@ -8,6 +8,9 @@
 - tools for summarizing training results
 - improve output of the training to facilitate follow-up work with it
 - class for different metrics
+- change the code structure to work with the layers in a way of 
+dictionaries
+- create new branch for model architecture change
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)

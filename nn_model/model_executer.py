@@ -13,7 +13,7 @@ from torch.amp import autocast
 from torch.utils.data import DataLoader
 
 from dataset_loader import SparseSpikeDataset, different_times_collate_fn
-from model import RNNCellModel, ConstrainedRNNCell, ComplexConstrainedRNNCell
+from models import RNNCellModel, ConstrainedRNNCell, ComplexConstrainedRNNCell
 from evaluation_metrics import NormalizedCrossCorrelation
 import globals
 
@@ -23,14 +23,15 @@ class ModelExecuter():
     input_layers = ['X_ON', 'X_OFF']
 
     def __init__(self, args):
-        self.layer_sizes = {
-            'X_ON': globals.X_ON_SIZE,
-            'X_OFF': globals.X_OFF_SIZE,
-            'V1_Exc_L4': globals.L4_EXC_SIZE,
-            'V1_Inh_L4': globals.L4_INH_SIZE,
-            'V1_Exc_L23': globals.L23_EXC_SIZE, 
-            'V1_Inh_L23': globals.L23_INH_SIZE, 
-        }
+        # self.layer_sizes = {
+        #     'X_ON': globals.X_ON_SIZE,
+        #     'X_OFF': globals.X_OFF_SIZE,
+        #     'V1_Exc_L4': globals.L4_EXC_SIZE,
+        #     'V1_Inh_L4': globals.L4_INH_SIZE,
+        #     'V1_Exc_L23': globals.L23_EXC_SIZE, 
+        #     'V1_Inh_L23': globals.L23_INH_SIZE, 
+        # }
+        self.layer_sizes = globals.MODEL_SIZES
 
         self.train_dataset, self.test_dataset = self._init_datasets(args)
         self.train_loader, self.test_loader = self._init_data_loaders()

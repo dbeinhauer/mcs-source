@@ -19,8 +19,8 @@ class SparseSpikeDataset(Dataset):
     def __init__(
             self, 
             spikes_dir: str, 
-            input_layers: dict[str, int],
-            output_layers: dict[str, int],
+            input_layers,#: dict[str, int],
+            output_layers,#: dict[str, int],
             is_test: bool=False,
             model_subset_path=None, 
         ):
