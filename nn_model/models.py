@@ -77,6 +77,11 @@ class RNNCellModel(nn.Module):
     """
     
     """
+    layers_inputs = {
+        LayerType.V1_Exc_L4.value:
+    }
+
+
     def __init__(
             self,
             # layer_names
@@ -97,7 +102,7 @@ class RNNCellModel(nn.Module):
         self.weight_constraints = self._init_weights_constraints()
         self._init_model_architecture()
 
-    def _init_layer_configs(self):
+    def _init_layer_configs(self, layer_sizes, ):
         {
             LayerConfig()
         }
@@ -113,36 +118,36 @@ class RNNCellModel(nn.Module):
 
     def _init_weights_constraints(self):#, layer_config):
         # TODO: uncomment
-        # return {
-        #     layer: layer_config.constraint
-        #     for layer, layer_config in self.layers_config.items()
-        # }
+        return {
+            layer: layer_config.constraint
+            for layer, layer_config in self.layers_config.items()
+        }
 
-        l4_exc_args = [
-            {'part_size': self.x_on_size, 'part_type': 'exc'},
-            {'part_size': self.x_off_size, 'part_type': 'exc'},
-            {'part_size': self.l4_inh_size, 'part_type': 'inh'},
-            {'part_size': self.l23_exc_size, 'part_type': 'exc'},
-        ]
-        l4_inh_args = [
-            {'part_size': self.x_on_size, 'part_type': 'exc'},
-            {'part_size': self.x_off_size, 'part_type': 'exc'},
-            {'part_size': self.l4_exc_size, 'part_type': 'exc'},
-            {'part_size': self.l23_exc_size, 'part_type': 'exc'},
-        ]
-        l23_exc_args = [
-            {'part_size': self.l4_exc_size, 'part_type': 'exc'},
-            {'part_size': self.l23_inh_size, 'part_type': 'inh'},
-        ]
-        l23_inh_args = [
-            {'part_size': self.l4_exc_size, 'part_type': 'exc'},
-            {'part_size': self.l23_exc_size, 'part_type': 'exc'},
-        ]
+        # l4_exc_args = [
+        #     {'part_size': self.x_on_size, 'part_type': 'exc'},
+        #     {'part_size': self.x_off_size, 'part_type': 'exc'},
+        #     {'part_size': self.l4_inh_size, 'part_type': 'inh'},
+        #     {'part_size': self.l23_exc_size, 'part_type': 'exc'},
+        # ]
+        # l4_inh_args = [
+        #     {'part_size': self.x_on_size, 'part_type': 'exc'},
+        #     {'part_size': self.x_off_size, 'part_type': 'exc'},
+        #     {'part_size': self.l4_exc_size, 'part_type': 'exc'},
+        #     {'part_size': self.l23_exc_size, 'part_type': 'exc'},
+        # ]
+        # l23_exc_args = [
+        #     {'part_size': self.l4_exc_size, 'part_type': 'exc'},
+        #     {'part_size': self.l23_inh_size, 'part_type': 'inh'},
+        # ]
+        # l23_inh_args = [
+        #     {'part_size': self.l4_exc_size, 'part_type': 'exc'},
+        #     {'part_size': self.l23_exc_size, 'part_type': 'exc'},
+        # ]
 
-        self.l4_excitatory_constraint = ExcitatoryWeightConstraint(l4_exc_args)
-        self.l4_inhibitory_constraint = InhibitoryWeightConstraint(l4_inh_args)
-        self.l23_excitatory_constraint = ExcitatoryWeightConstraint(l23_exc_args)
-        self.l23_inhibitory_constraint = InhibitoryWeightConstraint(l23_inh_args)
+        # self.l4_excitatory_constraint = ExcitatoryWeightConstraint(l4_exc_args)
+        # self.l4_inhibitory_constraint = InhibitoryWeightConstraint(l4_inh_args)
+        # self.l23_excitatory_constraint = ExcitatoryWeightConstraint(l23_exc_args)
+        # self.l23_inhibitory_constraint = InhibitoryWeightConstraint(l23_inh_args)
 
 
     # def _init_layer(self, layer_name, input_layers_names):

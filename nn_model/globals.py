@@ -3,7 +3,7 @@ This source code contains definition of all global variables that
 are used accorss multiple source files. Typically information
 about the layer and model parameters.
 """
-from enum import Enum#, auto
+from enum import Enum
 
 # Model Parameters:
 
