@@ -78,7 +78,26 @@ class RNNCellModel(nn.Module):
     
     """
     layers_inputs = {
-        LayerType.V1_Exc_L4.value:
+        LayerType.V1_Exc_L4.value: [
+            LayerType.X_ON.value,
+            LayerType.X_OFF.value,
+            LayerType.V1_Inh_L4.value,
+            LayerType.V1_Exc_L23.value,
+        ],
+        LayerType.V1_Inh_L4.value: [
+            LayerType.X_ON.value,
+            LayerType.X_OFF.value,
+            LayerType.V1_Exc_L4.value,
+            LayerType.V1_Exc_L23.value,
+        ],
+        LayerType.V1_Exc_L23.value: [
+            LayerType.V1_Exc_L4.value,
+            LayerType.V1_Inh_L23.value,
+        ],
+        LayerType.V1_Inh_L23.value: [
+            LayerType.V1_Exc_L4.value,
+            LayerType.V1_Exc_L23.value,
+        ],
     }
 
 
@@ -98,13 +117,38 @@ class RNNCellModel(nn.Module):
         self._init_layer_sizes(layer_sizes)
 
         self.layer_sizes = layer_sizes
-        # self.layers_configs = self._init_layer_configs()
+        self.layers_configs = self._init_layer_configs()
         self.weight_constraints = self._init_weights_constraints()
         self._init_model_architecture()
 
-    def _init_layer_configs(self, layer_sizes, ):
-        {
-            LayerConfig()
+    def _init_complex_complexities(self):
+
+    def _init_shared_complexities(self):
+        if self.rnn_cell_cls == ComplexConstrainedRNNCell:
+            return SharedComplexity
+            # shared_complexity_l4_exc = SharedComplexity(self.l4_exc_size, self.complexity_size)
+            # shared_complexity_l4_inh = SharedComplexity(self.l4_inh_size, self.complexity_size)
+            # shared_complexity_l23_exc = SharedComplexity(self.l23_exc_size, self.complexity_size)
+            # shared_complexity_l23_inh = SharedComplexity(self.l23_inh_size, self.complexity_size)
+        # else:
+        return None
+            # shared_complexity_l4_exc = None
+            # shared_complexity_l4_inh = None
+            # shared_complexity_l23_exc = None
+            # shared_complexity_l23_inh = None
+
+    def _init_shared_complexities(self, complexity):
+
+
+    def _init_layer_configs(self, layer_sizes, shared_complexities):
+        return {
+            layer: LayerConfig(
+                    layer_sizes[layer], 
+                    layer, 
+                    RNNCellModel.layers_inputs[layer],
+                    shared_complexities[layer],
+                )
+            for layer in RNNCellModel.layers_inputs.keys()
         }
     
     def _init_layer_sizes(self, layer_sizes):
