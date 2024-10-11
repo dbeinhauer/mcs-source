@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+This script defines manipulation with the models and is used to execute 
+model training and evaluation.
+"""
 
 import argparse
 import os
@@ -6,17 +10,20 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-import numpy as np
 from tqdm import tqdm
 import torch.nn
 import torch.optim as optim
-from torch.amp import autocast
 from torch.utils.data import DataLoader
 
-from dataset_loader import SparseSpikeDataset, different_times_collate_fn
-from models import RNNCellModel, ConstrainedRNNCell, ComplexConstrainedRNNCell
-from evaluation_metrics import NormalizedCrossCorrelation
 import globals
+from type_variants import LayerType, ModelTypes
+from dataset_loader import SparseSpikeDataset, different_times_collate_fn
+from models import (
+    RNNCellModel,
+    ConstrainedRNNCell,
+    ComplexConstrainedRNNCell,
+)
+from evaluation_metrics import NormalizedCrossCorrelation
 
 
 class ModelExecuter:
@@ -24,26 +31,31 @@ class ModelExecuter:
     input_layers = ["X_ON", "X_OFF"]
 
     def __init__(self, args):
+        """
+        Initializes dataset loaders, model and evaluation steps.
+        :param args: arguments defining next
+        """
+        # Basic arguments
+        self.num_epochs = args.num_epochs
         self.layer_sizes = globals.MODEL_SIZES
 
+        # Dataset Init
         self.train_dataset, self.test_dataset = self._init_datasets(args)
         self.train_loader, self.test_loader = self._init_data_loaders()
 
+        # Model Init
         self.model = self._init_model(args)
-
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(args.learning_rate)
 
+        # Evaluation metric
         self.evaluation_metrics = NormalizedCrossCorrelation()
-
-        self.num_epochs = args.num_epochs
-
         self._print_experiment_info(args)
 
     def _get_model_type(self, model_identifier: str):
-        if model_identifier == "simple":
+        if model_identifier == ModelTypes.SIMPLE.value:
             return ConstrainedRNNCell
-        if model_identifier == "complex":
+        if model_identifier == ModelTypes.COMPLEX.value:
             return ComplexConstrainedRNNCell
 
     def _split_input_output_layers(self):
@@ -94,13 +106,15 @@ class ModelExecuter:
         return train_loader, test_loader
 
     def _init_model(self, args):  # -> RNNCellModel:
-        if args.model == "simple":
+        if args.model == ModelTypes.SIMPLE.value:
             return RNNCellModel(self.layer_sizes).to(globals.device1)
-        if args.model == "complex":
+        if args.model == ModelTypes.COMPLEX.value:
             return RNNCellModel(
                 self.layer_sizes,
                 ComplexConstrainedRNNCell,
-                complexity_size={"complex_size": args.complexity_size},
+                complexity_kwargs={
+                    ModelTypes.COMPLEX.value: {"complexity_size": args.complexity_size}
+                },
             ).to(globals.device1)
 
         # return RNNCellModel
@@ -110,8 +124,6 @@ class ModelExecuter:
         return torch.nn.MSELoss()
 
     def _init_optimizer(self, learning_rate):
-        for name, param in self.model.named_parameters():
-            print(name, param.size())
         return optim.Adam(self.model.parameters(), lr=learning_rate)
 
     def _print_experiment_info(self, args):
@@ -153,20 +165,24 @@ class ModelExecuter:
         # h23_inh = torch.zeros(batch_size, self.model.l23_inh_size).to(globals.device1)
         h4_exc = torch.zeros(
             batch_size,
-            self.model.layers_configs[globals.LayerType.V1_Exc_L4.value].size,
-        ).to(globals.device0)
+            self.layer_sizes[LayerType.V1_Exc_L4.value],
+            device=globals.device0,
+        )  # .to(globals.device0)
         h4_inh = torch.zeros(
             batch_size,
-            self.model.layers_configs[globals.LayerType.V1_Inh_L4.value].size,
-        ).to(globals.device0)
+            self.layer_sizes[LayerType.V1_Inh_L4.value],
+            device=globals.device0,
+        )  # .to(globals.device0)
         h23_exc = torch.zeros(
             batch_size,
-            self.model.layers_configs[globals.LayerType.V1_Exc_L23.value].size,
-        ).to(globals.device1)
+            self.layer_sizes[LayerType.V1_Exc_L23.value],
+            device=globals.device0,
+        )  # .to(globals.device1)
         h23_inh = torch.zeros(
             batch_size,
-            self.model.layers_configs[globals.LayerType.V1_Inh_L23.value].size,
-        ).to(globals.device1)
+            self.layer_sizes[LayerType.V1_Inh_L23.value],
+            device=globals.device0,
+        )  # .to(globals.device1)
         return h4_exc, h4_inh, h23_exc, h23_inh
 
     def _compute_loss(self, predictions, targets):
@@ -189,10 +205,9 @@ class ModelExecuter:
         for epoch in range(self.num_epochs):
             loss = 0
             for i, (inputs, targets) in enumerate(tqdm(self.train_loader)):
-                if i > 3:
-                    break
+                # if i > 3:
+                #     break
                 inputs, targets = self._get_data(inputs, targets)
-
                 self.optimizer.zero_grad()
 
                 h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
@@ -341,11 +356,15 @@ if __name__ == "__main__":
         help="",
     )
     parser.add_argument(
-        "--model", type=str, default="simple", choices=["simple", "complex"], help=""
+        "--model",
+        type=str,
+        default="simple",
+        choices=[model_type.value for model_type in ModelTypes],
+        help="",
     )
     parser.add_argument("--complexity_size", type=int, default=64, help="")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="")
-    parser.add_argument("--num_epochs", type=int, default=3, help="")
+    parser.add_argument("--num_epochs", type=int, default=10, help="")
 
     args = parser.parse_args()
     main(args)

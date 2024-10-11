@@ -3,14 +3,9 @@ This script defines all classes used as weights contraints. These
 are typically used for determination of excitatory/inhibitory layer.
 """
 
-from enum import Enum
-
 import torch
 
-
-class WeightTypes(Enum):
-    EXCITATORY = "exc"
-    INHIBITORY = "inh"
+from type_variants import WeightTypes
 
 
 class WeightConstraint:

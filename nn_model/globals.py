@@ -4,7 +4,7 @@ are used accorss multiple source files. Typically information
 about the layer and model parameters.
 """
 
-from enum import Enum
+from type_variants import LayerType
 
 # Model Parameters:
 
@@ -16,15 +16,6 @@ SIZE_MULTIPLIER = 0.1
 
 # Model time step size
 TIME_STEP = 5
-
-
-class LayerType(Enum):
-    X_ON = "X_ON"
-    X_OFF = "X_OFF"
-    V1_Exc_L4 = "V1_Exc_L4"
-    V1_Inh_L4 = "V1_Inh_L4"
-    V1_Exc_L23 = "V1_Exc_L23"
-    V1_Inh_L23 = "V1_Inh_L23"
 
 
 # Will return values as its names

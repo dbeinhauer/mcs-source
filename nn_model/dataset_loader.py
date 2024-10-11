@@ -5,6 +5,7 @@ This source code defines dataset class for storing the experiment data.
 import os
 import pickle
 from collections import defaultdict
+from typing import Dict, List
 
 import numpy as np
 from scipy.sparse import load_npz
@@ -22,10 +23,10 @@ class SparseSpikeDataset(Dataset):
     def __init__(
         self,
         spikes_dir: str,
-        input_layers,  #: dict[str, int],
-        output_layers,  #: dict[str, int],
+        input_layers: Dict[str, int],
+        output_layers: Dict[str, int],
         is_test: bool = False,
-        model_subset_path=None,
+        model_subset_path: str = None,
     ):
         """
         Initializes class atributes, loads model subset indices and all
@@ -61,7 +62,7 @@ class SparseSpikeDataset(Dataset):
         """
         return len(self.experiments)
 
-    def _load_all_spikes_filenames(self, subdir="X_ON"):
+    def _load_all_spikes_filenames(self, subdir: str = "X_ON") -> List[List[str]]:
         """
         Load all spikes filenames from the provided layer subdirectory
         (the filenames should be same for all subdirectories). Additionally,
@@ -112,7 +113,7 @@ class SparseSpikeDataset(Dataset):
         with open(path, "rb") as pickle_file:
             return pickle.load(pickle_file)
 
-    def _load_model_subset_indices(self, model_subset_path):
+    def _load_model_subset_indices(self, model_subset_path: str):
         """
         Loads indices of the neurons that are part of the selected subset.
         For running the training/evaluation still on the same subset of neurons.
@@ -131,7 +132,7 @@ class SparseSpikeDataset(Dataset):
 
         return None
 
-    def _prepare_experiment_data(self, file_path: str, layer: str):
+    def _prepare_experiment_data(self, file_path: str, layer: str):  # -> np.array:
         """
         Loads spikes data from spartse scipy representation for
         the given experiment. Converts to dense reprezentation
