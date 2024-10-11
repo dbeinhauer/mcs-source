@@ -2,9 +2,11 @@
 This source code contains implementations of all evaluation metrics used
 in our model.
 """
+
 import torch
 
-class NormalizedCrossCorrelation():
+
+class NormalizedCrossCorrelation:
     """
     Class for computation Normalized Cross Correlation defined in paper:
     https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
@@ -15,8 +17,8 @@ class NormalizedCrossCorrelation():
         CC_ABS = Cov(r^{dash}, y^{dash}) / sqrt(Var(r^{dash})*Var(y^{dash}))
         CC_MAX = sqrt((N*Var(r^{dash} - Var(y)^{dash}) / ((N-1)*Var(y^{dash})))
 
-    Where `r` is in silico response (prediction), `y` is in vivo 
-    response (target), N is number of trials, and dashed values are means 
+    Where `r` is in silico response (prediction), `y` is in vivo
+    response (target), N is number of trials, and dashed values are means
     across the trials.
     """
 
@@ -30,7 +32,7 @@ class NormalizedCrossCorrelation():
         :return: Returns predictions rounded to integer.
         """
         return prediction.round()
-    
+
     def _merge_neuron_time_dim(self, data_tensor):
         """
         Merges (reshapes) time and neuron dimension for metrics computation.
@@ -38,32 +40,30 @@ class NormalizedCrossCorrelation():
         :return: Returns reshaped tensor.
         """
         return data_tensor.view(
-            self.batch_size, 
-            self.num_trials, 
-            self.time_duration * self.num_neurons
+            self.batch_size, self.num_trials, self.time_duration * self.num_neurons
         )
 
-    def _trials_avg(self, prediction, target, dim: int=1):
+    def _trials_avg(self, prediction, target, dim: int = 1):
         """
         Calculates prediction and target averages over the trial.
         :param prediction: prediction tensor.
         :param target: target tensor.
         :param dim: trials dimension (to compute average across).
-        :return: Returns tuple of prediction and target tensor 
+        :return: Returns tuple of prediction and target tensor
         averaged over the trials.
         """
         avg_prediction = prediction.mean(dim=dim)
         avg_target = target.mean(dim=dim)
 
         return avg_prediction, avg_target
-    
-    def _neurons_std(self, avg_prediction, avg_target, dim: int=1):
+
+    def _neurons_std(self, avg_prediction, avg_target, dim: int = 1):
         """
-        Calculates standard deviation over neurons for average 
+        Calculates standard deviation over neurons for average
         predictions and targets over trials.
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
-        :param dim: dimension for which we want to compute 
+        :param dim: dimension for which we want to compute
         the std (neurons dimension).
         :return: Returns tuple of tensors of std for predictions and targets.
         """
@@ -72,16 +72,15 @@ class NormalizedCrossCorrelation():
 
         return std_pred, std_target
 
-
-    def _covariance(self, avg_prediction, avg_target, dim: int=1) -> float:
+    def _covariance(self, avg_prediction, avg_target, dim: int = 1) -> float:
         """
-        Calculates the covariance between predictions and targets 
+        Calculates the covariance between predictions and targets
         averaged across trials.
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
-        :param dim: dimension for which we want to compute 
+        :param dim: dimension for which we want to compute
         the covariance (neurons dimension).
-        :return: Returns covariance between predictions 
+        :return: Returns covariance between predictions
         and targets averaged across trials.
         """
         # Mean across neurons.
@@ -92,15 +91,15 @@ class NormalizedCrossCorrelation():
         return ((avg_prediction - mean_pred) * (avg_target - mean_target)).mean(dim=dim)
 
     def _cc_abs(
-            self, 
-            avg_prediction, 
-            avg_target, 
-            std_pred, 
-            std_target, 
-            denom_offset: float=1e-8
-        ) -> float:
+        self,
+        avg_prediction,
+        avg_target,
+        std_pred,
+        std_target,
+        denom_offset: float = 1e-8,
+    ) -> float:
         """
-        Calculates CC_ABS from the paper. It represents Pearson's CC between 
+        Calculates CC_ABS from the paper. It represents Pearson's CC between
         predictions and targets averaged over trials.
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
@@ -114,18 +113,14 @@ class NormalizedCrossCorrelation():
 
         # Calculate correlation coefficients:
         #   Cov(r^dash, y^dash) / sqrt(Var(r^dash) * Var(y^dash))
-        return cov / ((std_pred*std_target) + denom_offset)
+        return cov / ((std_pred * std_target) + denom_offset)
 
     def _cc_max(
-            self, 
-            target, 
-            var_target, 
-            num_trials: int, 
-            denom_offset: float=1e-8
-        ) -> float:
+        self, target, var_target, num_trials: int, denom_offset: float = 1e-8
+    ) -> float:
         """
-        Calculates CC_MAX value from the paper. It represents the upper bound 
-        of achievable performance given the the in vivo variability of the 
+        Calculates CC_MAX value from the paper. It represents the upper bound
+        of achievable performance given the the in vivo variability of the
         neuron and the number of trials.
         :param target: targets tensor.
         :param var_target: target variance over neurons.
@@ -140,22 +135,22 @@ class NormalizedCrossCorrelation():
         mean_var_trials = var_trials.mean(dim=1)
 
         # N*Var(y^{dash}) - Var(y)^{dash}
-        numerator = num_trials*var_target  - mean_var_trials
+        numerator = num_trials * var_target - mean_var_trials
 
         # (N-1)*Var(y^{dash})
-        denominator = (num_trials - 1)*var_target
+        denominator = (num_trials - 1) * var_target
 
         return torch.sqrt(numerator / (denominator + denom_offset))
 
     def _cc_norm(
-            self, 
-            avg_prediction, 
-            avg_target, 
-            std_pred, 
-            std_target,
-            target,
-            denom_offset: float=1e-8
-        ) -> float:
+        self,
+        avg_prediction,
+        avg_target,
+        std_pred,
+        std_target,
+        target,
+        denom_offset: float = 1e-8,
+    ) -> float:
         """
         Calculates CC_NORM from the paper.
         :param avg_prediction: averaged prediction tensor across trials
@@ -167,10 +162,10 @@ class NormalizedCrossCorrelation():
         :return: Returns value of CC_NORM.
         """
         cc_abs = self._cc_abs(avg_prediction, avg_target, std_pred, std_target)
-        cc_max = self._cc_max(target, std_target*std_target, self.num_trials)
+        cc_max = self._cc_max(target, std_target * std_target, self.num_trials)
 
         return cc_abs / (cc_max + denom_offset)
-    
+
     def _batch_mean(self, cc_norm):
         """
         Calculates mean across batch for CC_NORM values.
@@ -182,7 +177,7 @@ class NormalizedCrossCorrelation():
     def calculate(self, prediction, target) -> float:
         """
         Calculates normalized cross correlation between predictions and targets.
-        
+
         It expects 4D pytorch tensors as input of shape:
             `(batch_size, num_trials, time_duration, num_neurons)`
 
@@ -193,7 +188,9 @@ class NormalizedCrossCorrelation():
         :return: Returns normalized cross correlation value.
         """
         # Assuming prediction and target are PyTorch tensors.
-        self.batch_size, self.num_trials, self.time_duration, self.num_neurons = prediction.shape
+        self.batch_size, self.num_trials, self.time_duration, self.num_neurons = (
+            prediction.shape
+        )
 
         # Round the prediction to closest integer.
         prediction = self._convert_prediction_to_spikes(prediction)
@@ -210,11 +207,11 @@ class NormalizedCrossCorrelation():
 
         # Calculate CC_NORM.
         cc_norm = self._cc_norm(
-                avg_prediction, 
-                avg_target, 
-                std_pred, 
-                std_target, 
-                target,
-            )
-        
+            avg_prediction,
+            avg_target,
+            std_pred,
+            std_target,
+            target,
+        )
+
         return self._batch_mean(cc_norm)

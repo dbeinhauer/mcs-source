@@ -10,7 +10,7 @@ import gc
 import pickle
 import sys
 import logging
-import argparse 
+import argparse
 from unicodedata import name
 
 import numpy as np
@@ -18,7 +18,7 @@ from tqdm import tqdm
 from scipy.sparse import csr_matrix
 from scipy.sparse import save_npz
 from parameters import ParameterSet
-import imagen 
+import imagen
 from imagen.image import BoundingBox
 import mozaik
 from mozaik.controller import Global, setup_logging
@@ -38,7 +38,7 @@ SPIKES_SUBDIR = "/spikes/"
 IMAGE_IDS_PREFIX = "image_ids_"
 NEURONS_IDS_PREFIX = "neuron_ids_"
 SPIKES_PREFIX = "spikes_"
-# Prefix when multiple trials 
+# Prefix when multiple trials
 TRIALS_PREFIX = "trial_"
 
 # Input directories:
@@ -52,14 +52,22 @@ OUTPUT_DIR_TEST = "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset"
 
 DEBUG_DIR = "/home/beinhaud/diplomka/mcs-source/dataset/debug"
 
-POSSIBLE_SHEETS = ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4']
+POSSIBLE_SHEETS = [
+    "X_ON",
+    "X_OFF",
+    "V1_Exc_L2/3",
+    "V1_Inh_L2/3",
+    "V1_Exc_L4",
+    "V1_Inh_L4",
+]
 
 
 class DatasetExporter:
     """
-    Class used for exporting target data (image and neuron IDs and spikes) 
+    Class used for exporting target data (image and neuron IDs and spikes)
     from raw datastore to representation that can be used for training the model.
     """
+
     def __init__(self):
         """
         Initalizes the experiment parameters variables.
@@ -110,9 +118,9 @@ class DatasetExporter:
         :return: _description_
         """
         pattern_sampler = imagen.image.PatternSampler(
-                size_normalization="fit_shortest",
-                whole_pattern_output_fns=[MaximumDynamicRange()],
-            )
+            size_normalization="fit_shortest",
+            whole_pattern_output_fns=[MaximumDynamicRange()],
+        )
 
         img = imagen.image.FileImage(
             filename=s.image_path,
@@ -136,7 +144,7 @@ class DatasetExporter:
     def _get_sheetname(self, sheet: str) -> str:
         """
         Renames the sheet name to format that can be used in the filename.
-        Note: It is needed because some functions need format with '/' symbol and 
+        Note: It is needed because some functions need format with '/' symbol and
         some of them need them without it.
         :param sheet: original sheet name provided to program.
         :return: returns modified sheetname to format without '/' symbols.
@@ -144,21 +152,23 @@ class DatasetExporter:
         if sheet == "V1_Inh_L2/3":
             sheet = "V1_Inh_L23"
         if sheet == "V1_Exc_L2/3":
-            sheet= "V1_Exc_L23"
+            sheet = "V1_Exc_L23"
         return sheet
 
     def _get_modified_datastore(self, path: str):
         """
-        Loads the provided datastore, filters it to take only 'NaturalImage' 
+        Loads the provided datastore, filters it to take only 'NaturalImage'
         and creates the list of trials for this datastore.
-        :param path: path of the datastore. 
-        :return: returns the tuple of modified datastore and 
+        :param path: path of the datastore.
+        :return: returns the tuple of modified datastore and
         list of trials sorted by ID (used mainly in test dataset).
         """
         dsv = self._get_datastore(path)
-        dsv = param_filter_query(dsv, st_name='NaturalImage')
+        dsv = param_filter_query(dsv, st_name="NaturalImage")
         # Trials list necessary for selecting specific trials stimuli (mainly for test dataset).
-        trials = sorted(list(set( MozaikParametrized.idd(s).trial for s in dsv.get_stimuli())))
+        trials = sorted(
+            list(set(MozaikParametrized.idd(s).trial for s in dsv.get_stimuli()))
+        )
 
         return dsv, trials
 
@@ -170,14 +180,14 @@ class DatasetExporter:
         :param trial: trial to get data for (from trials object).
         :param sheet: sheet identifier (type of neuronal population). Possible values
         are: ["X_ON", "X_OFF", "V1_Exc_L2/3", "V1_Inh_L2/3", "V1_Exc_L4", "V1_Inh_L4"]
-        :returns: tuple of blank segments and stimuli (image) 
+        :returns: tuple of blank segments and stimuli (image)
         segments extracted from provided datstore.
         """
         # Get data for specific sheet and trial.
         dsv_modified = param_filter_query(dsv, sheet_name=sheet)
         dsv_modified = param_filter_query(dsv_modified, st_trial=trial)
 
-        # Retrieve ordered segments (watch the parameters for 
+        # Retrieve ordered segments (watch the parameters for
         # selecting the blank and image segments).
         segs_blank = dsv_modified.get_segments(null=True, ordered=True)
         segs_image = dsv_modified.get_segments(ordered=True)
@@ -190,8 +200,8 @@ class DatasetExporter:
         :param segment: segment to obtain image information from.
         :returns: id of the image corresponding to segment.
         """
-        stimulus = MozaikParametrized.idd(segment.annotations['stimulus'])
-        return stimulus.image_path.split('/')[-1].split('_')[0]
+        stimulus = MozaikParametrized.idd(segment.annotations["stimulus"])
+        return stimulus.image_path.split("/")[-1].split("_")[0]
 
     def _sort_spiketrains(self, spike_trains):
         """
@@ -199,19 +209,20 @@ class DatasetExporter:
         :param spike_trains: spike trains object to be sorded.
         :return: returns sorted spike trains object based on its neuron IDs.
         """
+
         def sorting_key(spike_train):
             """
             Get sorting key for spike trains dataset.
             :param spike_train: spike train to get the sorting key.
             :return: returns ID of the source neuron.
             """
-            return spike_train.annotations['source_id']
-        
+            return spike_train.annotations["source_id"]
+
         return sorted(spike_trains, key=sorting_key)
 
     def _get_number_neurons(self, segment) -> int:
         """
-        Retrieves information about number of neurons.    
+        Retrieves information about number of neurons.
         :param segment: segment to retrieve information from.
         :returns: total number of neurons in the given segment.
         """
@@ -227,40 +238,44 @@ class DatasetExporter:
         return int(segment.spiketrains[0].duration) + 1
 
     def _image_iteration(
-            self,
-            segs_blank, 
-            segs_images, 
-            spikes: np.array, 
-            logs: bool=False,
-        ):
+        self,
+        segs_blank,
+        segs_images,
+        spikes: np.array,
+        logs: bool = False,
+    ):
         """
         Iterates through all images and extracts spiketrains info from them.
         :param segs_blank: segments containing time intervals for blank
         period (blank image presented).
-        :param segs_images: segments contatining the time intervals 
+        :param segs_images: segments contatining the time intervals
         for stimulus period (images presented).
-        :param spikes: array of spikes for all images and neurons. 
-        (shape: num_images*num_neurons*blank_and_image_duration), blank is always before image.    
+        :param spikes: array of spikes for all images and neurons.
+        (shape: num_images*num_neurons*blank_and_image_duration), blank is always before image.
         :param logs: `True` if we want to print logs.
         """
-        for img_id, (seg_blank, seg_image) in enumerate(tqdm(zip(segs_blank, segs_images))):
+        for img_id, (seg_blank, seg_image) in enumerate(
+            tqdm(zip(segs_blank, segs_images))
+        ):
             if logs:
                 # Get Image Index
                 print("NEW Image")
                 print("-------------------------------------------")
                 print(f"Image number: {img_id}")
                 print()
-                
-            self._neuron_iteration(img_id, seg_blank, seg_image, spikes, self.blank_duration)
+
+            self._neuron_iteration(
+                img_id, seg_blank, seg_image, spikes, self.blank_duration
+            )
 
     def _neuron_iteration(
-            self,
-            img_id: int, 
-            seg_blank, 
-            seg_image, 
-            spikes: np.array, 
-            blank_offset: int,
-        ):
+        self,
+        img_id: int,
+        seg_blank,
+        seg_image,
+        spikes: np.array,
+        blank_offset: int,
+    ):
         """
         Iterates through all neurons and extracts all spikes for the given image.
         :param img_id: index of the image in the spikes array.
@@ -270,22 +285,29 @@ class DatasetExporter:
         (shape: num_images*num_neurons*blank_and_image_duration), blank is always before image.
         :param blank_offset: duration of blank interval in the experiment.
         """
-        for neuron_id, (spikes_blank, spikes_image) in enumerate(zip(
-                seg_blank.spiketrains, 
-                seg_image.spiketrains
-            )):
+        for neuron_id, (spikes_blank, spikes_image) in enumerate(
+            zip(seg_blank.spiketrains, seg_image.spiketrains)
+        ):
             # Assign each spike of the given neuron in the given image to our spike representation.
             spikes[img_id, neuron_id, spikes_blank.times.magnitude.astype(int)] += 1
-            spikes[img_id, neuron_id, spikes_image.times.magnitude.astype(int) + blank_offset] += 1
+            spikes[
+                img_id,
+                neuron_id,
+                spikes_image.times.magnitude.astype(int) + blank_offset,
+            ] += 1
 
     def _prealocate_spikes(self) -> np.array:
         """
         Creates spikes `np.array` (prealocates the array).
-        :return: returns `np.array` of zeros in the shape 
+        :return: returns `np.array` of zeros in the shape
         (num_images, num_neurons, blank_and_image_duration).
         """
         return np.zeros(
-            (self.num_images, self.num_neurons, self.blank_duration + self.image_duration), 
+            (
+                self.num_images,
+                self.num_neurons,
+                self.blank_duration + self.image_duration,
+            ),
             dtype=np.uint8,
         )
 
@@ -295,14 +317,14 @@ class DatasetExporter:
         :param input_path: path to get ID from.
         :return: ID of the dataset part.
         """
-        return input_path.split(':')[-2].split('_')[0]
+        return input_path.split(":")[-2].split("_")[0]
 
     def _create_filename(self, args, variant: str, np_postfix=False) -> str:
         """
         Creates filename based on the provided parameters.
         :param args: command line arguments.
         :param variant: what to store (variants: 'images_ids', 'neurons_ids', 'spikes_[trial_{trial_ID}]').
-        :param np_postfix: `True` if we want to store numpy array (postfix '.npy'), 
+        :param np_postfix: `True` if we want to store numpy array (postfix '.npy'),
         otherwise `False` store '.npz' object.
         :return: filename in format '{variant}_{sheet_name}_{part_id}.npz'.
         """
@@ -315,15 +337,11 @@ class DatasetExporter:
         return variant + self._get_sheetname(args.sheet) + "_" + part_id + postfix
 
     def _create_spikes_filename(
-            self, 
-            args, 
-            spikes_prefix: str, 
-            trials_prefix: str, 
-            single_trial: bool
-        ) -> str:
+        self, args, spikes_prefix: str, trials_prefix: str, single_trial: bool
+    ) -> str:
         """
         Creates filename for the spikes file.
-        :param args: command line arguments.    
+        :param args: command line arguments.
         :param spikes_prefix: prefix of all spikes files.
         :param trials_prefix: trial part of prefix (in case there are multiple files).
         :param single_trial: `True` if single trial processing.
@@ -343,11 +361,15 @@ class DatasetExporter:
         :param sheet: sheet to be extracted.
         :param input_path: path to the raw data.
         """
-        print("\n".join([
-            "----------NEW EXPERIMENT---------------",
-            f"EXPERIMENT_SETTING: sheet-{self._get_sheetname(sheet)}, ID-{self._get_dataset_part_id(input_path)}",
-            "----------------------------------",
-        ]))
+        print(
+            "\n".join(
+                [
+                    "----------NEW EXPERIMENT---------------",
+                    f"EXPERIMENT_SETTING: sheet-{self._get_sheetname(sheet)}, ID-{self._get_dataset_part_id(input_path)}",
+                    "----------------------------------",
+                ]
+            )
+        )
 
     def _init_experiment_parameters(self, segs_blank, segs_images):
         """
@@ -362,7 +384,7 @@ class DatasetExporter:
         """
         Iterates through trials and obtains all spikes from all trials.
         :param args: command line arguments.
-        :param dsv: datastore view object containing the dataset. 
+        :param dsv: datastore view object containing the dataset.
         :param trials: all trials object of the experiment.
         :return: Returns list of spikes for each trials (1 item corresponds to 1 trial).
         """
@@ -381,10 +403,10 @@ class DatasetExporter:
                 self._init_experiment_parameters(segs_blank, segs_images)
                 self.save_experiment_parameters(args, segs_blank)
 
-            if args.subset != -1:    
+            if args.subset != -1:
                 # Take just subset of the segments (for testing).
-                segs_blank = segs_blank[0:args.subset]
-                segs_images = segs_images[0:args.subset]
+                segs_blank = segs_blank[0 : args.subset]
+                segs_images = segs_images[0 : args.subset]
 
             # Prealocate spikes array.
             spikes = self._prealocate_spikes()
@@ -393,9 +415,9 @@ class DatasetExporter:
             self._image_iteration(segs_blank, segs_images, spikes, logs=False)
             trials_spikes.append(spikes)
 
-        return trials_spikes    
-    
-    def save_image_ids(self, segs, filename: str):        
+        return trials_spikes
+
+    def save_image_ids(self, segs, filename: str):
         """
         Saves image IDs into file of `np.array` object.
         :param segs: segments object to get the IDs from.
@@ -411,16 +433,21 @@ class DatasetExporter:
         :param filename: name of the file where to store the ids.
         """
         print("Storing neuron IDs")
-        np.save(filename, np.array([spikes.annotations['source_id'] for spikes in segs[0].spiketrains]))
+        np.save(
+            filename,
+            np.array(
+                [spikes.annotations["source_id"] for spikes in segs[0].spiketrains]
+            ),
+        )
 
     def save_spiketrains(
-            self,
-            args,
-            trial_spikes: list,
-            spikes_subdirectory: str=SPIKES_SUBDIR, 
-            spikes_prefix: str=SPIKES_PREFIX,
-            trials_prefix: str=TRIALS_PREFIX,
-        ):
+        self,
+        args,
+        trial_spikes: list,
+        spikes_subdirectory: str = SPIKES_SUBDIR,
+        spikes_prefix: str = SPIKES_PREFIX,
+        trials_prefix: str = TRIALS_PREFIX,
+    ):
         """
         Reshapes the spikes for each trial into shape (num_neurons * (images*time_slots)), 
         converts it to sparse representation and stores it into the .npz file. 
@@ -435,15 +462,22 @@ class DatasetExporter:
         """
         for i, spikes in enumerate(trial_spikes):
             # Reshape to 2D matrix (num_neurons * (images*time_slots)) and convert to sparse representation.
-            sparse_spikes = csr_matrix(spikes.transpose(1, 0, 2).reshape(self.num_neurons, -1))
+            sparse_spikes = csr_matrix(
+                spikes.transpose(1, 0, 2).reshape(self.num_neurons, -1)
+            )
             print(f"Saving spike trains for trial: {i}")
-            base_path = args.output_path + spikes_subdirectory + self._get_sheetname(args.sheet) + "/"
+            base_path = (
+                args.output_path
+                + spikes_subdirectory
+                + self._get_sheetname(args.sheet)
+                + "/"
+            )
             filename = self._create_spikes_filename(
-                    args, 
-                    spikes_prefix, 
-                    f"{trials_prefix}{i}_", # Specify trial ID in the filename. 
-                    len(trial_spikes) == 1,
-                )
+                args,
+                spikes_prefix,
+                f"{trials_prefix}{i}_",  # Specify trial ID in the filename.
+                len(trial_spikes) == 1,
+            )
             save_npz(
                 base_path + filename,
                 sparse_spikes,
@@ -456,12 +490,16 @@ class DatasetExporter:
         :param segs_blank: segments of arbitrary blank period of the experiment (the IDs are in each segments same).
         """
         self.save_image_ids(
-            segs_blank, 
-            args.output_path + IMAGES_IDS_SUBDIR + self._create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
+            segs_blank,
+            args.output_path
+            + IMAGES_IDS_SUBDIR
+            + self._create_filename(args, IMAGE_IDS_PREFIX, np_postfix=True),
         )
         self.save_neuron_ids(
-            segs_blank, 
-            args.output_path + NEURONS_IDS_SUBDIR + self._create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
+            segs_blank,
+            args.output_path
+            + NEURONS_IDS_SUBDIR
+            + self._create_filename(args, NEURONS_IDS_PREFIX, np_postfix=True),
         )
 
     def run_extraction(self, args):
@@ -484,7 +522,6 @@ class DatasetExporter:
         print()
 
 
-
 def main(args):
     print(f"Input dataset path: {args.input_path}")
     dataset_exporter = DatasetExporter()
@@ -493,20 +530,42 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Export the dataset from the provided raw data for the given sheet.")
-    parser.add_argument("--input_path", type=str, default=None,
-        help="Path to input data.")
-    parser.add_argument("--output_path", type=str, default=None,
-        help="Path where to store the output (If empty then use the default predifined path based on the dataset type (train/test)).")
-    parser.add_argument('--dataset_variant', type= str, choices=['train', 'test'],
-        help="Variant of the dataset: ['train', 'test']")
+        description="Export the dataset from the provided raw data for the given sheet."
+    )
+    parser.add_argument(
+        "--input_path", type=str, default=None, help="Path to input data."
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default=None,
+        help="Path where to store the output (If empty then use the default predifined path based on the dataset type (train/test)).",
+    )
+    parser.add_argument(
+        "--dataset_variant",
+        type=str,
+        choices=["train", "test"],
+        help="Variant of the dataset: ['train', 'test']",
+    )
     parser.set_defaults(test_dataset=False)
-    parser.add_argument("--sheet", type=str, choices=POSSIBLE_SHEETS,
-        help="Name of the sheet. Possibilities: ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4'].")
-    parser.add_argument("--subset", type=int, default=-1, 
-        help="How big subset of the sheet to take (if `-1` then whole sheet).")
-    parser.add_argument("--num_trials", type=int, default=-1,
-        help="How many trials extract (if `-1` then all of them).")
+    parser.add_argument(
+        "--sheet",
+        type=str,
+        choices=POSSIBLE_SHEETS,
+        help="Name of the sheet. Possibilities: ['X_ON', 'X_OFF', 'V1_Exc_L2/3', 'V1_Inh_L2/3', 'V1_Exc_L4', 'V1_Inh_L4'].",
+    )
+    parser.add_argument(
+        "--subset",
+        type=int,
+        default=-1,
+        help="How big subset of the sheet to take (if `-1` then whole sheet).",
+    )
+    parser.add_argument(
+        "--num_trials",
+        type=int,
+        default=-1,
+        help="How many trials extract (if `-1` then all of them).",
+    )
 
     args = parser.parse_args()
 
