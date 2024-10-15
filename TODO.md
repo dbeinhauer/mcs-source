@@ -1,10 +1,17 @@
 # Now
-- try to find better measure
-    - something for correlation of binary values
 - think about model hyperparameters
-- tools for summarizing training results
-- different evaluation metrics
 - different losses
+- training: only one step (not sequence) - weights to real data (target)
+- start on the first time step (not with the zeros)
+- figures + random neurons - plot responses
+    - for the meeting to see what the neurons does in the response
+- neuron NN 
+    - smaller size of the layer
+    - higher number of layers
+    - input should be one neuron -> output one neuron (not the whole population)
+- larger bins
+    - bin of size 10 and 20
+
 
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
@@ -12,6 +19,12 @@
     - need to share the weights (othewise it would not be sufficient to run it (too large model))
 - for the training with smaller numbers (float16)
     - it might be good idea to lower the training step
+- try to find better measure
+    - something for correlation of binary values
+- tools for summarizing training results
+- different evaluation metrics
+- different losses
+
 
 # In longer time period:
 - install the model to computational cluster
@@ -25,6 +38,3 @@
 
 
 # Notes for the meeting
-- does it make sense to compute Pearson's CC for integers (or can predictions stay floats)
-- how to improve the model training
-    - why the learning is so inconsistent

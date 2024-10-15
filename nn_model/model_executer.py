@@ -242,7 +242,7 @@ class ModelExecuter:
             print(f"Epoch [{epoch+1}/{self.num_epochs}], Loss: {loss.item():.4f}")
             if evaluation_step != -1 and epoch % evaluation_step == 0:
                 # Do control evaluation after this step.
-                self.evaluation(subset=2)
+                self.evaluation(subset=10)
                 self.model.train()
 
     def _get_all_trials_predictions(self, inputs, num_trials):

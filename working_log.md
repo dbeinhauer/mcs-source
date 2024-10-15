@@ -368,3 +368,18 @@
 - finished results of 0.25
     - looks like the best is of the learning rate 0.00075
 - testing training of complex NN (with NN instead of neuron)
+
+# 15.10.2024
+Notes after the meeting:
+- the training that reached 0.34 CC is quite good (although normally it might go to 0.9)
+    - pros:
+        - the data are much different (we are predicting the sequence not the number of spikes)
+            - also the CC is not designed for sequencial data
+        - the training makes much more sense when each step starts on the previous target
+        - it might increase when using larget time bins (reaching to 20)
+- when using the NN instead of neuron it should be replaces by each neuron, it does not have to be super large in case of the width (layer size) but it should be deeper
+    - basically we want 1 input and 1 output -> the neuron should add complexity
+    - first thing that comes to my mind is using iterating through each input and returning output (loop through number of layer neurons)
+- when predicting each step with predicted hidden state it does not make much sence in future time steps
+    - it might in fact misled the training (it trains on wrong inputs)
+- when starting the new sequence it should start with the first time step not zeros
