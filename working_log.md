@@ -4,10 +4,10 @@
     - different from classical approach
         * just discrete spikes
         * just feed-forward network (our approach would be use RNN)
-- it would be neccessary to use RNN
+- it would be necessary to use RNN
     - train on the data from the simulator 
         - these I should get from Luca at the end of the next week
-        - anotated data together with "data parser"
+        - annotated data together with "data parser"
             - I would just need to rewrite it to continuous data (instead of the spikes)
         - data consist of neural spikes from the LGN, V4 and V2/3 (both inhibitory and excitatory layers)
         
@@ -20,7 +20,7 @@
     - probably the good idea would be to design the model based on the layers (learn how!)
     - the model has to be more complex than the one for the spikes
         - although the continuous information also adds amount of info in the train data
-            * it is possible that the resulting model would be more constained than the easier one -> better performance 
+            * it is possible that the resulting model would be more constrained than the easier one -> better performance 
             (might be the goal of the whole thesis, also good result for the good academic paper)
 
 - final result (not mine) of the project is to merge it together with the simulator
@@ -374,12 +374,13 @@ Notes after the meeting:
 - the training that reached 0.34 CC is quite good (although normally it might go to 0.9)
     - pros:
         - the data are much different (we are predicting the sequence not the number of spikes)
-            - also the CC is not designed for sequencial data
+            - also the CC is not designed for sequential data
         - the training makes much more sense when each step starts on the previous target
-        - it might increase when using larget time bins (reaching to 20)
+        - it might increase when using larger time bins (reaching to 20)
 - when using the NN instead of neuron it should be replaces by each neuron, it does not have to be super large in case of the width (layer size) but it should be deeper
     - basically we want 1 input and 1 output -> the neuron should add complexity
     - first thing that comes to my mind is using iterating through each input and returning output (loop through number of layer neurons)
-- when predicting each step with predicted hidden state it does not make much sence in future time steps
+- when predicting each step with predicted hidden state it does not make much sense in future time steps
     - it might in fact misled the training (it trains on wrong inputs)
 - when starting the new sequence it should start with the first time step not zeros
+- interval sizes: 5, 10, 15, and 20 are available for learning (other sizes have to be generated)

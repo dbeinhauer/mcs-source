@@ -1,6 +1,6 @@
 """
 This source code contains definition of all global variables that
-are used accorss multiple source files. Typically information
+are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
@@ -10,8 +10,8 @@ from type_variants import LayerType
 
 # Model Diminishing factor
 # SIZE_MULTIPLIER = 0.53
-# SIZE_MULTIPLIER = 0.1
-SIZE_MULTIPLIER = 0.25
+SIZE_MULTIPLIER = 0.1
+# SIZE_MULTIPLIER = 0.25
 # SIZE_MULTIPLIER = 0.5
 
 # Model time step size

@@ -190,7 +190,7 @@ class ModelExecuter:
         for layer, target in targets.items():
             loss += self.criterion(
                 torch.cat(predictions[layer], dim=1).float().cpu(),
-                target.float(),
+                target[:, 1:, :].float(),
             )
 
         return loss
@@ -203,27 +203,34 @@ class ModelExecuter:
     def train(self, evaluation_step: int = -1):
         self.model.train()
         for epoch in range(self.num_epochs):
-            loss = 0
+            loss = None
             for i, (inputs, targets) in enumerate(tqdm(self.train_loader)):
                 # if i > 3:
                 #     break
                 inputs, targets = self._get_data(inputs, targets)
                 self.optimizer.zero_grad()
 
-                h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
-                    globals.train_batch_size,
-                )
+                # h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
+                #     globals.train_batch_size,
+                # )
+
+                # predictions = self.model(
+                #     inputs["X_ON"],
+                #     inputs["X_OFF"],
+                #     h4_exc,
+                #     h4_inh,
+                #     h23_exc,
+                #     h23_inh,
+                # )
 
                 predictions = self.model(
-                    inputs["X_ON"],
-                    inputs["X_OFF"],
-                    h4_exc,
-                    h4_inh,
-                    h23_exc,
-                    h23_inh,
+                    inputs,
+                    targets,
                 )
+
                 # print("Predictions done")
-                del inputs, h4_exc, h4_inh, h23_inh, h23_exc
+                # del inputs, h4_exc, h4_inh, h23_inh, h23_exc
+                del inputs
                 torch.cuda.empty_cache()
 
                 loss = self._compute_loss(predictions, targets)
@@ -245,34 +252,56 @@ class ModelExecuter:
                 self.evaluation(subset=10)
                 self.model.train()
 
-    def _get_all_trials_predictions(self, inputs, num_trials):
+    def _get_all_trials_predictions(self, inputs, targets, num_trials):
+        """_summary_
+
+        :param inputs: dict(batch_size, num_trials, time, num_neurons)
+        :param hidden_states: in shape: dict (batch_size, num_trials, time, num_neurons),
+        I expect that the states are for timestep 1
+        :param num_trials: _description_
+        :return: _description_
+        """
         dict_predictions = {}
-        h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
-            globals.test_batch_size,
-        )
+        # h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
+        #     globals.test_batch_size,
+        # )
+        # hidden_states
         for i in range(num_trials):
+            # trial_predictions = self.model(
+            #     inputs["X_ON"][:, i, :, :],
+            #     inputs["X_OFF"][:, i, :, :],
+            #     h4_exc,
+            #     h4_inh,
+            #     h23_exc,
+            #     h23_inh,
+            # )
+            trial_inputs = {
+                layer: layer_input[:, i, :, :] for layer, layer_input in inputs.items()
+            }
+            trial_hidden = {
+                layer: layer_hidden[:, i, 0, :].clone()
+                # Pass slices of targets in time 0 (starting hidden step,
+                # in evaluation we do not want to reset hidden states).
+                for layer, layer_hidden in targets.items()
+            }
             trial_predictions = self.model(
-                inputs["X_ON"][:, i, :, :],
-                inputs["X_OFF"][:, i, :, :],
-                h4_exc,
-                h4_inh,
-                h23_exc,
-                h23_inh,
+                trial_inputs,
+                trial_hidden,
             )
             # predictions.append(trial_predictions)
             for key, prediction in trial_predictions.items():
                 prediction = torch.cat(prediction, dim=1)
-                if key not in dict_predictions.keys():
+                if key not in dict_predictions:
                     dict_predictions[key] = [prediction]
                 else:
                     dict_predictions[key].append(prediction)
 
         return dict_predictions
 
-    def _prepare_predictions_for_evaluation(self, inputs, num_trials):
+    def _prepare_predictions_for_evaluation(self, inputs, targets, num_trials):
 
         # Get predictions for all trials.
-        dict_predictions = self._get_all_trials_predictions(inputs, num_trials)
+        dict_predictions = self._get_all_trials_predictions(inputs, targets, num_trials)
         torch.cuda.empty_cache()
 
         # Stack all predictions into one torch array.
@@ -312,9 +341,12 @@ class ModelExecuter:
 
                 inputs, targets = self._get_data(inputs, targets, test=True)
                 predictions = self._prepare_predictions_for_evaluation(
-                    inputs, inputs["X_ON"].shape[1]
+                    inputs, targets, inputs["X_ON"].shape[1]
                 )
-                correlation_sum += self.compute_evaluation_score(targets, predictions)
+                correlation_sum += self.compute_evaluation_score(
+                    {layer: target[:, :, 1:, :] for layer, target in targets.items()},
+                    predictions,
+                )
                 num_examples += 1
 
                 if i % print_each_step == 0:

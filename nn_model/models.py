@@ -53,12 +53,12 @@ class LayerConfig:
 
     def _determine_input_constraints(self) -> List[Dict]:
         """
-        Determines input weights contraint (chooses between excitatory/inhibitory).
+        Determines input weights constraint (chooses between excitatory/inhibitory).
 
         :return: Returns list of dictionaries with parameters specifying
         the distribution of input weight types of each input layer.
 
-        The format is same as the expeted kwargs for `WeightConstraint` objects.
+        The format is same as the expected kwargs for `WeightConstraint` objects.
         The order of the dictionaries should be same as the order of the input layers.
 
         The keys in the dictionaries are:
@@ -144,7 +144,7 @@ class RNNCellModel(nn.Module):
         complexity_kwargs: Dict = {},
     ):
         """
-        Initializes model paramters, sets weights constraints and creates model architecture.
+        Initializes model parameters, sets weights constraints and creates model architecture.
 
         :param layer_sizes: sizes of all model layers (input included).
         :param rnn_cell_cls: type of the layer used in the model.
@@ -236,7 +236,7 @@ class RNNCellModel(nn.Module):
 
     def _init_layer(self, layer: str, rnn_cell_cls):
         """
-        Intializes one layer of the model.
+        Initializes one layer of the model.
 
         :param layer: layer name (`LayerType`).
         :param rnn_cell_cls: layer object variant.
@@ -262,35 +262,88 @@ class RNNCellModel(nn.Module):
         for layer in RNNCellModel.layers_inputs.keys():
             self.layers[layer] = self._init_layer(layer, self.rnn_cell_cls)
 
-    def forward(self, x_on, x_off, h4_exc, h4_inh, h23_exc, h23_inh):
+    # def forward(self, x_on, x_off, h4_exc, h4_inh, h23_exc, h23_inh):
+    def forward(self, inputs, targets):
+        """
+
+        :param inputs: dict[layer, inputs] - size (batch, time, neurons)
+        :param targets: dict[layer, inputs] - size (batch, neurons) or (batch, time, neurons)
+        :return: _description_
+        """
         outputs = {layer: [] for layer in RNNCellModel.layers_inputs.keys()}
 
-        for t in range(x_on.size(1)):
+        time_length = inputs[LayerType.X_ON.value].size(1)
+
+        hidden_layers = targets
+        if not self.training:
+            hidden_layers = {
+                layer: hidden.to(globals.device0)
+                for layer, hidden in hidden_layers.items()
+            }
+
+        # Start from the second step, because the first one is
+        # the initial one (we predict all time steps but the )
+        for t in range(1, time_length):  # x_on.size(1)):
+            if self.training:
+                # In case we train, we assign new hidden layers based on the target in each step.
+                hidden_layers = {
+                    layer: target[:, t - 1, :].clone().to(globals.device0)
+                    for layer, target in targets.items()
+                }
+
             # if t % 100 == 0:
             #     print(f"Got to iteration: {t}")
             #     torch.cuda.empty_cache()
 
             # LGN
+            # input_t = torch.cat(
+            #     (x_on[:, t, :], x_off[:, t, :]),
+            #     dim=1,
+            # ).to(globals.device0)
             input_t = torch.cat(
-                (x_on[:, t, :], x_off[:, t, :]),
+                (
+                    inputs[LayerType.X_ON.value][:, t, :],
+                    inputs[LayerType.X_OFF.value][:, t, :],
+                ),
                 dim=1,
             ).to(globals.device0)
 
             # L4:
             ## L4_Exc
             L4_input_exc = torch.cat(
-                (input_t, h4_inh, h23_exc),
+                # (input_t, h4_inh, h23_exc),
+                (
+                    input_t,
+                    hidden_layers[LayerType.V1_Inh_L4.value],
+                    hidden_layers[LayerType.V1_Exc_L23.value],
+                ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_Exc_L4.value].to(globals.device0)
-            h4_exc = self.layers[LayerType.V1_Exc_L4.value](L4_input_exc, h4_exc)
+            # h4_exc = self.layers[LayerType.V1_Exc_L4.value](L4_input_exc, h4_exc)
+            h4_exc = self.layers[LayerType.V1_Exc_L4.value](
+                L4_input_exc, hidden_layers[LayerType.V1_Exc_L4.value]
+            )
+
             ## L4_Inh
+            # L4_input_inh = torch.cat(
+            #     (input_t, h4_exc, h23_exc),
+            #     dim=1,
+            # ).to(globals.device0)
+
             L4_input_inh = torch.cat(
-                (input_t, h4_exc, h23_exc),
+                (
+                    input_t,
+                    hidden_layers[LayerType.V1_Exc_L4.value],
+                    hidden_layers[LayerType.V1_Exc_L23.value],
+                ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_Inh_L4.value].to(globals.device0)
-            h4_inh = self.layers[LayerType.V1_Inh_L4.value](L4_input_inh, h4_inh)
+            # h4_inh = self.layers[LayerType.V1_Inh_L4.value](L4_input_inh, h4_inh)
+            h4_inh = self.layers[LayerType.V1_Inh_L4.value](
+                L4_input_inh, hidden_layers[LayerType.V1_Inh_L4.value]
+            )
 
             ## Collect L4 outputs
             outputs[LayerType.V1_Exc_L4.value].append(h4_exc.unsqueeze(1).cpu())
@@ -299,25 +352,45 @@ class RNNCellModel(nn.Module):
             # L23:
             ## L23_Exc
             L23_input_exc = torch.cat(
-                (h4_exc, h23_inh),
+                # (h4_exc, h23_inh),
+                (
+                    hidden_layers[LayerType.V1_Exc_L4.value],
+                    hidden_layers[LayerType.V1_Inh_L23.value],
+                ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_Exc_L23.value].to(globals.device0)
-            h23_exc = self.layers[LayerType.V1_Exc_L23.value](L23_input_exc, h23_exc)
+            # h23_exc = self.layers[LayerType.V1_Exc_L23.value](L23_input_exc, h23_exc)
+            h23_exc = self.layers[LayerType.V1_Exc_L23.value](
+                L23_input_exc, hidden_layers[LayerType.V1_Exc_L23.value]
+            )
             ## L23_Inh
             L23_input_inh = torch.cat(
-                (h4_exc, h23_exc),
+                # (h4_exc, h23_exc),
+                (
+                    hidden_layers[LayerType.V1_Exc_L4.value],
+                    hidden_layers[LayerType.V1_Exc_L23.value],
+                ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_Inh_L23.value].to(globals.device0)
-            h23_inh = self.layers[LayerType.V1_Inh_L23.value](L23_input_inh, h23_inh)
+            # h23_inh = self.layers[LayerType.V1_Inh_L23.value](L23_input_inh, h23_inh)
+            h23_inh = self.layers[LayerType.V1_Inh_L23.value](
+                L23_input_inh, hidden_layers[LayerType.V1_Inh_L23.value]
+            )
 
             # Collect L23 outputs
             outputs[LayerType.V1_Exc_L23.value].append(h23_exc.unsqueeze(1).cpu())
             outputs[LayerType.V1_Inh_L23.value].append(h23_inh.unsqueeze(1).cpu())
 
+            if not self.training:
+                hidden_layers[LayerType.V1_Exc_L4.value] = h4_exc
+                hidden_layers[LayerType.V1_Inh_L4.value] = h4_inh
+                hidden_layers[LayerType.V1_Exc_L23.value] = h23_exc
+                hidden_layers[LayerType.V1_Inh_L23.value] = h23_inh
+
         # Clear caches
-        del x_on, x_off, input_t, L4_input_inh, L23_input_exc, L23_input_inh
+        del inputs, input_t, L4_input_inh, L23_input_exc, L23_input_inh
         torch.cuda.empty_cache()
 
         return outputs
