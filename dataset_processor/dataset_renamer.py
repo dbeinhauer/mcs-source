@@ -19,7 +19,7 @@ def rename_files(args):
     Note: Default template and also expected variant in further operations
     with the dataset is:
         `spikes_[trial_{trial_id}]_{experiment_id}.npz
-    Where `[]` means that this part is optional (only when multitrial experiments).
+    Where `[]` means that this part is optional (only when multi-trial experiments).
     :param args: command line arguments specifying the renaming process.
     """
     # Regular expression to match filenames containing numbers.
@@ -35,7 +35,7 @@ def rename_files(args):
             image_id = match[-1]
             trial_id = ""
             if args.multitrial:
-                # Multitrial processing -> trial ID is the penultimate number in the filename.
+                # Multi-trial processing -> trial ID is the penultimate number in the filename.
                 trial_id = match[0]
 
             new_filename = args.template.format(trial_id=trial_id, image_id=image_id)

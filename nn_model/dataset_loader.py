@@ -26,28 +26,29 @@ class SparseSpikeDataset(Dataset):
         input_layers: Dict[str, int],
         output_layers: Dict[str, int],
         is_test: bool = False,
-        model_subset_path: str = None,
+        model_subset_path: str = "",
     ):
         """
-        Initializes class atributes, loads model subset indices and all
+        Initializes class attributes, loads model subset indices and all
         paths where the dataset is stored.
+
         :param spikes_dir: root path where all extracted spikes for all
         layers are stored in sparse scipy representation.
         :param input_layers: dictionary of all input layer names and sizes.
         Typically the layers: ['X_ON', 'X_OFF']
         :param output_layers: dictionary of all output layer names and sizes.
         Typically the layers: ['V1_Exc_L4', 'V1_Ing_L4', 'V1_Exc_L23', 'V1_Inh_L23']
-        :param is_test: glag whether the dataset it used for test
-        (for multitrial evaluation).
-        :param model_subset_path: path to file where indicies of the model subset
-        are stored (size defined in `globals.py`). If `None` then no subset.
+        :param is_test: flag whether the dataset it used for test
+        (for multi-trial evaluation).
+        :param model_subset_path: path to file where indices of the model subset
+        are stored (size defined in `globals.py`). If empty string then no subset.
         """
-        # Define basic atributes.
+        # Define basic attributes.
         self.spikes_dir = spikes_dir
         self.input_layers = input_layers
         self.output_layers = output_layers
 
-        # Flag if we are storing multitrial dataset (for evaluation).
+        # Flag if we are storing multi-trial dataset (for evaluation).
         self.is_test = is_test
 
         # Load subset indices (subset of neurons). Dictionary of np.array of indices.
@@ -76,6 +77,7 @@ class SparseSpikeDataset(Dataset):
         The necessary is that the `experiment_id` is in second-to-last
         position when we split by `_` symbol. And that there are at least
         3 part while splitting by `_` symbol.
+
         :param subdir: name of the layer subdirectory containing the spikes files.
         :return: Returns list of lists that contain all filenames of all
         trials for the given experiment.
@@ -107,6 +109,7 @@ class SparseSpikeDataset(Dataset):
         Loads indices used for train/test split.
 
         NOTE: Not used now, as we do not have multiple trials in all examples.
+
         :param path: path to file where all ids of the given subset are stored.
         :return: returns numpy array of all experiment ids of the given subset.
         """
@@ -117,34 +120,36 @@ class SparseSpikeDataset(Dataset):
         """
         Loads indices of the neurons that are part of the selected subset.
         For running the training/evaluation still on the same subset of neurons.
+
         :param model_subset_path: path to numpy file containing ids of
         all the neurons from all the layers that are part of the selected subset
         (selected by the subset size). If `None` then do not load model subset
         (use all model).
         :return: Returns dictionary of neuron indices that are part of the
         subset for all layers (keys are layer names). In case we want to select
-        all neurons it returs `None`.
+        all neurons it returns `None`.
         """
-        if model_subset_path is not None:
+        if model_subset_path != "":
             # Load indices of subset.
             with open(model_subset_path, "rb") as pickle_file:
                 return pickle.load(pickle_file)
 
         return None
 
-    def _prepare_experiment_data(self, file_path: str, layer: str):  # -> np.array:
+    def _prepare_experiment_data(self, file_path: str, layer: str):
         """
-        Loads spikes data from spartse scipy representation for
-        the given experiment. Converts to dense reprezentation
+        Loads spikes data from sparse scipy representation for
+        the given experiment. Converts to dense representation
         (`np.array`), expands it with new dimension (for trials)
         and extracts only subset of neurons (if the subset provided).
+
         :param file_path: path where the spikes data are stored.
         :param layer: layer subdirectory name.
         :return: Returns loaded spikes data as `np.array` of shape
         (num_trials, time, num_neurons).
         Where `num_trials` is always 1 (new dimension).
         """
-        # Load the data from the file and convert to dense reprezentation.
+        # Load the data from the file and convert to dense representation.
         data = load_npz(file_path)
         data = data.toarray()
 
@@ -164,8 +169,9 @@ class SparseSpikeDataset(Dataset):
     def _load_experiment(self, exp_names, layer: str):
         """
         Loads all spikes data for the provided experiment for all
-        the trials and converts the data to proper format for futher
+        the trials and converts the data to proper format for further
         work with it.
+
         :param exp_names: list of names of experiment files on same
         data but different trials.
         :param layer: name of the layer to extract (subdirectory name).
@@ -192,6 +198,7 @@ class SparseSpikeDataset(Dataset):
         """
         Loads spikes data for the given experiment splitted on input and
         output layers.
+
         :param idx: ID of the experiment to load.
         :return: Returns tuple of two dictionaries. First stands for input
         data (input layers). Second is stands for output data (output layers).
@@ -226,7 +233,7 @@ def different_times_collate_fn(batch):
     Function that deals with loading data in batch that differ in time
     duration (there are fragments of dataset that are slightly different
     in time duration (the start and end parts of the experiment run)).
-    It padds the missing time with zeros (pads missing blank stage).
+    It pads the missing time with zeros (pads missing blank stage).
     :param batch: batch of data to pad (tuple of input and output).
     :return: Returns tuple of padded batch of input and output data.
     """

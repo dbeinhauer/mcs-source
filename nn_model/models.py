@@ -115,25 +115,25 @@ class RNNCellModel(nn.Module):
 
     # Define model architecture (output layers with its inputs).
     layers_inputs = {
-        LayerType.V1_Exc_L4.value: [
+        LayerType.V1_EXC_L4.value: [
             LayerType.X_ON.value,
             LayerType.X_OFF.value,
-            LayerType.V1_Inh_L4.value,
-            LayerType.V1_Exc_L23.value,
+            LayerType.V1_INH_L4.value,
+            LayerType.V1_EXC_L23.value,
         ],
-        LayerType.V1_Inh_L4.value: [
+        LayerType.V1_INH_L4.value: [
             LayerType.X_ON.value,
             LayerType.X_OFF.value,
-            LayerType.V1_Exc_L4.value,
-            LayerType.V1_Exc_L23.value,
+            LayerType.V1_EXC_L4.value,
+            LayerType.V1_EXC_L23.value,
         ],
-        LayerType.V1_Exc_L23.value: [
-            LayerType.V1_Exc_L4.value,
-            LayerType.V1_Inh_L23.value,
+        LayerType.V1_EXC_L23.value: [
+            LayerType.V1_EXC_L4.value,
+            LayerType.V1_INH_L23.value,
         ],
-        LayerType.V1_Inh_L23.value: [
-            LayerType.V1_Exc_L4.value,
-            LayerType.V1_Exc_L23.value,
+        LayerType.V1_INH_L23.value: [
+            LayerType.V1_EXC_L4.value,
+            LayerType.V1_EXC_L23.value,
         ],
     }
 
@@ -314,15 +314,15 @@ class RNNCellModel(nn.Module):
                 # (input_t, h4_inh, h23_exc),
                 (
                     input_t,
-                    hidden_layers[LayerType.V1_Inh_L4.value],
-                    hidden_layers[LayerType.V1_Exc_L23.value],
+                    hidden_layers[LayerType.V1_INH_L4.value],
+                    hidden_layers[LayerType.V1_EXC_L23.value],
                 ),
                 dim=1,
             ).to(globals.device0)
-            self.layers[LayerType.V1_Exc_L4.value].to(globals.device0)
+            self.layers[LayerType.V1_EXC_L4.value].to(globals.device0)
             # h4_exc = self.layers[LayerType.V1_Exc_L4.value](L4_input_exc, h4_exc)
-            h4_exc = self.layers[LayerType.V1_Exc_L4.value](
-                L4_input_exc, hidden_layers[LayerType.V1_Exc_L4.value]
+            h4_exc = self.layers[LayerType.V1_EXC_L4.value](
+                L4_input_exc, hidden_layers[LayerType.V1_EXC_L4.value]
             )
 
             ## L4_Inh
@@ -334,60 +334,60 @@ class RNNCellModel(nn.Module):
             L4_input_inh = torch.cat(
                 (
                     input_t,
-                    hidden_layers[LayerType.V1_Exc_L4.value],
-                    hidden_layers[LayerType.V1_Exc_L23.value],
+                    hidden_layers[LayerType.V1_EXC_L4.value],
+                    hidden_layers[LayerType.V1_EXC_L23.value],
                 ),
                 dim=1,
             ).to(globals.device0)
-            self.layers[LayerType.V1_Inh_L4.value].to(globals.device0)
+            self.layers[LayerType.V1_INH_L4.value].to(globals.device0)
             # h4_inh = self.layers[LayerType.V1_Inh_L4.value](L4_input_inh, h4_inh)
-            h4_inh = self.layers[LayerType.V1_Inh_L4.value](
-                L4_input_inh, hidden_layers[LayerType.V1_Inh_L4.value]
+            h4_inh = self.layers[LayerType.V1_INH_L4.value](
+                L4_input_inh, hidden_layers[LayerType.V1_INH_L4.value]
             )
 
             ## Collect L4 outputs
-            outputs[LayerType.V1_Exc_L4.value].append(h4_exc.unsqueeze(1).cpu())
-            outputs[LayerType.V1_Inh_L4.value].append(h4_inh.unsqueeze(1).cpu())
+            outputs[LayerType.V1_EXC_L4.value].append(h4_exc.unsqueeze(1).cpu())
+            outputs[LayerType.V1_INH_L4.value].append(h4_inh.unsqueeze(1).cpu())
 
             # L23:
             ## L23_Exc
             L23_input_exc = torch.cat(
                 # (h4_exc, h23_inh),
                 (
-                    hidden_layers[LayerType.V1_Exc_L4.value],
-                    hidden_layers[LayerType.V1_Inh_L23.value],
+                    hidden_layers[LayerType.V1_EXC_L4.value],
+                    hidden_layers[LayerType.V1_INH_L23.value],
                 ),
                 dim=1,
             ).to(globals.device0)
-            self.layers[LayerType.V1_Exc_L23.value].to(globals.device0)
+            self.layers[LayerType.V1_EXC_L23.value].to(globals.device0)
             # h23_exc = self.layers[LayerType.V1_Exc_L23.value](L23_input_exc, h23_exc)
-            h23_exc = self.layers[LayerType.V1_Exc_L23.value](
-                L23_input_exc, hidden_layers[LayerType.V1_Exc_L23.value]
+            h23_exc = self.layers[LayerType.V1_EXC_L23.value](
+                L23_input_exc, hidden_layers[LayerType.V1_EXC_L23.value]
             )
             ## L23_Inh
             L23_input_inh = torch.cat(
                 # (h4_exc, h23_exc),
                 (
-                    hidden_layers[LayerType.V1_Exc_L4.value],
-                    hidden_layers[LayerType.V1_Exc_L23.value],
+                    hidden_layers[LayerType.V1_EXC_L4.value],
+                    hidden_layers[LayerType.V1_EXC_L23.value],
                 ),
                 dim=1,
             ).to(globals.device0)
-            self.layers[LayerType.V1_Inh_L23.value].to(globals.device0)
+            self.layers[LayerType.V1_INH_L23.value].to(globals.device0)
             # h23_inh = self.layers[LayerType.V1_Inh_L23.value](L23_input_inh, h23_inh)
-            h23_inh = self.layers[LayerType.V1_Inh_L23.value](
-                L23_input_inh, hidden_layers[LayerType.V1_Inh_L23.value]
+            h23_inh = self.layers[LayerType.V1_INH_L23.value](
+                L23_input_inh, hidden_layers[LayerType.V1_INH_L23.value]
             )
 
             # Collect L23 outputs
-            outputs[LayerType.V1_Exc_L23.value].append(h23_exc.unsqueeze(1).cpu())
-            outputs[LayerType.V1_Inh_L23.value].append(h23_inh.unsqueeze(1).cpu())
+            outputs[LayerType.V1_ECX_L23.value].append(h23_exc.unsqueeze(1).cpu())
+            outputs[LayerType.V1_INH_L23.value].append(h23_inh.unsqueeze(1).cpu())
 
             if not self.training:
-                hidden_layers[LayerType.V1_Exc_L4.value] = h4_exc
-                hidden_layers[LayerType.V1_Inh_L4.value] = h4_inh
-                hidden_layers[LayerType.V1_Exc_L23.value] = h23_exc
-                hidden_layers[LayerType.V1_Inh_L23.value] = h23_inh
+                hidden_layers[LayerType.V1_EXC_L4.value] = h4_exc
+                hidden_layers[LayerType.V1_INH_L4.value] = h4_inh
+                hidden_layers[LayerType.V1_EXC_L23.value] = h23_exc
+                hidden_layers[LayerType.V1_INH_L23.value] = h23_inh
 
         # Clear caches
         del inputs, input_t, L4_input_inh, L23_input_exc, L23_input_inh

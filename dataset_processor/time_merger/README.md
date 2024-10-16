@@ -11,7 +11,7 @@ To run the time merger we need to execute the command:
 ./run_parallel_time_merger.sh <merged_interval_size> <dataset_variant>
 ```
 Where `merged_interval_size` is the size of the interval we want to merge,
-`dataset_variant` is either train or test (difference in multitrials).
+`dataset_variant` is either train or test (difference in multi-trials).
 
 
 # Directory Content

@@ -23,11 +23,15 @@ class NormalizedCrossCorrelation:
     """
 
     def __init__(self):
-        pass
+        self.batch_size = 0
+        self.num_trials = 0
+        self.time_duration = 0
+        self.num_neurons = 0
 
     def _convert_prediction_to_spikes(self, prediction):
         """
         Rounds the prediction to the closes integer (should represent spikes).
+
         :param prediction: torch tensor of float prediction.
         :return: Returns predictions rounded to integer.
         """
@@ -36,6 +40,7 @@ class NormalizedCrossCorrelation:
     def _merge_neuron_time_dim(self, data_tensor):
         """
         Merges (reshapes) time and neuron dimension for metrics computation.
+
         :param data_tensor: tensor to be reshaped.
         :return: Returns reshaped tensor.
         """
@@ -46,6 +51,7 @@ class NormalizedCrossCorrelation:
     def _trials_avg(self, prediction, target, dim: int = 1):
         """
         Calculates prediction and target averages over the trial.
+
         :param prediction: prediction tensor.
         :param target: target tensor.
         :param dim: trials dimension (to compute average across).
@@ -61,6 +67,7 @@ class NormalizedCrossCorrelation:
         """
         Calculates standard deviation over neurons for average
         predictions and targets over trials.
+
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
         :param dim: dimension for which we want to compute
@@ -76,6 +83,7 @@ class NormalizedCrossCorrelation:
         """
         Calculates the covariance between predictions and targets
         averaged across trials.
+
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
         :param dim: dimension for which we want to compute
@@ -101,6 +109,7 @@ class NormalizedCrossCorrelation:
         """
         Calculates CC_ABS from the paper. It represents Pearson's CC between
         predictions and targets averaged over trials.
+
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
         :param std_pred: standard deviation of trial mean predictions across neurons.
@@ -122,6 +131,7 @@ class NormalizedCrossCorrelation:
         Calculates CC_MAX value from the paper. It represents the upper bound
         of achievable performance given the the in vivo variability of the
         neuron and the number of trials.
+
         :param target: targets tensor.
         :param var_target: target variance over neurons.
         :param num_trials: number of trials.
@@ -140,7 +150,7 @@ class NormalizedCrossCorrelation:
         # (N-1)*Var(y^{dash})
         denominator = (num_trials - 1) * var_target
 
-        return torch.sqrt(numerator / (denominator + denom_offset))
+        return torch.sqrt(numerator / (denominator + denom_offset)).item()
 
     def _cc_norm(
         self,
@@ -153,6 +163,7 @@ class NormalizedCrossCorrelation:
     ) -> float:
         """
         Calculates CC_NORM from the paper.
+
         :param avg_prediction: averaged prediction tensor across trials
         :param avg_target: averaged target tensor across trials.
         :param std_pred: standard deviation of trial mean predictions across neurons.
@@ -169,6 +180,7 @@ class NormalizedCrossCorrelation:
     def _batch_mean(self, cc_norm):
         """
         Calculates mean across batch for CC_NORM values.
+
         :param cc_norm: values of CC_NORM for all batch examples.
         :return: Returns mean of CC_NORM across batch.
         """
@@ -183,6 +195,7 @@ class NormalizedCrossCorrelation:
 
         Calculation is defined in paper:
         https://www.biorxiv.org/content/10.1101/2023.03.21.533548v1.full.pdf
+
         :param prediction: model predictions. In silico responses, `r` from the paper.
         :param target: target values. In vivo responses, `y` from the paper.
         :return: Returns normalized cross correlation value.

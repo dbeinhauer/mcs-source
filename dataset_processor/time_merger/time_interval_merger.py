@@ -76,12 +76,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "input_directory",
         type=str,
-        help="Path to the input directory containing sheets subdirectories with .npz files with appropriate neurons.",
+        help="""Path to the input directory containing sheets subdirectories
+        with .npz files with appropriate neurons.""",
     )
     parser.add_argument(
         "output_directory",
         type=str,
-        help="Path to the output directory where processed files will be saved (in appropriate subdirectories).",
+        help="""Path to the output directory where processed files will
+        be saved (in appropriate subdirectories).""",
     )
     parser.add_argument(
         "--time_interval",
@@ -98,7 +100,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Process only the given sheet (othervise all sheets).
+    # Process only the given sheet (otherwise all sheets).
     if args.sheet != None and args.sheet in SUBDIRECTORIES:
         SUBDIRECTORIES = [args.sheet]
 

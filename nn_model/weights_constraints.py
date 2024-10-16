@@ -1,5 +1,5 @@
 """
-This script defines all classes used as weights contraints. These 
+This script defines all classes used as weights constraints. These 
 are typically used for determination of excitatory/inhibitory layer.
 """
 
@@ -44,7 +44,8 @@ class WeightConstraint:
     def hidden_constraint(self, module, kwargs):
         """
         Applies constraints on the `weight_hh` (hidden) parameters
-        of the provided layer. Aplying excitatory/inhibitory constraint.
+        of the provided layer. Applying excitatory/inhibitory constraint.
+
         :param module: module (layer) to which we want to apply the constraint to.
         :param kwargs: kwargs of the `torch.clamp` function specifying the
         operation on the weights.
@@ -61,6 +62,7 @@ class WeightConstraint:
         Applies the constrain in ascending order to the parts of the weights
         based on the properties of the input of the layer specified in the
         attribute `self.input_parameters`.
+
         :param module: module (layer) to which we want to apply the constraint to.
         """
         if hasattr(module, "weight_ih"):
@@ -91,11 +93,12 @@ class ExcitatoryWeightConstraint(WeightConstraint):
         :param input_parameters: input parameters for the parent
         `WeightConstraint` class.
         """
-        super().__init__(input_parameters)
+        super(WeightConstraint).__init__(input_parameters)
 
     def apply(self, module):
         """
         Applies the constraints on the given module.
+
         :param module: module (layer) to which we want to apply the constraint to.
         """
         # Apply excitatory condition to all hidden neurons.
@@ -115,11 +118,12 @@ class InhibitoryWeightConstraint(WeightConstraint):
         :param input_parameters: input parameters for the parent
         `WeightConstraint` class.
         """
-        super().__init__(input_parameters)
+        super(WeightConstraint).__init__(input_parameters)
 
     def apply(self, module):
         """
         Applies the constraints on the given module.
+
         :param module: module (layer) to which we want to apply the constraint to.
         """
         # Apply inhibitory condition to all hidden neurons.

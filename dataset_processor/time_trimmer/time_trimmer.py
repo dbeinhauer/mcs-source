@@ -1,5 +1,5 @@
 """
-Trimms the spikes matrix to multiple smaller ones representing smaller time interval 
+Trims the spikes matrix to multiple smaller ones representing smaller time interval 
 and stores them into new destination. 
 
 It should be used to trim the time intervals the way that there should be 
@@ -20,10 +20,11 @@ FILE_POSTFIX = ".npz"
 
 def trim_sparse_matrix(matrix, interval_size: int = 712, start_offset: int = 76):
     """
-    Trims the sparse matrix into submatrices of a given interval size.
+    Trims the sparse matrix into sub-matrices of a given interval size.
 
-    Note: If the matrix cannot be evenly divided, the last submatrix will be smaller.
+    NOTE: If the matrix cannot be evenly divided, the last sub-matrix will be smaller.
     The first matrix will be larger than the rest by `start_offset`.
+
     :param matrix: numpy matrix for trimming in shape `(time_duration, num_neurons)`.
     :param interval_size: size of the wanted time interval
     (first and last will have different sizes).
@@ -50,6 +51,7 @@ def process_directory(input_dir: str, output_dir: str, interval_size: int = 712)
     """
     Load all sparse matrices from the input directory, trim them, and store
     them in sparse representation to the output directory.
+
     :param input_dir: input directory where the matrices are stored.
     :param output_dir: output directory where to store the new matrices.
     :param interval_size: size of the new time interval
@@ -65,10 +67,10 @@ def process_directory(input_dir: str, output_dir: str, interval_size: int = 712)
             matrix = matrix.toarray().transpose(1, 0)
 
             # Get the original experiment ID from the filename
-            # (shoud be in format: 'spikes_{number}.npz').
+            # (should be in format: 'spikes_{number}.npz').
             matrix_base_number = int(os.path.splitext(filename)[0].split("_")[-1])
 
-            # Get rid of the image number and posfix.
+            # Get rid of the image number and postfix.
             file_prefix = filename.split("/")[-1].split(
                 f"_{matrix_base_number}{FILE_POSTFIX}"
             )[0]
@@ -95,12 +97,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "input_directory",
         type=str,
-        help="Path to the input directory containing sheets subdirectories with .npz files with appropriate neurons.",
+        help="""Path to the input directory containing sheets subdirectories 
+        with .npz files with appropriate neurons.""",
     )
     parser.add_argument(
         "output_directory",
         type=str,
-        help="Path to the output directory where processed files will be saved (in appropriate subdirectories).",
+        help="""Path to the output directory where processed files will be saved
+        (in appropriate subdirectories).""",
     )
     parser.add_argument(
         "--interval_size", type=int, default=712, help="Size of new time interval."

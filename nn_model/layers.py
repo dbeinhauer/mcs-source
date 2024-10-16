@@ -1,6 +1,6 @@
 """
 This source code defines variants of possible model layers
-typically in some form of `RNNCell` modul with additional
+typically in some form of `RNNCell` module with additional
 operations and complexities.
 """
 
@@ -22,26 +22,28 @@ class ConstrainedRNNCell(nn.Module):
     ):
         """
         Initializes layer parameters and constraints.
+
         :param input_size: input size of the layer.
         :param hidden_size: hidden (output) size of the layer.
         :param weight_constraint: constraints of the layer.
         :param shared_complexity: placeholder for shared complexity
         model used in more complex models. Here only for proper header
-        definintion.
+        definition.
         """
         super(ConstrainedRNNCell, self).__init__()
         self.hidden_size = hidden_size
         self.rnn_cell = nn.RNNCell(input_size, hidden_size)
         self.constraint = weight_constraint
 
-    def forward(self, input, hidden):
+    def forward(self, input_data, hidden):
         """
         Forward step the cell. One time step.
-        :param input: input data.
+
+        :param input_data: input data.
         :param hidden: output data of the previous step (or zeros if first step).
         :return: Returns the output of the forward step.
         """
-        hidden = self.rnn_cell(input, hidden)
+        hidden = self.rnn_cell(input_data, hidden)
         return hidden
 
     def apply_constraints(self):
@@ -63,9 +65,9 @@ class ComplexConstrainedRNNCell(ConstrainedRNNCell):
         )
         self.shared_complexity = shared_complexity  # Shared complexity module
 
-    def forward(self, input, hidden):
+    def forward(self, input_data, hidden):
         # Apply the RNN operation
-        hidden = self.rnn_cell(input, hidden)
+        hidden = self.rnn_cell(input_data, hidden)
 
         # Apply the shared complexity transformation
         complex_hidden = self.shared_complexity(hidden)

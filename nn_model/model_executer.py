@@ -165,22 +165,22 @@ class ModelExecuter:
         # h23_inh = torch.zeros(batch_size, self.model.l23_inh_size).to(globals.device1)
         h4_exc = torch.zeros(
             batch_size,
-            self.layer_sizes[LayerType.V1_Exc_L4.value],
+            self.layer_sizes[LayerType.V1_EXC_L4.value],
             device=globals.device0,
         )  # .to(globals.device0)
         h4_inh = torch.zeros(
             batch_size,
-            self.layer_sizes[LayerType.V1_Inh_L4.value],
+            self.layer_sizes[LayerType.V1_INH_L4.value],
             device=globals.device0,
         )  # .to(globals.device0)
         h23_exc = torch.zeros(
             batch_size,
-            self.layer_sizes[LayerType.V1_Exc_L23.value],
+            self.layer_sizes[LayerType.V1_EXC_L23.value],
             device=globals.device0,
         )  # .to(globals.device1)
         h23_inh = torch.zeros(
             batch_size,
-            self.layer_sizes[LayerType.V1_Inh_L23.value],
+            self.layer_sizes[LayerType.V1_INH_L23.value],
             device=globals.device0,
         )  # .to(globals.device1)
         return h4_exc, h4_inh, h23_exc, h23_inh
@@ -257,7 +257,7 @@ class ModelExecuter:
 
         :param inputs: dict(batch_size, num_trials, time, num_neurons)
         :param hidden_states: in shape: dict (batch_size, num_trials, time, num_neurons),
-        I expect that the states are for timestep 1
+        I expect that the states are for time step 1
         :param num_trials: _description_
         :return: _description_
         """

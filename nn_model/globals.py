@@ -22,22 +22,22 @@ TIME_STEP = 5
 EXCITATORY_LAYERS = {
     LayerType.X_ON.value,
     LayerType.X_OFF.value,
-    LayerType.V1_Exc_L4.value,
-    LayerType.V1_Exc_L23.value,
+    LayerType.V1_EXC_L4.value,
+    LayerType.V1_EXC_L23.value,
 }
 INHIBITORY_LAYERS = {
-    LayerType.V1_Inh_L4.value,
-    LayerType.V1_Inh_L23.value,
+    LayerType.V1_INH_L4.value,
+    LayerType.V1_INH_L23.value,
 }
 
 
 ORIGINAL_SIZES = {
     LayerType.X_ON.value: 7200,
     LayerType.X_OFF.value: 7200,
-    LayerType.V1_Exc_L4.value: 37500,
-    LayerType.V1_Inh_L4.value: 9375,
-    LayerType.V1_Exc_L23.value: 37500,
-    LayerType.V1_Inh_L23.value: 9375,
+    LayerType.V1_EXC_L4.value: 37500,
+    LayerType.V1_INH_L4.value: 9375,
+    LayerType.V1_EXC_L23.value: 37500,
+    LayerType.V1_INH_L23.value: 9375,
 }
 
 # Number of time steps

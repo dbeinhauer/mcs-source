@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Python script containg definition of the class used for extraction of raw 
+Python script contaning definition of the class used for extraction of raw 
 data to target dataset. Additionally, it contains script for running the 
 single extraction.
 """
 
-import os
-import gc
+# import os
+# import gc
 import pickle
 import sys
 import logging
@@ -70,7 +70,7 @@ class DatasetExporter:
 
     def __init__(self):
         """
-        Initalizes the experiment parameters variables.
+        Initializes the experiment parameters variables.
         """
         self.num_neurons = 0
         self.num_images = 0
@@ -80,6 +80,7 @@ class DatasetExporter:
     def _get_datastore(self, root: str):
         """
         Gets mozaik datastore from the given path.
+
         :param root: root directory where the mozaik datastore is stored.
         :return: returns the mozaik datastore object from the given root.
         """
@@ -94,6 +95,7 @@ class DatasetExporter:
     def extract_images(self, path: str) -> str:
         """
         # TODO: not used now.
+
         :param path: _description_
         :return: _description_
         """
@@ -104,6 +106,7 @@ class DatasetExporter:
         """
         # TODO: now used now
         Creates pickle dump file of the provided file.
+
         :param path: path where the pickle path should be stored.
         :param file: file to convert to pickle.
         """
@@ -114,6 +117,7 @@ class DatasetExporter:
         """
         TODO: not used in the current version.
         # Should reconstruct the image from the stimuli.
+
         :param s: _description_
         :return: _description_
         """
@@ -144,8 +148,10 @@ class DatasetExporter:
     def _get_sheetname(self, sheet: str) -> str:
         """
         Renames the sheet name to format that can be used in the filename.
-        Note: It is needed because some functions need format with '/' symbol and
+
+        NOTE: It is needed because some functions need format with '/' symbol and
         some of them need them without it.
+
         :param sheet: original sheet name provided to program.
         :return: returns modified sheetname to format without '/' symbols.
         """
@@ -159,6 +165,7 @@ class DatasetExporter:
         """
         Loads the provided datastore, filters it to take only 'NaturalImage'
         and creates the list of trials for this datastore.
+
         :param path: path of the datastore.
         :return: returns the tuple of modified datastore and
         list of trials sorted by ID (used mainly in test dataset).
@@ -176,12 +183,13 @@ class DatasetExporter:
         """
         Retrieves segments for both blanks and images in chronological order as they
         were presented in the experiments.
+
         :param dsv: mozaik datastore object filtered for 'NaturalImage'.
         :param trial: trial to get data for (from trials object).
         :param sheet: sheet identifier (type of neuronal population). Possible values
         are: ["X_ON", "X_OFF", "V1_Exc_L2/3", "V1_Inh_L2/3", "V1_Exc_L4", "V1_Inh_L4"]
         :returns: tuple of blank segments and stimuli (image)
-        segments extracted from provided datstore.
+        segments extracted from provided datastore.
         """
         # Get data for specific sheet and trial.
         dsv_modified = param_filter_query(dsv, sheet_name=sheet)
@@ -197,6 +205,7 @@ class DatasetExporter:
     def _get_image_id(self, segment) -> str:
         """
         Retrieves index of the image of the given segment.
+
         :param segment: segment to obtain image information from.
         :returns: id of the image corresponding to segment.
         """
@@ -206,13 +215,15 @@ class DatasetExporter:
     def _sort_spiketrains(self, spike_trains):
         """
         Sort spiketrains based on the neuron ID.
-        :param spike_trains: spike trains object to be sorded.
+
+        :param spike_trains: spike trains object to be sorted.
         :return: returns sorted spike trains object based on its neuron IDs.
         """
 
         def sorting_key(spike_train):
             """
             Get sorting key for spike trains dataset.
+
             :param spike_train: spike train to get the sorting key.
             :return: returns ID of the source neuron.
             """
@@ -223,6 +234,7 @@ class DatasetExporter:
     def _get_number_neurons(self, segment) -> int:
         """
         Retrieves information about number of neurons.
+
         :param segment: segment to retrieve information from.
         :returns: total number of neurons in the given segment.
         """
@@ -231,6 +243,7 @@ class DatasetExporter:
     def _get_segment_duration(self, segment) -> int:
         """
         Retrieves duration of the segment.
+
         :param segment: segment to get duration from.
         :returns: duration of the segment in ms.
         """
@@ -246,9 +259,10 @@ class DatasetExporter:
     ):
         """
         Iterates through all images and extracts spiketrains info from them.
+
         :param segs_blank: segments containing time intervals for blank
         period (blank image presented).
-        :param segs_images: segments contatining the time intervals
+        :param segs_images: segments containing the time intervals
         for stimulus period (images presented).
         :param spikes: array of spikes for all images and neurons.
         (shape: num_images*num_neurons*blank_and_image_duration), blank is always before image.
@@ -273,15 +287,16 @@ class DatasetExporter:
         img_id: int,
         seg_blank,
         seg_image,
-        spikes: np.array,
+        spikes,
         blank_offset: int,
     ):
         """
         Iterates through all neurons and extracts all spikes for the given image.
+
         :param img_id: index of the image in the spikes array.
         :param seg_blank: blank part of the segments.
         :param seg_image: stimulus (image) part of the segments.
-        :param spikes: np.array of spikes for all images and neurons.
+        :param spikes: `np.array` of spikes for all images and neurons.
         (shape: num_images*num_neurons*blank_and_image_duration), blank is always before image.
         :param blank_offset: duration of blank interval in the experiment.
         """
@@ -298,7 +313,7 @@ class DatasetExporter:
 
     def _prealocate_spikes(self) -> np.array:
         """
-        Creates spikes `np.array` (prealocates the array).
+        Creates spikes `np.array` (preallocates the array).
         :return: returns `np.array` of zeros in the shape
         (num_images, num_neurons, blank_and_image_duration).
         """
@@ -341,6 +356,7 @@ class DatasetExporter:
     ) -> str:
         """
         Creates filename for the spikes file.
+
         :param args: command line arguments.
         :param spikes_prefix: prefix of all spikes files.
         :param trials_prefix: trial part of prefix (in case there are multiple files).
@@ -358,6 +374,7 @@ class DatasetExporter:
     def _print_experiment_header(self, sheet: str, input_path: str):
         """
         Prints header when the extraction starts.
+
         :param sheet: sheet to be extracted.
         :param input_path: path to the raw data.
         """
@@ -383,6 +400,7 @@ class DatasetExporter:
     def _trials_iteration(self, args, dsv, trials) -> list:
         """
         Iterates through trials and obtains all spikes from all trials.
+
         :param args: command line arguments.
         :param dsv: datastore view object containing the dataset.
         :param trials: all trials object of the experiment.
@@ -408,7 +426,7 @@ class DatasetExporter:
                 segs_blank = segs_blank[0 : args.subset]
                 segs_images = segs_images[0 : args.subset]
 
-            # Prealocate spikes array.
+            # Preallocate spikes array.
             spikes = self._prealocate_spikes()
 
             # Extract the spike trains for the trial.
@@ -420,6 +438,7 @@ class DatasetExporter:
     def save_image_ids(self, segs, filename: str):
         """
         Saves image IDs into file of `np.array` object.
+
         :param segs: segments object to get the IDs from.
         :param filename: name of the file where to store the IDs.
         """
@@ -429,6 +448,7 @@ class DatasetExporter:
     def save_neuron_ids(self, segs, filename: str):
         """
         Saves neuron IDs into file of `np.array` object.
+
         :param segs: segments object to get the IDs from.
         :param filename: name of the file where to store the ids.
         """
@@ -449,11 +469,12 @@ class DatasetExporter:
         trials_prefix: str = TRIALS_PREFIX,
     ):
         """
-        Reshapes the spikes for each trial into shape (num_neurons * (images*time_slots)), 
-        converts it to sparse representation and stores it into the .npz file. 
-        The output filename format is: 
+        Reshapes the spikes for each trial into shape (num_neurons * (images*time_slots)),
+        converts it to sparse representation and stores it into the .npz file.
+        The output filename format is:
             `output_path/spike_subdirectory/sheet/spikes_[trial_{trial_ID}]_{sheet}_{ID}.npz`
-        Where `trial_{trial_ID}` is optional and is present only for multiple trials processing.\
+        Where `trial_{trial_ID}` is optional and is present only for multiple trials processing.
+
         :param args: command line arguments.
         :param trial_spikes: list of `np.array` objects of spikes for all trials.
         :param spikes_subdirectory: where to store the spikes.
@@ -486,6 +507,7 @@ class DatasetExporter:
     def save_experiment_parameters(self, args, segs_blank):
         """
         Saves images and neurons IDs of the experiment.
+
         :param args: command line arguments.
         :param segs_blank: segments of arbitrary blank period of the experiment (the IDs are in each segments same).
         """
@@ -505,6 +527,7 @@ class DatasetExporter:
     def run_extraction(self, args):
         """
         Extracts the spiketrains for the provided experiment.
+
         :param args: command line arguments with extraction settings.
         """
         setup_logging()
@@ -539,7 +562,8 @@ if __name__ == "__main__":
         "--output_path",
         type=str,
         default=None,
-        help="Path where to store the output (If empty then use the default predifined path based on the dataset type (train/test)).",
+        help="""Path where to store the output (If empty then use the 
+        default predefined path based on the dataset type (train/test)).""",
     )
     parser.add_argument(
         "--dataset_variant",

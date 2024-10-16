@@ -12,10 +12,10 @@ class LayerType(Enum):
 
     X_ON = "X_ON"
     X_OFF = "X_OFF"
-    V1_Exc_L4 = "V1_Exc_L4"
-    V1_Inh_L4 = "V1_Inh_L4"
-    V1_Exc_L23 = "V1_Exc_L23"
-    V1_Inh_L23 = "V1_Inh_L23"
+    V1_EXC_L4 = "V1_Exc_L4"
+    V1_INH_L4 = "V1_Inh_L4"
+    V1_EXC_L23 = "V1_Exc_L23"
+    V1_INH_L23 = "V1_Inh_L23"
 
 
 class WeightTypes(Enum):
