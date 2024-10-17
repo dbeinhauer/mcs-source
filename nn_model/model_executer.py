@@ -311,9 +311,12 @@ class ModelExecuter:
                 if debugging_stop_index != -1 and i > debugging_stop_index:
                     # Train only for few batches in case of debugging.
                     break
+
+                # Retrieve the batch of data.
                 input_batch, target_batch = self._get_data(input_batch, target_batch)
                 self.optimizer.zero_grad()
 
+                # Get model prediction.
                 predictions = self.model(
                     input_batch,
                     target_batch,
@@ -322,15 +325,17 @@ class ModelExecuter:
                 del input_batch
                 torch.cuda.empty_cache()
 
+                # Compute loss of the model predictions.
                 loss = self._compute_loss(predictions, target_batch)
 
                 del target_batch, predictions
                 torch.cuda.empty_cache()
 
+                # Perform backward step.
                 loss.backward()
                 self.optimizer.step()
 
-                # Apply weight constrains for all the layers.
+                # Apply weight constrains (excitatory/inhibitory) for all the layers.
                 self._apply_model_constraints()
 
                 torch.cuda.empty_cache()
@@ -342,9 +347,10 @@ class ModelExecuter:
             )
 
     def _get_all_trials_predictions(self, inputs, targets, num_trials):
-        """_summary_
+        """
+        Computes predictions for all trials (used for evaluation usually).
 
-        :param inputs: dict(batch_size, num_trials, time, num_neurons)
+        :param inputs: dictionary of inputs for each input layer dict(batch_size, num_trials, time, num_neurons)
         :param hidden_states: in shape: dict (batch_size, num_trials, time, num_neurons),
         I expect that the states are for timestep 1
         :param num_trials: _description_
