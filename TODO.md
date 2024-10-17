@@ -1,5 +1,5 @@
 # Now
-- think about model hyperparameters
+- think about model hyper-parameters
 - different losses
 - training: only one step (not sequence) - weights to real data (target)
 - start on the first time step (not with the zeros)
@@ -16,7 +16,7 @@
 # Future steps
 - possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
     - might be better than some small NN instead of simple neuron
-    - need to share the weights (othewise it would not be sufficient to run it (too large model))
+    - need to share the weights (otherwise it would not be sufficient to run it (too large model))
 - for the training with smaller numbers (float16)
     - it might be good idea to lower the training step
 - try to find better measure

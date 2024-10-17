@@ -105,7 +105,7 @@ class NormalizedCrossCorrelation:
         std_pred,
         std_target,
         denom_offset: float = 1e-8,
-    ) -> float:
+    ) -> torch.Tensor:
         """
         Calculates CC_ABS from the paper. It represents Pearson's CC between
         predictions and targets averaged over trials.
@@ -126,7 +126,7 @@ class NormalizedCrossCorrelation:
 
     def _cc_max(
         self, target, var_target, num_trials: int, denom_offset: float = 1e-8
-    ) -> float:
+    ) -> torch.Tensor:
         """
         Calculates CC_MAX value from the paper. It represents the upper bound
         of achievable performance given the the in vivo variability of the
@@ -150,7 +150,7 @@ class NormalizedCrossCorrelation:
         # (N-1)*Var(y^{dash})
         denominator = (num_trials - 1) * var_target
 
-        return torch.sqrt(numerator / (denominator + denom_offset)).item()
+        return torch.sqrt(numerator / (denominator + denom_offset))
 
     def _cc_norm(
         self,
@@ -160,7 +160,7 @@ class NormalizedCrossCorrelation:
         std_target,
         target,
         denom_offset: float = 1e-8,
-    ) -> float:
+    ) -> torch.Tensor:
         """
         Calculates CC_NORM from the paper.
 

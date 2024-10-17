@@ -6,14 +6,15 @@ model training and evaluation.
 
 import argparse
 import os
+from typing import Tuple, Dict, Optional
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-from tqdm import tqdm
 import torch.nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 import globals
 from type_variants import LayerType, ModelTypes
@@ -27,38 +28,62 @@ from evaluation_metrics import NormalizedCrossCorrelation
 
 
 class ModelExecuter:
-    # Input layer keys (LGN).
-    input_layers = ["X_ON", "X_OFF"]
+    """
+    Class used for execution of training and testing steps of the models.
+    """
 
-    def __init__(self, args):
+    # Input layer keys (LGN).
+    input_layers = [LayerType.X_ON.value, LayerType.X_OFF.value]
+
+    # Default kwargs for continuous evaluation (evaluation after training steps).
+    continuous_evaluation_kwargs = {
+        "epoch_offset": 1,
+        "evaluation_subset_size": 10,
+    }
+
+    def __init__(self, arguments):
         """
         Initializes dataset loaders, model and evaluation steps.
-        :param args: arguments defining next
+
+        :param arguments: command line arguments.
         """
         # Basic arguments
-        self.num_epochs = args.num_epochs
+        self.num_epochs = arguments.num_epochs
         self.layer_sizes = globals.MODEL_SIZES
 
         # Dataset Init
-        self.train_dataset, self.test_dataset = self._init_datasets(args)
+        self.train_dataset, self.test_dataset = self._init_datasets(arguments)
         self.train_loader, self.test_loader = self._init_data_loaders()
 
         # Model Init
-        self.model = self._init_model(args)
+        self.model = self._init_model(arguments)
         self.criterion = self._init_criterion()
-        self.optimizer = self._init_optimizer(args.learning_rate)
+        self.optimizer = self._init_optimizer(arguments.learning_rate)
 
         # Evaluation metric
         self.evaluation_metrics = NormalizedCrossCorrelation()
-        self._print_experiment_info(args)
+        self._print_experiment_info(arguments)
 
     def _get_model_type(self, model_identifier: str):
+        """
+        Based on the model identifier returns type of the model layer.
+
+        :param model_identifier: string identifier of the model.
+        :return: Returns class of the layer that should be used in the model.
+        """
         if model_identifier == ModelTypes.SIMPLE.value:
+            # Simple model -> used classical cells without additional NN instead of neuron.
             return ConstrainedRNNCell
         if model_identifier == ModelTypes.COMPLEX.value:
+            # Complex model -> use additional shared NN for each layer instead of simple neuron.
             return ComplexConstrainedRNNCell
 
-    def _split_input_output_layers(self):
+    def _split_input_output_layers(self) -> Tuple[Dict[str, int], Dict[str, int]]:
+        """
+        Splits layers sizes to input and output ones.
+
+        :return: Returns tuple of dictionaries of input and output layer sizes.
+        """
         input_layers = {
             key: self.layer_sizes[key] for key in ModelExecuter.input_layers
         }
@@ -70,27 +95,40 @@ class ModelExecuter:
 
         return input_layers, output_layers
 
-    def _init_datasets(self, args):
+    def _init_datasets(
+        self, arguments
+    ) -> Tuple[SparseSpikeDataset, SparseSpikeDataset]:
+        """
+        Initializes train and test dataset.
+
+        :param arguments: command line arguments.
+        :return: Returns tuple of initialized train and test dataset.
+        """
         input_layers, output_layers = self._split_input_output_layers()
 
         train_dataset = SparseSpikeDataset(
-            args.train_dir,
+            arguments.train_dir,
             input_layers,
             output_layers,
             is_test=False,
-            model_subset_path=args.subset_dir,
+            model_subset_path=arguments.subset_dir,
         )
         test_dataset = SparseSpikeDataset(
-            args.test_dir,
+            arguments.test_dir,
             input_layers,
             output_layers,
             is_test=True,
-            model_subset_path=args.subset_dir,
+            model_subset_path=arguments.subset_dir,
         )
 
         return train_dataset, test_dataset
 
-    def _init_data_loaders(self):  # -> tuple[DataLoader, DataLoader]:
+    def _init_data_loaders(self) -> Tuple[DataLoader, DataLoader]:
+        """
+        Initialized train and test `DataLoader` objects.
+
+        :return: Returns initialized train and test `Dataloader` classes.
+        """
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=globals.train_batch_size,
@@ -105,44 +143,84 @@ class ModelExecuter:
 
         return train_loader, test_loader
 
-    def _init_model(self, args):  # -> RNNCellModel:
-        if args.model == ModelTypes.SIMPLE.value:
+    def _init_model(self, arguments) -> RNNCellModel:
+        """
+        Initializes model based on the provided arguments.
+
+        :param arguments: command line arguments containing model setup info.
+        :return: Returns initializes model.
+        """
+        if arguments.model == ModelTypes.SIMPLE.value:
+            # Simple model (without shared complexity).
             return RNNCellModel(self.layer_sizes).to(globals.device1)
-        if args.model == ModelTypes.COMPLEX.value:
+        if arguments.model == ModelTypes.COMPLEX.value:
+            # Complex model (with shared complexity).
             return RNNCellModel(
                 self.layer_sizes,
                 ComplexConstrainedRNNCell,
                 complexity_kwargs={
-                    ModelTypes.COMPLEX.value: {"complexity_size": args.complexity_size}
+                    ModelTypes.COMPLEX.value: {
+                        "complexity_size": arguments.complexity_size
+                    }
                 },
             ).to(globals.device1)
 
-        # return RNNCellModel
-        # return RNNCellModel(self.layer_sizes).to(globals.device1)
-
     def _init_criterion(self):
+        """
+        Initializes model criterion.
+
+        :return: Returns model criterion (loss function).
+        """
         return torch.nn.MSELoss()
 
-    def _init_optimizer(self, learning_rate):
+    def _init_optimizer(self, learning_rate: float):
+        """
+        Initializes model optimizer.
+
+        :param learning_rate: learning rate of the optimizer.
+        :return: Returns used model optimizer (Adam).
+        """
         return optim.Adam(self.model.parameters(), lr=learning_rate)
 
-    def _print_experiment_info(self, args):
+    def _print_experiment_info(self, argument):
+        """
+        Prints basic information about the experiment.
+
+        :param argument: command line arguments.
+        """
         print(
             "\n".join(
                 [
                     "NEW EXPERIMENT",
                     "---------------------------------",
                     "Running with parameters:",
-                    f"Model variant: {args.model}",
-                    f"Complexity model size: {args.complexity_size}",
+                    f"Model variant: {argument.model}",
+                    f"Complexity model size: {argument.complexity_size}",
                     f"Batch size: {globals.train_batch_size}",
-                    f"Learning rate: {args.learning_rate}",
-                    f"Num epochs: {args.num_epochs}",
+                    f"Learning rate: {argument.learning_rate}",
+                    f"Num epochs: {argument.num_epochs}",
                 ]
             )
         )
 
-    def _get_data(self, inputs, targets, test: bool = False):
+    def _get_data(self, inputs, targets, test: bool = False) -> Tuple[Dict, Dict]:
+        """
+        Converts loaded data from corresponding `DataLoader` child class
+        to proper format further used in training/evaluation.
+
+        It converts the loaded inputs and targets to dictionary of
+        layer identifier and its corresponding values.
+        For training dataset it removes (uses 0-th) trial dimension (not used there).
+        For testing dataset it keeps the trials dimension.
+
+        :param inputs: input slice loaded from `DataLoader` class object.
+        :param targets: target slice loaded from `DataLoader` class object.
+        :param test: flag whether the loaded data are from evaluation (test) set,
+        otherwise `False` - train set.
+        :return: Returns tuple of dictionaries of inputs and targets further used
+        for either model training or evaluation. In case of training it removes the
+        trials dimension (it is not used).
+        """
         # Define what part of trials dimension we want to take.
         # Take `0` for train or all trials `slice(None) == :` for test.
         slice_ = slice(None) if test else 0
@@ -152,93 +230,104 @@ class ModelExecuter:
             for layer, input_data in inputs.items()
         }
         targets = {
-            layer: output_data[:, slice_, :, :].float()
+            layer: output_data[
+                :, slice_, :, :
+            ].float()  # Do not move it to GPU as it is not always used there (only in training).
             for layer, output_data in targets.items()
         }
 
         return inputs, targets
 
-    def _init_model_weights(self, batch_size):
-        # h4_exc = torch.zeros(batch_size, self.model.l4_exc_size).to(globals.device0)
-        # h4_inh = torch.zeros(batch_size, self.model.l4_inh_size).to(globals.device0)
-        # h23_exc = torch.zeros(batch_size, self.model.l23_exc_size).to(globals.device1)
-        # h23_inh = torch.zeros(batch_size, self.model.l23_inh_size).to(globals.device1)
-        h4_exc = torch.zeros(
-            batch_size,
-            self.layer_sizes[LayerType.V1_EXC_L4.value],
-            device=globals.device0,
-        )  # .to(globals.device0)
-        h4_inh = torch.zeros(
-            batch_size,
-            self.layer_sizes[LayerType.V1_INH_L4.value],
-            device=globals.device0,
-        )  # .to(globals.device0)
-        h23_exc = torch.zeros(
-            batch_size,
-            self.layer_sizes[LayerType.V1_EXC_L23.value],
-            device=globals.device0,
-        )  # .to(globals.device1)
-        h23_inh = torch.zeros(
-            batch_size,
-            self.layer_sizes[LayerType.V1_INH_L23.value],
-            device=globals.device0,
-        )  # .to(globals.device1)
-        return h4_exc, h4_inh, h23_exc, h23_inh
+    def _compute_loss(self, predictions, targets) -> torch.Tensor:
+        """
+        Computes model loss of all model layer predictions.
 
-    def _compute_loss(self, predictions, targets):
-        loss = 0
+        :param predictions: model predictions.
+        :param targets: model targets.
+        :return: Returns sum of losses for all model layer predictions.
+        """
+        loss = torch.zeros((1))
         for layer, target in targets.items():
             loss += self.criterion(
                 torch.cat(predictions[layer], dim=1).float().cpu(),
                 target[:, 1:, :].float(),
+                # Compute loss only for the values from time step 1
+                # (we start with the step 0 initial hidden steps).
             )
 
         return loss
 
     def _apply_model_constraints(self):
+        """
+        Applies model constraints on all model layers (excitatory/inhibitory).
+        """
         for module in self.model.modules():
             if isinstance(module, ConstrainedRNNCell):
                 module.apply_constraints()
 
-    def train(self, evaluation_step: int = -1):
+    def _epoch_evaluation_step(
+        self,
+        epoch: int,
+        epoch_offset: int = 1,
+        evaluation_subset_size: int = 10,
+    ):
+        """
+        Runs continuous evaluation steps in selected training epochs on
+        selected subset of test examples.
+
+        :param epoch: current epoch number.
+        :param epoch_offset: after how many epochs perform evaluation. If `-1` then never run.
+        :param evaluation_subset_size: how many batches use for evaluation.
+        If `-1` then all test dataset.
+        """
+        if epoch_offset != -1 and epoch % epoch_offset == 0:
+            # Do continuous evaluation after this step.
+            self.evaluation(subset=evaluation_subset_size)
+            self.model.train()
+
+    def train(
+        self,
+        continuous_evaluation_kwargs: Dict = {},
+        debugging_stop_index: int = -1,
+    ):
+        """
+        Runs all model training steps.
+
+        The training works as follows:
+            1. It skips first time step (we do not have hidden states).
+            2. Hidden states are targets from the previous step.
+                - in the training step it makes sense (we want to learn only the next step)
+            3. Prediction of the model is the following (current) hidden state (output layer).
+
+        :param continuous_evaluation_kwargs: kwargs for continuous evaluation setup
+        (see `self._epoch_evaluation_step` for more information).
+        :param debugging_stop_step: number of steps (batches) to be performed in debugging
+        run of the training. If `-1` then train on all provided data.
+        """
         self.model.train()
         for epoch in range(self.num_epochs):
             loss = None
-            for i, (inputs, targets) in enumerate(tqdm(self.train_loader)):
-                # if i > 3:
-                #     break
-                inputs, targets = self._get_data(inputs, targets)
+            for i, (input_batch, target_batch) in enumerate(tqdm(self.train_loader)):
+                if debugging_stop_index != -1 and i > debugging_stop_index:
+                    # Train only for few batches in case of debugging.
+                    break
+                input_batch, target_batch = self._get_data(input_batch, target_batch)
                 self.optimizer.zero_grad()
 
-                # h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
-                #     globals.train_batch_size,
-                # )
-
-                # predictions = self.model(
-                #     inputs["X_ON"],
-                #     inputs["X_OFF"],
-                #     h4_exc,
-                #     h4_inh,
-                #     h23_exc,
-                #     h23_inh,
-                # )
-
                 predictions = self.model(
-                    inputs,
-                    targets,
+                    input_batch,
+                    target_batch,
                 )
 
-                # print("Predictions done")
-                # del inputs, h4_exc, h4_inh, h23_inh, h23_exc
-                del inputs
+                del input_batch
                 torch.cuda.empty_cache()
 
-                loss = self._compute_loss(predictions, targets)
+                loss = self._compute_loss(predictions, target_batch)
 
-                del targets, predictions
+                del target_batch, predictions
                 torch.cuda.empty_cache()
 
-                loss.float().backward()
+                loss.backward()
                 self.optimizer.step()
 
                 # Apply weight constrains for all the layers.
@@ -247,34 +336,23 @@ class ModelExecuter:
                 torch.cuda.empty_cache()
 
             print(f"Epoch [{epoch+1}/{self.num_epochs}], Loss: {loss.item():.4f}")
-            if evaluation_step != -1 and epoch % evaluation_step == 0:
-                # Do control evaluation after this step.
-                self.evaluation(subset=10)
-                self.model.train()
+            self._epoch_evaluation_step(
+                epoch,
+                **continuous_evaluation_kwargs,
+            )
 
     def _get_all_trials_predictions(self, inputs, targets, num_trials):
         """_summary_
 
         :param inputs: dict(batch_size, num_trials, time, num_neurons)
         :param hidden_states: in shape: dict (batch_size, num_trials, time, num_neurons),
-        I expect that the states are for time step 1
+        I expect that the states are for timestep 1
         :param num_trials: _description_
         :return: _description_
         """
         dict_predictions = {}
-        # h4_exc, h4_inh, h23_exc, h23_inh = self._init_model_weights(
-        #     globals.test_batch_size,
-        # )
-        # hidden_states
+
         for i in range(num_trials):
-            # trial_predictions = self.model(
-            #     inputs["X_ON"][:, i, :, :],
-            #     inputs["X_OFF"][:, i, :, :],
-            #     h4_exc,
-            #     h4_inh,
-            #     h23_exc,
-            #     h23_inh,
-            # )
             trial_inputs = {
                 layer: layer_input[:, i, :, :] for layer, layer_input in inputs.items()
             }
@@ -363,7 +441,13 @@ class ModelExecuter:
 def main(args):
     model_executer = ModelExecuter(args)
 
-    model_executer.train(evaluation_step=1)
+    model_executer.train(
+        continuous_evaluation_kwargs={
+            "epoch_offset": 1,
+            "evaluation_subset_size": 10,
+        },
+        debugging_stop_index=-1,
+    )
     model_executer.evaluation()
 
 

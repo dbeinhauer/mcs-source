@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 """
-Python script contaning definition of the class used for extraction of raw 
+Python script containing definition of the class used for extraction of raw 
 data to target dataset. Additionally, it contains script for running the 
 single extraction.
 """
+
+import argparse
+import logging
 
 # import os
 # import gc
 import pickle
 import sys
-import logging
-import argparse
 from unicodedata import name
 
-import numpy as np
-from tqdm import tqdm
-from scipy.sparse import csr_matrix
-from scipy.sparse import save_npz
-from parameters import ParameterSet
 import imagen
-from imagen.image import BoundingBox
 import mozaik
+import numpy as np
+from imagen.image import BoundingBox
 from mozaik.controller import Global, setup_logging
-from mozaik.storage.queries import param_filter_query
-from mozaik.storage.datastore import PickledDataStore
-from mozaik.tools.mozaik_parametrized import MozaikParametrized
 from mozaik.stimuli.vision.topographica_based import MaximumDynamicRange
+from mozaik.storage.datastore import PickledDataStore
+from mozaik.storage.queries import param_filter_query
+from mozaik.tools.mozaik_parametrized import MozaikParametrized
+from parameters import ParameterSet
+from scipy.sparse import csr_matrix, save_npz
+from tqdm import tqdm
 
 logging.basicConfig(stream=sys.stdout, level=logging.ERROR)
 

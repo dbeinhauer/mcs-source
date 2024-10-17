@@ -93,7 +93,7 @@ class ExcitatoryWeightConstraint(WeightConstraint):
         :param input_parameters: input parameters for the parent
         `WeightConstraint` class.
         """
-        super(WeightConstraint).__init__(input_parameters)
+        super().__init__(input_parameters)
 
     def apply(self, module):
         """
@@ -118,7 +118,7 @@ class InhibitoryWeightConstraint(WeightConstraint):
         :param input_parameters: input parameters for the parent
         `WeightConstraint` class.
         """
-        super(WeightConstraint).__init__(input_parameters)
+        super().__init__(input_parameters)
 
     def apply(self, module):
         """

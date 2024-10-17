@@ -40,7 +40,7 @@ class LayerConfig:
         :param size: size of the layer (number of neurons).
         :param layer_type: name of the layer.
         :param input_layers: ordered list of input layers of the layer.
-        :shared_complexity: shared complexity model(s), if no then `None`.
+        :param shared_complexity: shared complexity model(s), if no then `None`.
         """
         self.size = size
         self.layer_type = layer_type
@@ -85,7 +85,14 @@ class LayerConfig:
         if layer_type in globals.INHIBITORY_LAYERS:
             return WeightTypes.INHIBITORY.value
 
-        raise Exception(f"Wrong layer type. The type {layer_type} does not exist.")
+        class WrongLayerException(Exception):
+            """
+            Exception class to be raised while wrong layer type chosen.
+            """
+
+        raise WrongLayerException(
+            f"Wrong layer type. The type {layer_type} does not exist."
+        )
 
     def _determine_constraint(self, layer_type: str, input_constraints: List[Dict]):
         """
@@ -172,7 +179,7 @@ class RNNCellModel(nn.Module):
 
         :return: Returns dictionary of layer name (`LayerType`) and Nones.
         """
-        return {layer: None for layer in RNNCellModel.layers_inputs.keys()}
+        return {layer: None for layer in RNNCellModel.layers_inputs}
 
     def _init_complex_complexities(
         self,
@@ -189,7 +196,7 @@ class RNNCellModel(nn.Module):
         """
         return {
             layer: SharedComplexity(layer_sizes[layer], **complexity_kwargs)
-            for layer in RNNCellModel.layers_inputs.keys()
+            for layer in RNNCellModel.layers_inputs
         }
 
     def _init_shared_complexities(
@@ -200,7 +207,7 @@ class RNNCellModel(nn.Module):
         Initializes shared complexities of the model.
 
         :param layer_sizes: sizes of all model layers (input included).
-        :return: Retruns dictionary of layer name (`LayerType`) and
+        :return: Returns dictionary of layer name (`LayerType`) and
         appropriate shared complexity object.
         """
         if self.rnn_cell_cls == ComplexConstrainedRNNCell:
@@ -231,7 +238,7 @@ class RNNCellModel(nn.Module):
                 RNNCellModel.layers_inputs[layer],
                 shared_complexities[layer],
             )
-            for layer in RNNCellModel.layers_inputs.keys()
+            for layer in RNNCellModel.layers_inputs
         }
 
     def _init_layer(self, layer: str, rnn_cell_cls):
@@ -259,7 +266,7 @@ class RNNCellModel(nn.Module):
         """
         self.layers = nn.ModuleDict()
 
-        for layer in RNNCellModel.layers_inputs.keys():
+        for layer in RNNCellModel.layers_inputs:
             self.layers[layer] = self._init_layer(layer, self.rnn_cell_cls)
 
     # def forward(self, x_on, x_off, h4_exc, h4_inh, h23_exc, h23_inh):
@@ -270,25 +277,36 @@ class RNNCellModel(nn.Module):
         :param targets: dict[layer, inputs] - size (batch, neurons) or (batch, time, neurons)
         :return: _description_
         """
-        outputs = {layer: [] for layer in RNNCellModel.layers_inputs.keys()}
+        outputs = {layer: [] for layer in RNNCellModel.layers_inputs}
 
         time_length = inputs[LayerType.X_ON.value].size(1)
 
-        hidden_layers = targets
+        hidden_layers = {}
         if not self.training:
             hidden_layers = {
-                layer: hidden.to(globals.device0)
-                for layer, hidden in hidden_layers.items()
+                layer: hidden.to(globals.device0) for layer, hidden in targets.items()
+            }
+        all_hidden_layers = {}
+        if self.training:
+            # In case we train, we assign new hidden layers based on the target in each step.
+            all_hidden_layers = {
+                layer: target.clone().to(globals.device0)
+                for layer, target in targets.items()
             }
 
         # Start from the second step, because the first one is
         # the initial one (we predict all time steps but the )
         for t in range(1, time_length):  # x_on.size(1)):
+
             if self.training:
                 # In case we train, we assign new hidden layers based on the target in each step.
+                # hidden_layers = {
+                #     layer: target[:, t - 1, :].clone().to(globals.device0)
+                #     for layer, target in targets.items()
+                # }
                 hidden_layers = {
-                    layer: target[:, t - 1, :].clone().to(globals.device0)
-                    for layer, target in targets.items()
+                    layer: target[:, t - 1, :]
+                    for layer, target in all_hidden_layers.items()
                 }
 
             # if t % 100 == 0:
@@ -380,7 +398,7 @@ class RNNCellModel(nn.Module):
             )
 
             # Collect L23 outputs
-            outputs[LayerType.V1_ECX_L23.value].append(h23_exc.unsqueeze(1).cpu())
+            outputs[LayerType.V1_EXC_L23.value].append(h23_exc.unsqueeze(1).cpu())
             outputs[LayerType.V1_INH_L23.value].append(h23_inh.unsqueeze(1).cpu())
 
             if not self.training:
