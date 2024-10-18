@@ -300,10 +300,6 @@ class RNNCellModel(nn.Module):
 
             if self.training:
                 # In case we train, we assign new hidden layers based on the target in each step.
-                # hidden_layers = {
-                #     layer: target[:, t - 1, :].clone().to(globals.device0)
-                #     for layer, target in targets.items()
-                # }
                 hidden_layers = {
                     layer: target[:, t - 1, :]
                     for layer, target in all_hidden_layers.items()
@@ -320,8 +316,8 @@ class RNNCellModel(nn.Module):
             # ).to(globals.device0)
             input_t = torch.cat(
                 (
-                    inputs[LayerType.X_ON.value][:, t, :],
-                    inputs[LayerType.X_OFF.value][:, t, :],
+                    inputs[LayerType.X_ON.value][:, t, :],  # time t
+                    inputs[LayerType.X_OFF.value][:, t, :],  # time t
                 ),
                 dim=1,
             ).to(globals.device0)
@@ -331,36 +327,40 @@ class RNNCellModel(nn.Module):
             L4_input_exc = torch.cat(
                 # (input_t, h4_inh, h23_exc),
                 (
-                    input_t,
-                    hidden_layers[LayerType.V1_INH_L4.value],
-                    hidden_layers[LayerType.V1_EXC_L23.value],
+                    input_t,  # time t
+                    hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
+                    hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
                 ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_EXC_L4.value].to(globals.device0)
             # h4_exc = self.layers[LayerType.V1_Exc_L4.value](L4_input_exc, h4_exc)
             h4_exc = self.layers[LayerType.V1_EXC_L4.value](
-                L4_input_exc, hidden_layers[LayerType.V1_EXC_L4.value]
+                L4_input_exc,
+                hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
             )
 
             ## L4_Inh
             # L4_input_inh = torch.cat(
             #     (input_t, h4_exc, h23_exc),
             #     dim=1,
-            # ).to(globals.device0)
+            # ).to(globals.device0)            # if t % 100 == 0:
+            #     print(f"Got to iteration: {t}")
+            #     torch.cuda.empty_cache()
 
             L4_input_inh = torch.cat(
                 (
-                    input_t,
-                    hidden_layers[LayerType.V1_EXC_L4.value],
-                    hidden_layers[LayerType.V1_EXC_L23.value],
+                    input_t,  # time t
+                    hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
+                    hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
                 ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_INH_L4.value].to(globals.device0)
             # h4_inh = self.layers[LayerType.V1_Inh_L4.value](L4_input_inh, h4_inh)
             h4_inh = self.layers[LayerType.V1_INH_L4.value](
-                L4_input_inh, hidden_layers[LayerType.V1_INH_L4.value]
+                L4_input_inh,
+                hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
             )
 
             ## Collect L4 outputs
@@ -372,29 +372,33 @@ class RNNCellModel(nn.Module):
             L23_input_exc = torch.cat(
                 # (h4_exc, h23_inh),
                 (
-                    hidden_layers[LayerType.V1_EXC_L4.value],
-                    hidden_layers[LayerType.V1_INH_L23.value],
+                    # hidden_layers[LayerType.V1_EXC_L4.value],
+                    h4_exc,  # time t
+                    hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
                 ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_EXC_L23.value].to(globals.device0)
             # h23_exc = self.layers[LayerType.V1_Exc_L23.value](L23_input_exc, h23_exc)
             h23_exc = self.layers[LayerType.V1_EXC_L23.value](
-                L23_input_exc, hidden_layers[LayerType.V1_EXC_L23.value]
+                L23_input_exc,
+                hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
             )
             ## L23_Inh
             L23_input_inh = torch.cat(
                 # (h4_exc, h23_exc),
                 (
-                    hidden_layers[LayerType.V1_EXC_L4.value],
-                    hidden_layers[LayerType.V1_EXC_L23.value],
+                    # hidden_layers[LayerType.V1_EXC_L4.value],
+                    h4_exc,  # time t
+                    hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
                 ),
                 dim=1,
             ).to(globals.device0)
             self.layers[LayerType.V1_INH_L23.value].to(globals.device0)
             # h23_inh = self.layers[LayerType.V1_Inh_L23.value](L23_input_inh, h23_inh)
             h23_inh = self.layers[LayerType.V1_INH_L23.value](
-                L23_input_inh, hidden_layers[LayerType.V1_INH_L23.value]
+                L23_input_inh,
+                hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
             )
 
             # Collect L23 outputs

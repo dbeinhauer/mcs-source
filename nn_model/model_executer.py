@@ -6,7 +6,7 @@ model training and evaluation.
 
 import argparse
 import os
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, List
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -346,24 +346,32 @@ class ModelExecuter:
                 **continuous_evaluation_kwargs,
             )
 
-    def _get_all_trials_predictions(self, inputs, targets, num_trials):
+    def _get_all_trials_predictions(
+        self,
+        inputs: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
+        num_trials: int,
+    ) -> Dict[str, List[torch.Tensor]]:
         """
         Computes predictions for all trials (used for evaluation usually).
 
-        :param inputs: dictionary of inputs for each input layer dict(batch_size, num_trials, time, num_neurons)
-        :param hidden_states: in shape: dict (batch_size, num_trials, time, num_neurons),
-        I expect that the states are for timestep 1
-        :param num_trials: _description_
-        :return: _description_
+        :param inputs: dictionary of inputs for each input layer.
+        Inputs of shape: (batch_size, num_trials, time, num_neurons)
+        :param hidden_states: dictionary of hidden states for each output (hidden) layer
+        Of shape: (batch_size, num_trials, time, num_neurons)
+        :param num_trials: total number of trials in provided data.
+        :return: Returns dictionary of lists of predictions for all trials with key layer name.
         """
         dict_predictions = {}
 
-        for i in range(num_trials):
+        for trial in range(num_trials):
+            # Get predictions for each trial.
             trial_inputs = {
-                layer: layer_input[:, i, :, :] for layer, layer_input in inputs.items()
+                layer: layer_input[:, trial, :, :]
+                for layer, layer_input in inputs.items()
             }
             trial_hidden = {
-                layer: layer_hidden[:, i, 0, :].clone()
+                layer: layer_hidden[:, trial, 0, :].clone()
                 # Pass slices of targets in time 0 (starting hidden step,
                 # in evaluation we do not want to reset hidden states).
                 for layer, layer_hidden in targets.items()
@@ -372,13 +380,13 @@ class ModelExecuter:
                 trial_inputs,
                 trial_hidden,
             )
-            # predictions.append(trial_predictions)
-            for key, prediction in trial_predictions.items():
+            for layer, prediction in trial_predictions.items():
+                # For each layer add the predictions to corresponding list of all predictions.
                 prediction = torch.cat(prediction, dim=1)
-                if key not in dict_predictions:
-                    dict_predictions[key] = [prediction]
+                if layer not in dict_predictions:
+                    dict_predictions[layer] = [prediction]
                 else:
-                    dict_predictions[key].append(prediction)
+                    dict_predictions[layer].append(prediction)
 
         return dict_predictions
 
