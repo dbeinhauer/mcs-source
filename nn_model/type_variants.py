@@ -18,6 +18,15 @@ class LayerType(Enum):
     V1_INH_L23 = "V1_Inh_L23"
 
 
+class TimeStepVariant(Enum):
+    """
+    All possible time steps used in the model.
+    """
+
+    PREVIOUS = "previous"
+    CURRENT = "current"
+
+
 class WeightTypes(Enum):
     """
     All possible weight types.

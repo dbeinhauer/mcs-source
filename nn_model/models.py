@@ -2,13 +2,13 @@
 This source code contains definition of all models used in our experiments.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import torch
 import torch.nn as nn
 
 import globals
-from type_variants import LayerType
+from type_variants import LayerType, TimeStepVariant
 from weights_constraints import (
     WeightTypes,
     ExcitatoryWeightConstraint,
@@ -30,7 +30,7 @@ class LayerConfig:
         self,
         size: int,
         layer_type: str,
-        input_layers: List[str],  # List input layer names.
+        input_layers_parameters: List[Tuple[str, str]],  # List input layer names.
         shared_complexity=None,
     ):
         """
@@ -39,12 +39,14 @@ class LayerConfig:
 
         :param size: size of the layer (number of neurons).
         :param layer_type: name of the layer.
-        :param input_layers: ordered list of input layers of the layer.
+        :param input_layers_parameters: ordered list of input layer parameters of the layer.
+        The parameters are in form of tuple with first value its name from `LayerType`
+        and second value its time step name from `TimeStepVariant`.
         :param shared_complexity: shared complexity model(s), if no then `None`.
         """
-        self.size = size
-        self.layer_type = layer_type
-        self.input_layers = input_layers
+        self.size: int = size
+        self.layer_type: str = layer_type
+        self.input_layers_parameters: List[Tuple[str, str]] = input_layers_parameters
         self.shared_complexity = shared_complexity
 
         # Determine weight constraints for the layer (excitatory/inhibitory).
@@ -67,10 +69,10 @@ class LayerConfig:
         """
         return [
             {
-                "part_size": globals.MODEL_SIZES[layer],
-                "part_type": self._get_constraint_type(layer),
+                "part_size": globals.MODEL_SIZES[layer[0]],
+                "part_type": self._get_constraint_type(layer[0]),
             }
-            for layer in self.input_layers
+            for layer in self.input_layers_parameters
         ]
 
     def _get_constraint_type(self, layer_type: str) -> str:
@@ -121,26 +123,26 @@ class RNNCellModel(nn.Module):
     """
 
     # Define model architecture (output layers with its inputs).
-    layers_inputs = {
+    layers_input_parameters = {
         LayerType.V1_EXC_L4.value: [
-            LayerType.X_ON.value,
-            LayerType.X_OFF.value,
-            LayerType.V1_INH_L4.value,
-            LayerType.V1_EXC_L23.value,
+            (LayerType.X_ON.value, TimeStepVariant.CURRENT.value),
+            (LayerType.X_OFF.value, TimeStepVariant.CURRENT.value),
+            (LayerType.V1_INH_L4.value, TimeStepVariant.PREVIOUS.value),
+            (LayerType.V1_EXC_L23.value, TimeStepVariant.PREVIOUS.value),
         ],
         LayerType.V1_INH_L4.value: [
-            LayerType.X_ON.value,
-            LayerType.X_OFF.value,
-            LayerType.V1_EXC_L4.value,
-            LayerType.V1_EXC_L23.value,
+            (LayerType.X_ON.value, TimeStepVariant.CURRENT.value),
+            (LayerType.X_OFF.value, TimeStepVariant.CURRENT.value),
+            (LayerType.V1_EXC_L4.value, TimeStepVariant.PREVIOUS.value),
+            (LayerType.V1_EXC_L23.value, TimeStepVariant.PREVIOUS.value),
         ],
         LayerType.V1_EXC_L23.value: [
-            LayerType.V1_EXC_L4.value,
-            LayerType.V1_INH_L23.value,
+            (LayerType.V1_EXC_L4.value, TimeStepVariant.CURRENT.value),
+            (LayerType.V1_INH_L23.value, TimeStepVariant.PREVIOUS.value),
         ],
         LayerType.V1_INH_L23.value: [
-            LayerType.V1_EXC_L4.value,
-            LayerType.V1_EXC_L23.value,
+            (LayerType.V1_EXC_L4.value, TimeStepVariant.CURRENT.value),
+            (LayerType.V1_EXC_L23.value, TimeStepVariant.PREVIOUS.value),
         ],
     }
 
@@ -161,7 +163,7 @@ class RNNCellModel(nn.Module):
 
         self.rnn_cell_cls = rnn_cell_cls  # Store the RNN cell class
         # Kwargs to store complexity properties for various complexity types.
-        self.compexity_kwargs = complexity_kwargs
+        self.complexity_kwargs = complexity_kwargs
 
         self.layer_sizes = layer_sizes  # Needed for model architecture definition
 
@@ -179,7 +181,7 @@ class RNNCellModel(nn.Module):
 
         :return: Returns dictionary of layer name (`LayerType`) and Nones.
         """
-        return {layer: None for layer in RNNCellModel.layers_inputs}
+        return {layer: None for layer in RNNCellModel.layers_input_parameters}
 
     def _init_complex_complexities(
         self,
@@ -195,8 +197,8 @@ class RNNCellModel(nn.Module):
         complex complexity object.
         """
         return {
-            layer: SharedComplexity(layer_sizes[layer], **complexity_kwargs)
-            for layer in RNNCellModel.layers_inputs
+            layer[0]: SharedComplexity(layer_sizes[layer], **complexity_kwargs)
+            for layer in RNNCellModel.layers_input_parameters
         }
 
     def _init_shared_complexities(
@@ -213,7 +215,7 @@ class RNNCellModel(nn.Module):
         if self.rnn_cell_cls == ComplexConstrainedRNNCell:
             # Complex complexity.
             return self._init_complex_complexities(
-                layer_sizes, self.compexity_kwargs["complex"]
+                layer_sizes, self.complexity_kwargs["complex"]
             )
 
         # Simple complexity (no additional complexity).
@@ -235,10 +237,10 @@ class RNNCellModel(nn.Module):
             layer: LayerConfig(
                 layer_sizes[layer],
                 layer,
-                RNNCellModel.layers_inputs[layer],
+                input_parameters,
                 shared_complexities[layer],
             )
-            for layer in RNNCellModel.layers_inputs
+            for layer, input_parameters in RNNCellModel.layers_input_parameters.items()
         }
 
     def _init_layer(self, layer: str, rnn_cell_cls):
@@ -251,8 +253,8 @@ class RNNCellModel(nn.Module):
         """
         return rnn_cell_cls(
             sum(
-                self.layer_sizes[input_layer]
-                for input_layer in RNNCellModel.layers_inputs[layer]
+                self.layer_sizes[layer_name]
+                for layer_name, _ in RNNCellModel.layers_input_parameters[layer]
             ),
             self.layers_configs[layer].size,
             self.layers_configs[layer].constraint,
@@ -266,10 +268,169 @@ class RNNCellModel(nn.Module):
         """
         self.layers = nn.ModuleDict()
 
-        for layer in RNNCellModel.layers_inputs:
+        for layer in RNNCellModel.layers_input_parameters:
             self.layers[layer] = self._init_layer(layer, self.rnn_cell_cls)
 
-    # def forward(self, x_on, x_off, h4_exc, h4_inh, h23_exc, h23_inh):
+    def _init_hidden_layers(self, targets) -> Dict[str, torch.Tensor]:
+        """
+        Initializes hidden layers for targets based on the training mode.
+
+        :param targets: dictionary containing the hidden layers for a neural network model.
+        :return: Returns a dictionary of hidden layers moved to CUDA if in evaluation mode,
+        otherwise (training mode) returns empty dictionary.
+        """
+        if not self.training:
+            # Evaluation step. Use only time step 0 as initialization of hidden states.
+            return {
+                layer: hidden.to(globals.device0) for layer, hidden in targets.items()
+            }
+        # Training mode (initialization of the hidden layer is in each time step).
+        return {}
+
+    def _move_targets_to_cuda(
+        self, targets: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Moves targets to CUDA if in training mode as they will be used as hidden states.
+        We want to convert it once at the start of the training.
+
+        :param targets: targets to be moved to CUDA.
+        :return: Returns dictionary of targets moved to CUDA if in training mode, otherwise
+        (in evaluation mode) returns empty dictionary.
+        """
+        if self.training:
+            # In case we train, move all targets to CUDA
+            # (will be used as hidden states during training)
+            return {
+                layer: target.clone().to(globals.device0)
+                for layer, target in targets.items()
+            }
+        return {}
+
+    def _assign_time_step_hidden_layers(
+        self, time: int, targets: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Assigns hidden layers at previous time step based on the provided targets.
+
+        NOTE: This function is used during training for assigning
+        previous time steps of the model layers.
+
+        :param time: current time steps of the model prediction.
+        :param targets: model targets to assign previous time step for the hidden states.
+        :return: Returns dictionary of hidden layers of previous time step.
+        """
+        return {layer: target[:, time - 1, :] for layer, target in targets.items()}
+
+    def _get_layer_input_tensor(self, input_current_parts, input_previous_parts):
+        """
+        input_parts: are in form of tuple of import pytorch tensors.
+        """
+        # print(len(input_current_parts))
+        # print(len(input_previous_parts))
+        return torch.cat(
+            input_current_parts + input_previous_parts,
+            dim=1,
+        ).to(globals.device0)
+
+    def _get_list_by_time_variant(
+        self, layer_type: str, time_variant: str, time_variant_layer_values
+    ):
+        """_summary_
+
+        :param layer_type: type name (X_ON, V1_EXC_L4...)
+        :param time_variant: time varian (previous, current)
+        :param time_variant_layer_values: hidden_layer or current_time_values
+        :return: _description_
+        """
+        time_variant_list = []
+        for (
+            input_part_layer_name,
+            input_part_time_variant,
+        ) in RNNCellModel.layers_input_parameters[layer_type]:
+            if input_part_time_variant == time_variant:
+                time_variant_list.append(
+                    time_variant_layer_values[input_part_layer_name]
+                )
+
+        return time_variant_list
+
+    def _get_all_input_tensors(self, inputs, hidden_layers, time):
+        # input_t = tuple(tensor[:, time, :] for tensor in inputs.values())
+
+        current_time_outputs = {
+            layer: layer_tensor[:, time, :] for layer, layer_tensor in inputs.items()
+        }
+        for layer in RNNCellModel.layers_input_parameters:
+            # current_time_outputs[layer] = self.layers[LayerType.V1_EXC_L4.value](
+            current_time_outputs[layer] = self.layers[layer](
+                self._get_layer_input_tensor(
+                    # input_t,
+                    self._get_list_by_time_variant(
+                        layer,
+                        TimeStepVariant.CURRENT.value,
+                        current_time_outputs,
+                    ),  # time t
+                    self._get_list_by_time_variant(
+                        layer,
+                        TimeStepVariant.PREVIOUS.value,
+                        hidden_layers,
+                    ),  # time t-1
+                    # (
+                    #     hidden_layers[LayerType.V1_INH_L4.value],
+                    #     hidden_layers[LayerType.V1_EXC_L23.value],
+                    # ),
+                ),
+                hidden_layers[layer],  # Recurrent itself time (t-1)
+                # hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
+            )
+
+        return current_time_outputs
+
+        # h4_exc = self.layers[LayerType.V1_EXC_L4.value](
+        #     # l4_input_exc,
+        #     self._get_layer_input_tensor(
+        #         input_t,
+        #         (
+        #             hidden_layers[LayerType.V1_INH_L4.value],
+        #             hidden_layers[LayerType.V1_EXC_L23.value],
+        #         ),
+        #     ),
+        #     hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
+        # )
+        # h4_inh = self.layers[LayerType.V1_INH_L4.value](
+        #     # l4_input_inh,
+        #     self._get_layer_input_tensor(
+        #         input_t,
+        #         (
+        #             hidden_layers[LayerType.V1_EXC_L4.value],
+        #             hidden_layers[LayerType.V1_EXC_L23.value],
+        #         ),
+        #     ),
+        #     hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
+        # )
+        # h23_exc = self.layers[LayerType.V1_EXC_L23.value](
+        #     # l23_input_exc,
+        #     self._get_layer_input_tensor(
+        #         (h4_exc),
+        #         (hidden_layers[LayerType.V1_INH_L23.value]),
+        #     ),
+        #     hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
+        # )
+        # h23_inh = self.layers[LayerType.V1_INH_L23.value](
+        #     # l23_input_inh,
+        #     self._get_layer_input_tensor(
+        #         (h4_exc),
+        #         (hidden_layers[LayerType.V1_EXC_L23.value]),
+        #     ),
+        #     hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
+        # )
+
+    def _append_outputs(self, all_outputs, time_step_outputs):
+        for layer, layer_outputs in time_step_outputs.items():
+            if layer in RNNCellModel.layers_input_parameters:
+                all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
+
     def forward(self, inputs, targets):
         """
 
@@ -277,142 +438,136 @@ class RNNCellModel(nn.Module):
         :param targets: dict[layer, inputs] - size (batch, neurons) or (batch, time, neurons)
         :return: _description_
         """
-        outputs = {layer: [] for layer in RNNCellModel.layers_inputs}
+        # Init dictionary of model outputs.
+        all_time_outputs = {layer: [] for layer in RNNCellModel.layers_input_parameters}
 
-        time_length = inputs[LayerType.X_ON.value].size(1)
-
-        hidden_layers = {}
-        if not self.training:
-            hidden_layers = {
-                layer: hidden.to(globals.device0) for layer, hidden in targets.items()
-            }
-        all_hidden_layers = {}
-        if self.training:
-            # In case we train, we assign new hidden layers based on the target in each step.
-            all_hidden_layers = {
-                layer: target.clone().to(globals.device0)
-                for layer, target in targets.items()
-            }
+        hidden_layers = self._init_hidden_layers(targets)
+        all_hidden_layers = self._move_targets_to_cuda(targets)
 
         # Start from the second step, because the first one is
-        # the initial one (we predict all time steps but the )
-        for t in range(1, time_length):  # x_on.size(1)):
-
+        # the initial one (we predict all time steps but the 0-th one).
+        time_length = inputs[LayerType.X_ON.value].size(1)
+        for t in range(1, time_length):
             if self.training:
-                # In case we train, we assign new hidden layers based on the target in each step.
-                hidden_layers = {
-                    layer: target[:, t - 1, :]
-                    for layer, target in all_hidden_layers.items()
-                }
+                # In case we train, we assign new hidden layers based on
+                # the previous target in each step.
+                hidden_layers = self._assign_time_step_hidden_layers(
+                    t, all_hidden_layers
+                )
 
-            # if t % 100 == 0:
-            #     print(f"Got to iteration: {t}")
-            #     torch.cuda.empty_cache()
+            current_time_outputs = self._get_all_input_tensors(inputs, hidden_layers, t)
 
             # LGN
             # input_t = torch.cat(
-            #     (x_on[:, t, :], x_off[:, t, :]),
+            #     (
+            #         inputs[LayerType.X_ON.value][:, t, :],  # time t
+            #         inputs[LayerType.X_OFF.value][:, t, :],  # time t
+            #     ),
             #     dim=1,
             # ).to(globals.device0)
-            input_t = torch.cat(
-                (
-                    inputs[LayerType.X_ON.value][:, t, :],  # time t
-                    inputs[LayerType.X_OFF.value][:, t, :],  # time t
-                ),
-                dim=1,
-            ).to(globals.device0)
 
-            # L4:
-            ## L4_Exc
-            L4_input_exc = torch.cat(
-                # (input_t, h4_inh, h23_exc),
-                (
-                    input_t,  # time t
-                    hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
-                    hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-                ),
-                dim=1,
-            ).to(globals.device0)
-            self.layers[LayerType.V1_EXC_L4.value].to(globals.device0)
-            # h4_exc = self.layers[LayerType.V1_Exc_L4.value](L4_input_exc, h4_exc)
-            h4_exc = self.layers[LayerType.V1_EXC_L4.value](
-                L4_input_exc,
-                hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
-            )
+            # # input_t = self._get_layer_input_tensor((input_tensor for i in ))
+            # input_t = tuple(tensor[:, t, :] for tensor in inputs.values())
 
-            ## L4_Inh
-            # L4_input_inh = torch.cat(
-            #     (input_t, h4_exc, h23_exc),
-            #     dim=1,
-            # ).to(globals.device0)            # if t % 100 == 0:
-            #     print(f"Got to iteration: {t}")
-            #     torch.cuda.empty_cache()
+            # # # L4:
+            # # ## L4_Exc
+            # # l4_input_exc = torch.cat(
+            # #     (
+            # #         input_t,  # time t
+            # #         hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
+            # #         hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
+            # #     ),
+            # #     dim=1,
+            # # ).to(globals.device0)
+            # h4_exc = self.layers[LayerType.V1_EXC_L4.value](
+            #     # l4_input_exc,
+            #     self._get_layer_input_tensor(
+            #         input_t,
+            #         (
+            #             hidden_layers[LayerType.V1_INH_L4.value],
+            #             hidden_layers[LayerType.V1_EXC_L23.value],
+            #         ),
+            #     ),
+            #     hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
+            # )
 
-            L4_input_inh = torch.cat(
-                (
-                    input_t,  # time t
-                    hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
-                    hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-                ),
-                dim=1,
-            ).to(globals.device0)
-            self.layers[LayerType.V1_INH_L4.value].to(globals.device0)
-            # h4_inh = self.layers[LayerType.V1_Inh_L4.value](L4_input_inh, h4_inh)
-            h4_inh = self.layers[LayerType.V1_INH_L4.value](
-                L4_input_inh,
-                hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
-            )
+            # ## L4_Inh
+            # # l4_input_inh = torch.cat(
+            # #     (
+            # #         input_t,  # time t
+            # #         hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
+            # #         hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
+            # #     ),
+            # #     dim=1,
+            # # ).to(globals.device0)
+            # h4_inh = self.layers[LayerType.V1_INH_L4.value](
+            #     # l4_input_inh,
+            #     self._get_layer_input_tensor(
+            #         input_t,
+            #         (
+            #             hidden_layers[LayerType.V1_EXC_L4.value],
+            #             hidden_layers[LayerType.V1_EXC_L23.value],
+            #         ),
+            #     ),
+            #     hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
+            # )
 
-            ## Collect L4 outputs
-            outputs[LayerType.V1_EXC_L4.value].append(h4_exc.unsqueeze(1).cpu())
-            outputs[LayerType.V1_INH_L4.value].append(h4_inh.unsqueeze(1).cpu())
+            # # L23:
+            # ## L23_Exc
+            # # l23_input_exc = torch.cat(
+            # #     (
+            # #         h4_exc,  # time t
+            # #         hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
+            # #     ),
+            # #     dim=1,
+            # # ).to(globals.device0)
+            # h23_exc = self.layers[LayerType.V1_EXC_L23.value](
+            #     # l23_input_exc,
+            #     self._get_layer_input_tensor(
+            #         (h4_exc),
+            #         (hidden_layers[LayerType.V1_INH_L23.value]),
+            #     ),
+            #     hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
+            # )
 
-            # L23:
-            ## L23_Exc
-            L23_input_exc = torch.cat(
-                # (h4_exc, h23_inh),
-                (
-                    # hidden_layers[LayerType.V1_EXC_L4.value],
-                    h4_exc,  # time t
-                    hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
-                ),
-                dim=1,
-            ).to(globals.device0)
-            self.layers[LayerType.V1_EXC_L23.value].to(globals.device0)
-            # h23_exc = self.layers[LayerType.V1_Exc_L23.value](L23_input_exc, h23_exc)
-            h23_exc = self.layers[LayerType.V1_EXC_L23.value](
-                L23_input_exc,
-                hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-            )
-            ## L23_Inh
-            L23_input_inh = torch.cat(
-                # (h4_exc, h23_exc),
-                (
-                    # hidden_layers[LayerType.V1_EXC_L4.value],
-                    h4_exc,  # time t
-                    hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-                ),
-                dim=1,
-            ).to(globals.device0)
-            self.layers[LayerType.V1_INH_L23.value].to(globals.device0)
-            # h23_inh = self.layers[LayerType.V1_Inh_L23.value](L23_input_inh, h23_inh)
-            h23_inh = self.layers[LayerType.V1_INH_L23.value](
-                L23_input_inh,
-                hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
-            )
+            # ## L23_Inh
+            # # l23_input_inh = torch.cat(
+            # #     (
+            # #         h4_exc,  # time t
+            # #         hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
+            # #     ),
+            # #     dim=1,
+            # # ).to(globals.device0)
+            # h23_inh = self.layers[LayerType.V1_INH_L23.value](
+            #     # l23_input_inh,
+            #     self._get_layer_input_tensor(
+            #         (h4_exc),
+            #         (hidden_layers[LayerType.V1_EXC_L23.value]),
+            #     ),
+            #     hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
+            # )
 
-            # Collect L23 outputs
-            outputs[LayerType.V1_EXC_L23.value].append(h23_exc.unsqueeze(1).cpu())
-            outputs[LayerType.V1_INH_L23.value].append(h23_inh.unsqueeze(1).cpu())
+            self._append_outputs(all_time_outputs, current_time_outputs)
+            # ## Collect L4 outputs
+
+            # outputs[LayerType.V1_EXC_L4.value].append(h4_exc.unsqueeze(1).cpu())
+            # outputs[LayerType.V1_INH_L4.value].append(h4_inh.unsqueeze(1).cpu())
+            # # Collect L23 outputs
+            # outputs[LayerType.V1_EXC_L23.value].append(h23_exc.unsqueeze(1).cpu())
+            # outputs[LayerType.V1_INH_L23.value].append(h23_inh.unsqueeze(1).cpu())
 
             if not self.training:
-                hidden_layers[LayerType.V1_EXC_L4.value] = h4_exc
-                hidden_layers[LayerType.V1_INH_L4.value] = h4_inh
-                hidden_layers[LayerType.V1_EXC_L23.value] = h23_exc
-                hidden_layers[LayerType.V1_INH_L23.value] = h23_inh
+                hidden_layers = current_time_outputs
+                # hidden_layers[LayerType.V1_EXC_L4.value] = h4_exc
+                # hidden_layers[LayerType.V1_INH_L4.value] = h4_inh
+                # hidden_layers[LayerType.V1_EXC_L23.value] = h23_exc
+                # hidden_layers[LayerType.V1_INH_L23.value] = h23_inh
 
         # Clear caches
-        del inputs, input_t, L4_input_inh, L23_input_exc, L23_input_inh
+        del (
+            inputs,
+            # input_t,
+        )  # l4_input_inh, l23_input_exc, l23_input_inh
         torch.cuda.empty_cache()
 
-        return outputs
+        return all_time_outputs
