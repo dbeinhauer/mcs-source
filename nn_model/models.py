@@ -356,8 +356,8 @@ class RNNCellModel(nn.Module):
         return time_variant_list
 
     def _get_all_input_tensors(self, inputs, hidden_layers, time):
-        # input_t = tuple(tensor[:, time, :] for tensor in inputs.values())
-
+        
+        # We already have LGN inputs (assign them)
         current_time_outputs = {
             layer: layer_tensor[:, time, :] for layer, layer_tensor in inputs.items()
         }
@@ -386,45 +386,6 @@ class RNNCellModel(nn.Module):
             )
 
         return current_time_outputs
-
-        # h4_exc = self.layers[LayerType.V1_EXC_L4.value](
-        #     # l4_input_exc,
-        #     self._get_layer_input_tensor(
-        #         input_t,
-        #         (
-        #             hidden_layers[LayerType.V1_INH_L4.value],
-        #             hidden_layers[LayerType.V1_EXC_L23.value],
-        #         ),
-        #     ),
-        #     hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
-        # )
-        # h4_inh = self.layers[LayerType.V1_INH_L4.value](
-        #     # l4_input_inh,
-        #     self._get_layer_input_tensor(
-        #         input_t,
-        #         (
-        #             hidden_layers[LayerType.V1_EXC_L4.value],
-        #             hidden_layers[LayerType.V1_EXC_L23.value],
-        #         ),
-        #     ),
-        #     hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
-        # )
-        # h23_exc = self.layers[LayerType.V1_EXC_L23.value](
-        #     # l23_input_exc,
-        #     self._get_layer_input_tensor(
-        #         (h4_exc),
-        #         (hidden_layers[LayerType.V1_INH_L23.value]),
-        #     ),
-        #     hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-        # )
-        # h23_inh = self.layers[LayerType.V1_INH_L23.value](
-        #     # l23_input_inh,
-        #     self._get_layer_input_tensor(
-        #         (h4_exc),
-        #         (hidden_layers[LayerType.V1_EXC_L23.value]),
-        #     ),
-        #     hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
-        # )
 
     def _append_outputs(self, all_outputs, time_step_outputs):
         for layer, layer_outputs in time_step_outputs.items():
@@ -455,119 +416,17 @@ class RNNCellModel(nn.Module):
                     t, all_hidden_layers
                 )
 
+            # Perform model step
             current_time_outputs = self._get_all_input_tensors(inputs, hidden_layers, t)
 
-            # LGN
-            # input_t = torch.cat(
-            #     (
-            #         inputs[LayerType.X_ON.value][:, t, :],  # time t
-            #         inputs[LayerType.X_OFF.value][:, t, :],  # time t
-            #     ),
-            #     dim=1,
-            # ).to(globals.device0)
-
-            # # input_t = self._get_layer_input_tensor((input_tensor for i in ))
-            # input_t = tuple(tensor[:, t, :] for tensor in inputs.values())
-
-            # # # L4:
-            # # ## L4_Exc
-            # # l4_input_exc = torch.cat(
-            # #     (
-            # #         input_t,  # time t
-            # #         hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
-            # #         hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-            # #     ),
-            # #     dim=1,
-            # # ).to(globals.device0)
-            # h4_exc = self.layers[LayerType.V1_EXC_L4.value](
-            #     # l4_input_exc,
-            #     self._get_layer_input_tensor(
-            #         input_t,
-            #         (
-            #             hidden_layers[LayerType.V1_INH_L4.value],
-            #             hidden_layers[LayerType.V1_EXC_L23.value],
-            #         ),
-            #     ),
-            #     hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
-            # )
-
-            # ## L4_Inh
-            # # l4_input_inh = torch.cat(
-            # #     (
-            # #         input_t,  # time t
-            # #         hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
-            # #         hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-            # #     ),
-            # #     dim=1,
-            # # ).to(globals.device0)
-            # h4_inh = self.layers[LayerType.V1_INH_L4.value](
-            #     # l4_input_inh,
-            #     self._get_layer_input_tensor(
-            #         input_t,
-            #         (
-            #             hidden_layers[LayerType.V1_EXC_L4.value],
-            #             hidden_layers[LayerType.V1_EXC_L23.value],
-            #         ),
-            #     ),
-            #     hidden_layers[LayerType.V1_INH_L4.value],  # time t-1
-            # )
-
-            # # L23:
-            # ## L23_Exc
-            # # l23_input_exc = torch.cat(
-            # #     (
-            # #         h4_exc,  # time t
-            # #         hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
-            # #     ),
-            # #     dim=1,
-            # # ).to(globals.device0)
-            # h23_exc = self.layers[LayerType.V1_EXC_L23.value](
-            #     # l23_input_exc,
-            #     self._get_layer_input_tensor(
-            #         (h4_exc),
-            #         (hidden_layers[LayerType.V1_INH_L23.value]),
-            #     ),
-            #     hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-            # )
-
-            # ## L23_Inh
-            # # l23_input_inh = torch.cat(
-            # #     (
-            # #         h4_exc,  # time t
-            # #         hidden_layers[LayerType.V1_EXC_L23.value],  # time t-1
-            # #     ),
-            # #     dim=1,
-            # # ).to(globals.device0)
-            # h23_inh = self.layers[LayerType.V1_INH_L23.value](
-            #     # l23_input_inh,
-            #     self._get_layer_input_tensor(
-            #         (h4_exc),
-            #         (hidden_layers[LayerType.V1_EXC_L23.value]),
-            #     ),
-            #     hidden_layers[LayerType.V1_INH_L23.value],  # time t-1
-            # )
-
+            # Append time step prediction to all predictions.
             self._append_outputs(all_time_outputs, current_time_outputs)
-            # ## Collect L4 outputs
-
-            # outputs[LayerType.V1_EXC_L4.value].append(h4_exc.unsqueeze(1).cpu())
-            # outputs[LayerType.V1_INH_L4.value].append(h4_inh.unsqueeze(1).cpu())
-            # # Collect L23 outputs
-            # outputs[LayerType.V1_EXC_L23.value].append(h23_exc.unsqueeze(1).cpu())
-            # outputs[LayerType.V1_INH_L23.value].append(h23_inh.unsqueeze(1).cpu())
 
             if not self.training:
                 hidden_layers = current_time_outputs
-                # hidden_layers[LayerType.V1_EXC_L4.value] = h4_exc
-                # hidden_layers[LayerType.V1_INH_L4.value] = h4_inh
-                # hidden_layers[LayerType.V1_EXC_L23.value] = h23_exc
-                # hidden_layers[LayerType.V1_INH_L23.value] = h23_inh
 
         # Clear caches
-        del (
-            inputs,
-            # input_t,
-        )  # l4_input_inh, l23_input_exc, l23_input_inh
+        del inputs
         torch.cuda.empty_cache()
 
         return all_time_outputs
