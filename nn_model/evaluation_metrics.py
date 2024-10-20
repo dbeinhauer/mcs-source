@@ -115,14 +115,21 @@ class NormalizedCrossCorrelation:
         :param std_pred: standard deviation of trial mean predictions across neurons.
         :param std_target: standard deviation of trial mean targets across neurons.
         :param denom_offset: offset for sanity of the division.
-        :return: Returns tje value of CC_ABS.
+        :return: Returns the value of CC_ABS.
         """
         # Calculate covariance between predictions and targets.
         cov = self._covariance(avg_prediction, avg_target)
 
         # Calculate correlation coefficients:
         #   Cov(r^dash, y^dash) / sqrt(Var(r^dash) * Var(y^dash))
-        return cov / ((std_pred * std_target) + denom_offset)
+        denom = torch.clamp(
+            std_pred * std_target, min=denom_offset
+        )  # Assuring the denominator is reasonably large
+        return cov / denom
+
+        # Calculate correlation coefficients:
+        #   Cov(r^dash, y^dash) / sqrt(Var(r^dash) * Var(y^dash))
+        # return cov / ((std_pred * std_target) + denom_offset)
 
     def _cc_max(
         self, target, var_target, num_trials: int, denom_offset: float = 1e-8
@@ -150,7 +157,9 @@ class NormalizedCrossCorrelation:
         # (N-1)*Var(y^{dash})
         denominator = (num_trials - 1) * var_target
 
-        return torch.sqrt(numerator / (denominator + denom_offset))
+        cc_max = torch.sqrt(numerator / (denominator + denom_offset))
+
+        return torch.clamp(cc_max, min=1e-6)  # Assuring the cc_max is reasonably large
 
     def _cc_norm(
         self,
@@ -175,7 +184,10 @@ class NormalizedCrossCorrelation:
         cc_abs = self._cc_abs(avg_prediction, avg_target, std_pred, std_target)
         cc_max = self._cc_max(target, std_target * std_target, self.num_trials)
 
-        return cc_abs / (cc_max + denom_offset)
+        cc_norm = cc_abs / (cc_max + denom_offset)
+
+        # return cc_abs / (cc_max + denom_offset)
+        return torch.clamp(cc_norm, min=-1.0, max=1.0)
 
     def _batch_mean(self, cc_norm):
         """
@@ -206,7 +218,7 @@ class NormalizedCrossCorrelation:
         )
 
         # Round the prediction to closest integer.
-        prediction = self._convert_prediction_to_spikes(prediction)
+        # prediction = self._convert_prediction_to_spikes(prediction)
 
         # Reshape to have time and neurons in one dimension.
         prediction = self._merge_neuron_time_dim(prediction)

@@ -22,7 +22,7 @@ from dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from models import (
     RNNCellModel,
     ConstrainedRNNCell,
-    ComplexConstrainedRNNCell,
+    # ComplexConstrainedRNNCell,
 )
 from evaluation_metrics import NormalizedCrossCorrelation
 
@@ -56,7 +56,7 @@ class ModelExecuter:
         self.train_loader, self.test_loader = self._init_data_loaders()
 
         # Model Init
-        self.model = self._init_model(arguments)
+        self.model = self._init_model(arguments).to(device=globals.device0)
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(arguments.learning_rate)
 
@@ -64,19 +64,19 @@ class ModelExecuter:
         self.evaluation_metrics = NormalizedCrossCorrelation()
         self._print_experiment_info(arguments)
 
-    def _get_model_type(self, model_identifier: str):
-        """
-        Based on the model identifier returns type of the model layer.
+    # def _get_model_type(self, model_identifier: str):
+    #     """
+    #     Based on the model identifier returns type of the model layer.
 
-        :param model_identifier: string identifier of the model.
-        :return: Returns class of the layer that should be used in the model.
-        """
-        if model_identifier == ModelTypes.SIMPLE.value:
-            # Simple model -> used classical cells without additional NN instead of neuron.
-            return ConstrainedRNNCell
-        if model_identifier == ModelTypes.COMPLEX.value:
-            # Complex model -> use additional shared NN for each layer instead of simple neuron.
-            return ComplexConstrainedRNNCell
+    #     :param model_identifier: string identifier of the model.
+    #     :return: Returns class of the layer that should be used in the model.
+    #     """
+    #     if model_identifier == ModelTypes.SIMPLE.value:
+    #         # Simple model -> used classical cells without additional NN instead of neuron.
+    #         return ConstrainedRNNCell
+    #     if model_identifier == ModelTypes.COMPLEX.value:
+    #         # Complex model -> use additional shared NN for each layer instead of simple neuron.
+    #         return ComplexConstrainedRNNCell
 
     def _split_input_output_layers(self) -> Tuple[Dict[str, int], Dict[str, int]]:
         """
@@ -143,6 +143,22 @@ class ModelExecuter:
 
         return train_loader, test_loader
 
+    def _get_complexity_kwargs(self, arguments):
+        if arguments.model == ModelTypes.SIMPLE.value:
+            return {}
+        if arguments.model == ModelTypes.COMPLEX.value:
+            return {
+                ModelTypes.COMPLEX.value: {
+                    "num_layers": arguments.neuron_num_layers,
+                    "layer_size": arguments.neuron_layer_size,
+                    "residual": arguments.neuron_not_residual,
+                }
+            }
+
+        # Wrongly defined complexity type
+        print("Wrong complexity, using simple complexity layer.")
+        return {}
+
     def _init_model(self, arguments) -> RNNCellModel:
         """
         Initializes model based on the provided arguments.
@@ -150,20 +166,28 @@ class ModelExecuter:
         :param arguments: command line arguments containing model setup info.
         :return: Returns initializes model.
         """
-        if arguments.model == ModelTypes.SIMPLE.value:
-            # Simple model (without shared complexity).
-            return RNNCellModel(self.layer_sizes).to(globals.device1)
-        if arguments.model == ModelTypes.COMPLEX.value:
-            # Complex model (with shared complexity).
-            return RNNCellModel(
-                self.layer_sizes,
-                ComplexConstrainedRNNCell,
-                complexity_kwargs={
-                    ModelTypes.COMPLEX.value: {
-                        "complexity_size": arguments.complexity_size
-                    }
-                },
-            ).to(globals.device1)
+        # if arguments.model == ModelTypes.SIMPLE.value:
+        #     # Simple model (without shared complexity).
+        #     return RNNCellModel(self.layer_sizes).to(globals.device1)
+        # if arguments.model == ModelTypes.COMPLEX.value:
+        #     # Complex model (with shared complexity).
+        #     return RNNCellModel(
+        #         self.layer_sizes,
+        #         ComplexConstrainedRNNCell,
+        #         complexity_kwargs={
+        #             ModelTypes.COMPLEX.value: {
+        #                 "complexity_size": arguments.complexity_size
+        #             }
+        #         },
+        #     ).to(globals.device1)
+
+        # complexity_kwargs = self._get_complexity_kwargs
+
+        return RNNCellModel(
+            self.layer_sizes,
+            arguments.model,
+            complexity_kwargs=self._get_complexity_kwargs(arguments),
+        )
 
     def _init_criterion(self):
         """
@@ -195,7 +219,10 @@ class ModelExecuter:
                     "---------------------------------",
                     "Running with parameters:",
                     f"Model variant: {argument.model}",
-                    f"Complexity model size: {argument.complexity_size}",
+                    # f"Complexity model size: {argument.complexity_size}",
+                    f"Neuron number of layers: {argument.neuron_num_layers}",
+                    f"Neurons layer sizes: {argument.neuron_layer_size}",
+                    f"Neuron use residual connection: {not argument.neuron_not_residual}",
                     f"Batch size: {globals.train_batch_size}",
                     f"Learning rate: {argument.learning_rate}",
                     f"Num epochs: {argument.num_epochs}",
@@ -412,12 +439,19 @@ class ModelExecuter:
     def compute_evaluation_score(self, targets, predictions):
         cross_correlation = 0
 
-        for layer, target in targets.items():
-            cross_correlation += self.evaluation_metrics.calculate(
-                predictions[layer].to(globals.device0), target.to(globals.device0)
-            )
-            del target, predictions[layer]
-            torch.cuda.empty_cache()
+        # Concatenate predictions and targets across all layers.
+        all_predictions = torch.cat(
+            [prediction for prediction in predictions.values()],
+            dim=-1,
+        ).to(globals.device0)
+        all_targets = torch.cat([target for target in targets.values()], dim=-1).to(
+            globals.device0
+        )
+
+        # Run the calculate function once on the concatenated tensors.
+        cross_correlation = self.evaluation_metrics.calculate(
+            all_predictions, all_targets
+        )
 
         return cross_correlation
 
@@ -488,11 +522,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="simple",
+        default="complex",  # "simple",
         choices=[model_type.value for model_type in ModelTypes],
         help="",
     )
-    parser.add_argument("--complexity_size", type=int, default=64, help="")
+    # parser.add_argument("--complexity_size", type=int, default=64, help="")
+    parser.add_argument("--neuron_num_layers", type=int, default=5, help="")
+    parser.add_argument("--neuron_layer_size", type=int, default=10, help="")
+    parser.set_defaults(neuron_not_residual=False)
+    parser.add_argument("--neuron_not_residual", action="store_true", help="")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="")
     parser.add_argument("--num_epochs", type=int, default=10, help="")
 

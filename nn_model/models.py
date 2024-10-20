@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 
 import globals
-from type_variants import LayerType, TimeStepVariant
+from type_variants import LayerType, TimeStepVariant, ModelTypes
 from weights_constraints import (
     WeightTypes,
     ExcitatoryWeightConstraint,
@@ -16,9 +16,9 @@ from weights_constraints import (
 )
 from layers import (
     ConstrainedRNNCell,
-    ComplexConstrainedRNNCell,
+    # ComplexConstrainedRNNCell,
 )
-from neurons import SharedComplexity
+from neurons import FeedForwardNeuron
 
 
 class LayerConfig:
@@ -31,7 +31,8 @@ class LayerConfig:
         size: int,
         layer_type: str,
         input_layers_parameters: List[Tuple[str, str]],  # List input layer names.
-        shared_complexity=None,
+        # shared_complexity=None,
+        neuron_model=None,
     ):
         """
         Initializes configuration based on the given parameters.
@@ -47,7 +48,7 @@ class LayerConfig:
         self.size: int = size
         self.layer_type: str = layer_type
         self.input_layers_parameters: List[Tuple[str, str]] = input_layers_parameters
-        self.shared_complexity = shared_complexity
+        self.neuron_model = neuron_model
 
         # Determine weight constraints for the layer (excitatory/inhibitory).
         input_constraints = self._determine_input_constraints()
@@ -149,8 +150,9 @@ class RNNCellModel(nn.Module):
     def __init__(
         self,
         layer_sizes: Dict[str, int],
-        rnn_cell_cls=ConstrainedRNNCell,
-        complexity_kwargs: Dict = {},
+        # rnn_cell_cls=ConstrainedRNNCell,
+        complexity_type: str,
+        complexity_kwargs: Dict,
     ):
         """
         Initializes model parameters, sets weights constraints and creates model architecture.
@@ -161,7 +163,9 @@ class RNNCellModel(nn.Module):
         """
         super(RNNCellModel, self).__init__()
 
-        self.rnn_cell_cls = rnn_cell_cls  # Store the RNN cell class
+        self.complexity_type = complexity_type
+
+        # self.rnn_cell_cls = rnn_cell_cls  # Store the RNN cell class
         # Kwargs to store complexity properties for various complexity types.
         self.complexity_kwargs = complexity_kwargs
 
@@ -169,7 +173,7 @@ class RNNCellModel(nn.Module):
 
         # Layer configuration.
         self.layers_configs = self._init_layer_configs(
-            layer_sizes, self._init_shared_complexities(layer_sizes)
+            layer_sizes, self._init_shared_complexities()  # layer_sizes)
         )
 
         # Init model.
@@ -185,7 +189,7 @@ class RNNCellModel(nn.Module):
 
     def _init_complex_complexities(
         self,
-        layer_sizes: Dict[str, int],
+        # layer_sizes: Dict[str, int],
         complexity_kwargs: Dict,
     ) -> Dict:
         """
@@ -197,13 +201,13 @@ class RNNCellModel(nn.Module):
         complex complexity object.
         """
         return {
-            layer[0]: SharedComplexity(layer_sizes[layer], **complexity_kwargs)
+            layer: FeedForwardNeuron(**complexity_kwargs)
             for layer in RNNCellModel.layers_input_parameters
         }
 
     def _init_shared_complexities(
         self,
-        layer_sizes: Dict[str, int],
+        # layer_sizes: Dict[str, int],
     ) -> Dict:
         """
         Initializes shared complexities of the model.
@@ -212,10 +216,11 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and
         appropriate shared complexity object.
         """
-        if self.rnn_cell_cls == ComplexConstrainedRNNCell:
+        # if self.rnn_cell_cls == ComplexConstrainedRNNCell:
+        if self.complexity_type == ModelTypes.COMPLEX.value:
             # Complex complexity.
             return self._init_complex_complexities(
-                layer_sizes, self.complexity_kwargs["complex"]
+                self.complexity_kwargs[ModelTypes.COMPLEX.value]
             )
 
         # Simple complexity (no additional complexity).
@@ -243,7 +248,7 @@ class RNNCellModel(nn.Module):
             for layer, input_parameters in RNNCellModel.layers_input_parameters.items()
         }
 
-    def _init_layer(self, layer: str, rnn_cell_cls):
+    def _init_layer(self, layer: str):  # , rnn_cell_cls):
         """
         Initializes one layer of the model.
 
@@ -251,14 +256,14 @@ class RNNCellModel(nn.Module):
         :param rnn_cell_cls: layer object variant.
         :return: Returns initializes layer object.
         """
-        return rnn_cell_cls(
+        return ConstrainedRNNCell(
             sum(
                 self.layer_sizes[layer_name]
                 for layer_name, _ in RNNCellModel.layers_input_parameters[layer]
             ),
             self.layers_configs[layer].size,
             self.layers_configs[layer].constraint,
-            self.layers_configs[layer].shared_complexity,
+            self.layers_configs[layer].neuron_model,
         )
 
     def _init_model_architecture(self):
@@ -269,7 +274,7 @@ class RNNCellModel(nn.Module):
         self.layers = nn.ModuleDict()
 
         for layer in RNNCellModel.layers_input_parameters:
-            self.layers[layer] = self._init_layer(layer, self.rnn_cell_cls)
+            self.layers[layer] = self._init_layer(layer)  # , self.rnn_cell_cls)
 
     def _init_hidden_layers(self, targets) -> Dict[str, torch.Tensor]:
         """
@@ -356,7 +361,7 @@ class RNNCellModel(nn.Module):
         return time_variant_list
 
     def _get_all_input_tensors(self, inputs, hidden_layers, time):
-        
+
         # We already have LGN inputs (assign them)
         current_time_outputs = {
             layer: layer_tensor[:, time, :] for layer, layer_tensor in inputs.items()
@@ -384,6 +389,9 @@ class RNNCellModel(nn.Module):
                 hidden_layers[layer],  # Recurrent itself time (t-1)
                 # hidden_layers[LayerType.V1_EXC_L4.value],  # time t-1
             )
+            # torch.cuda.empty_cache()
+
+            # current_time_outputs[layer] = self._apply_complexity(rnn_output, layer)
 
         return current_time_outputs
 

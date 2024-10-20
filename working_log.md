@@ -384,3 +384,14 @@ Notes after the meeting:
     - it might in fact misled the training (it trains on wrong inputs)
 - when starting the new sequence it should start with the first time step not zeros
 - interval sizes: 5, 10, 15, and 20 are available for learning (other sizes have to be generated)
+
+
+# 19.10.2024
+- mistake in evaluation encountered - I was adding CC for layers -> it overflows 1 (max value is 4 then)
+    - now corrected - evaluation is computed for concatenated tensors of the predictions for all layers
+- training steps corrected - now the hidden states are the previous ones for the targets
+    - in case of evaluation we assign only the first step (the rest should predict the model)
+- model architecture corrected 
+    - the inhibitory layers should get excitatory input from the previous state (not the current)
+- we also started training on size of time intervals 20 instead of 5 as it looks 5 is very hard to train and training on 20 takes much less time
+    - also now training on size 0.1 of the original model (since we finetune the training procedure and resolve the bugs)
