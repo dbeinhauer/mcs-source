@@ -54,7 +54,7 @@
         - should correspond to its function (inhibitory should have negative? outputs)
 
 - step 2: Add NN instead of the neurons
-    - probably convolutionary (just one NN for all neurons inside the layer)
+    - probably convolution (just one NN for all neurons inside the layer)
         - the layers should probably have different NN (slightly different function)
     - because the neurons are in reality much complicated than just some linear (or non-linear function)
 
@@ -66,11 +66,11 @@
 
 
 # 26.3.2024
-- the subdirecories in the Luca's dataset are due the memory managment (too large data)
+- the sub-directories in the Luca's dataset are due the memory management (too large data)
 - each segment is 1 experiment (1 image)
 - I am also interested in blank parts
 - trials are not interesting (they are here in case we have experiments with multiple trials)
-- basicaly what I want is to take the times of each spike train in each neuron
+- basically what I want is to take the times of each spike train in each neuron
     - need to manage the order (both experiments and neurons)
 - I want to create from the data multidimensional matrix
     - neurons matrix architecture:
@@ -132,13 +132,13 @@
 # 30.6.2024
 - dataset finalized
 - problem with the size of the dataset and work with it
-    - possible memmory problems to have all the dataset in the RAM
+    - possible memory problems to have all the dataset in the RAM
 - solution would be:
     - prepare the dataset for the given time interval size
     - cache the preprocessed dataset with the interval size
-        - to not do it repeteadely
+        - to not do it repeatedly
         - might not be a good idea (too large dataset)
-            - in my oppinion in sparse representation it would be ok
+            - in my opinion in sparse representation it would be ok
 - dataset extraction finished
 - problematic work with the size of 1 data (too large -> won't fit into local memory)
     - lets try it on metacentrum
@@ -147,12 +147,12 @@
     - loads each batch from the directory
         - otherwise won't fit into memory
     - we do not need any modification of dataset
-    - just need to create acumulated time steps (maybe some caching before run)
+    - just need to create accumulated time steps (maybe some caching before run)
 
 
 # 1.7.2024
 - trying work with time steps 10 ms
-    - succesfully started training -> killed because of memory
+    - successfully started training -> killed because of memory
         - possibly might work on metacentrum?
 
 
@@ -160,7 +160,7 @@
 - creating scripts for dataset trimming
     - for execution on wintermute
 - now it is possible to trim the dataset to arbitrary window size
-- for timesize 20 it is possible to run the model on local
+- for time-size 20 it is possible to run the model on local
 
 
 # 25.7.2024
@@ -176,13 +176,13 @@
 
 
 # 27.7.2024
-- used architecture that uses `nn.RNN` with hidden neurons corresponsing to number of neurons in each layer is too large
+- used architecture that uses `nn.RNN` with hidden neurons corresponding to number of neurons in each layer is too large
 - our architecture:
     - RNNs for each layer (without LGN (it is only input))
         - RNN layer:
             input: input size (previous layer size)
             hidden (output): num_neurons in the layer
-            interlayer connections: in RNN module definition
+            inter-layer connections: in RNN module definition
             inhibitory/excitatory: constrain weights to non-positive/negative
 - problem:
     - too large model it does not fit in the GPU memory
@@ -202,7 +202,7 @@
                 - FC created outputs for each layer that will be passed further
 - variant 1:
     - FC only for generating outputs
-    - problem with memory alocation
+    - problem with memory allocation
         - problematic part in weights constrains (for Inh/Exc) -> too much memory consuming
         - after that solved -> still problems with large time intervals
             - it would be probably necessary to trim the time intervals to smaller chunks
@@ -231,13 +231,13 @@
     - it would significantly reduce the output size
         -  the sequences would be only 1 experiment (not 100)
     - disadvantage: there might be loss of context (not significant)
-        - the majority of the effect of the image should disapear in during the blank sequences (because of that we want to split it in the middle of blank)
+        - the majority of the effect of the image should disappear in during the blank sequences (because of that we want to split it in the middle of blank)
 - reducing the layer size
     - randomly select subset of neurons for the training the model
     - it should have the largest impact on the size of the model
     - it should help us in definition using only RNNs (without FC)
     - try to play with the size till we reach the point where we can use RNNs
-    - disadantages:
+    - disadvantages:
         - significant loss of information (lack of neurons)
 - I should definitely implement variant of using multiple GPUs
 
@@ -255,13 +255,13 @@
 - shared memory - works for small GPUs
 - using half precision - possible only in forward step
     - optimizer needs to work with float32
-- reducing number of timesteps to 900 (should be 1 example)
+- reducing number of time-steps to 900 (should be 1 example)
 
 
 # 7.8.2024
 - using the GPU with 48 GB memory (largest possible)
     - after optimizations I am able to run 
-- the model is tested the way that all possible time step sizes will fit (even the 1 ms timestep)
+- the model is tested the way that all possible time step sizes will fit (even the 1 ms time-step)
 - we would use only one experiment for data
     - second part of blank + image + first part of next blank
         - first example also have first part of the blank
@@ -290,8 +290,8 @@
 - need to create docker image in order to run it on the cluster
 
 # 29.8.2024
-- obtained access to bionformatics cluster partition
-- will need to debug and work with the paralelism of the GPUs probably
+- obtained access to bio-informatics cluster partition
+- will need to debug and work with the parallelism of the GPUs probably
 - discussed the multitrial data with Luca and we agreed that he might generate some data for me
 - we should use normalized cross-correlation for the data evaluation
 - we agreed with Luca that he will generate new 1000 images with 10 trials for test dataset till I come back from vaccation
@@ -301,7 +301,7 @@
 
 # 31.8.2024
 - have to change from float16 back to float32
-    - othervise there are `nan`
+    - otherwise there are `nan`
 
 # 1.9.2024
 - working variant using batches 
@@ -309,19 +309,19 @@
     - also no memory problems
     - can easily apply evaluation
 - evaluation still returns `nan` -> need to be corrected
-- changes of the raw extraction and dataset tools to work with also with the mutliple trials
+- changes of the raw extraction and dataset tools to work with also with the multiple trials
     - not completed yet
 
 # 19.9.2024
 - Meeting notes:
-    - evaluation through whole vector concatenized through the timestaps
+    - evaluation through whole vector concatenated through the time-steps
     - there are techniques how to prevent `nan` during the training (using smaller learning rate)
-    - correlation should be for the vectors of all neurons in all timesteps
+    - correlation should be for the vectors of all neurons in all time-steps
     - from LGN it is all positive weights
 
 # 29.9.2024
 - LGN weights are corrected (all are excitatory)
-- loading of multitrials corrected
+- loading of multi-trials corrected
     - training loads always single trial
     - testing loads all available trials
 
@@ -347,7 +347,7 @@
 - conclusion:
     - maybe increase learning rate
     - probably more epochs
-    - might be good idea to change the metrics (better correlation coeficient)
+    - might be good idea to change the metrics (better correlation coefficient)
 
 
 # 1.10.2024
@@ -394,7 +394,19 @@ Notes after the meeting:
 - model architecture corrected 
     - the inhibitory layers should get excitatory input from the previous state (not the current)
 - we also started training on size of time intervals 20 instead of 5 as it looks 5 is very hard to train and training on 20 takes much less time
-    - also now training on size 0.1 of the original model (since we finetune the training procedure and resolve the bugs)
+    - also now training on size 0.1 of the original model (since we fine-tune the training procedure and resolve the bugs)
 
 # 21.10.2024
 - it seems that using residual connections inside complex neuron is much better than not using it
+
+# 24.10.2024
+- after several tests of model training on the size 0.25 we consider complex model much better than simple
+    - reached max CC `0.8` - almost our target
+    - it seems that best learning rate is `1e-05`
+    - it seems that `20` epochs is ideal number for training
+    - the complex model does not seem to be overtraining yet
+        - while model trained it stayed at similar CC
+    - training is much stable than using simple model
+- the residual connections are not probably better
+    - till now model without residual connections are better a little bit
+- CC over `0.7` is stable reachable

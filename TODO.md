@@ -11,6 +11,9 @@
     - higher number of layers
 - try other bins (now trying on size 20)
 - saving the best model based on the CC metric
+    - select the predictions on the selected part of the dataset during the last evaluation on all results for the best model (load the best model and do the evaluation + save the best results of it)
+- compute loss for all layers at once (do not add losses for each layer prediction)
+    - in `_compute_loss` function in `model_executer.py`
 
 
 # Future steps
