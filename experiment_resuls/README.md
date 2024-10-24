@@ -6,29 +6,24 @@ Each subdirectory specifies the size of the model in percentage of the original 
 # Experiment results
 
 ## Size 10
-Best CC is `0.24`
-- it might be good idea to change the metrics to work with discrete values (Pearson's CC does not)
-- from the first experiments it looks that ideal 
-    - `learning rate` is probably around `0.003 - 0.00075`
-    - `number of epochs` probably around `6 - 10`
-        - or higher and we did not test it 
-            - not very probable
-            - if more then very time consuming (almost impossible to learn for us)
-
+- best CC:  `0.84`
+- the results are quite random in case of training
+    - there is very high fluctuation during the training (rapid grows/drops)
+- generally it is good to use small learning rates (under `5e-05`)
+- regarding number of epochs it is variable
+    - sometimes it is high at the begging sometimes it reached maximum after last epoch
+- complex models look much more stable
+    - there is some pattern in CC development
 
 ## Size 25
+- generally slower training and worse results in comparison to smaller model
 
 ### Simple Model
-Best CC is: `0.22`
-- slightly worse results than in size 10 (only 3 examples though)
-- it looks the smallest learning rate gets the best results
-    - the best learnin rate `0.00075`
-    - number of epochs is ideally approx `6-8`
-        - after that it looks it overfits
+- looks very unstable and sometimes learns quickly, sometimes pretty badly
+
 
 ### Complex model
-Best CC is: `0.02`
-- by far we do not see any significant sign of learning
+- learning looks much more stable in comparison to simple model
 
 
 ## Size 50

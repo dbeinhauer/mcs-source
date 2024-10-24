@@ -1,16 +1,16 @@
 # Now
 - think about model hyper-parameters
-- different losses
-- training: only one step (not sequence) - weights to real data (target)
-- start on the first time step (not with the zeros)
 - figures + random neurons - plot responses
     - for the meeting to see what the neurons does in the response
+    - select random neurons
+    - select random images
+    - select best CC results
+    - plot these for each layer
 - neuron NN 
     - smaller size of the layer
     - higher number of layers
-    - input should be one neuron -> output one neuron (not the whole population)
-- larger bins
-    - bin of size 10 and 20
+- try other bins (now trying on size 20)
+- saving the best model based on the CC metric
 
 
 # Future steps

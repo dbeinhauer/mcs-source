@@ -395,3 +395,6 @@ Notes after the meeting:
     - the inhibitory layers should get excitatory input from the previous state (not the current)
 - we also started training on size of time intervals 20 instead of 5 as it looks 5 is very hard to train and training on 20 takes much less time
     - also now training on size 0.1 of the original model (since we finetune the training procedure and resolve the bugs)
+
+# 21.10.2024
+- it seems that using residual connections inside complex neuron is much better than not using it

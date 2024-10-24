@@ -435,10 +435,22 @@ class ModelExecuter:
         }
 
         return dict_predictions
+    
+    # def _select_random_subset():
 
     def compute_evaluation_score(self, targets, predictions):
         cross_correlation = 0
 
+        # TODO: randomly select neurons in each layer (approx. 10 of them) -> get rid of most neurons
+        # TODO: randomly select image in each layer (approx. 10 of them)    -> get rid of batch size
+        #   - here is a problem with image IDs (does it make sense to choose random image for each experiment?)
+        #       - probably it does make sense
+        # TODO: compute mean of the responses through the trials -> get rid of trials dimension
+        # TODO: Ideally we want dictionary of outputs:
+        #       {layer: tensor(shape=(selected_images, time_duration, avg_selected_neuron_responses))}
+        # TODO: We want to save these for the best results in regards to CC
+
+        # predictions shape:    (10, 20, 34, 3750)  -> (batch, trials, time_steps, num_neurons)
         # Concatenate predictions and targets across all layers.
         all_predictions = torch.cat(
             [prediction for prediction in predictions.values()],
@@ -494,7 +506,7 @@ def main(args):
             "epoch_offset": 1,
             "evaluation_subset_size": 10,
         },
-        debugging_stop_index=-1,
+        debugging_stop_index=3,
     )
     model_executer.evaluation()
 
@@ -522,7 +534,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="complex",  # "simple",
+        default="simple",
         choices=[model_type.value for model_type in ModelTypes],
         help="",
     )
@@ -530,6 +542,7 @@ if __name__ == "__main__":
     parser.add_argument("--neuron_num_layers", type=int, default=5, help="")
     parser.add_argument("--neuron_layer_size", type=int, default=10, help="")
     parser.set_defaults(neuron_not_residual=False)
+    # parser.set_defaults(neuron_not_residual=True)
     parser.add_argument("--neuron_not_residual", action="store_true", help="")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="")
     parser.add_argument("--num_epochs", type=int, default=10, help="")
