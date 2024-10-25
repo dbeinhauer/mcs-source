@@ -294,7 +294,7 @@
 - will need to debug and work with the parallelism of the GPUs probably
 - discussed the multitrial data with Luca and we agreed that he might generate some data for me
 - we should use normalized cross-correlation for the data evaluation
-- we agreed with Luca that he will generate new 1000 images with 10 trials for test dataset till I come back from vaccation
+- we agreed with Luca that he will generate new 1000 images with 10 trials for test dataset till I come back from vacation
 
 # 30.8.2024
 - work on the evaluation computation
@@ -401,7 +401,7 @@ Notes after the meeting:
 
 # 24.10.2024
 - after several tests of model training on the size 0.25 we consider complex model much better than simple
-    - reached max CC `0.8` - almost our target
+    - reached max CC `0.84` - almost our target
     - it seems that best learning rate is `1e-05`
     - it seems that `20` epochs is ideal number for training
     - the complex model does not seem to be overtraining yet
@@ -410,3 +410,10 @@ Notes after the meeting:
 - the residual connections are not probably better
     - till now model without residual connections are better a little bit
 - CC over `0.7` is stable reachable
+
+# 25.10.2024
+- computation of loss changed - now computing loss across all layers at once
+    - also I was printing only last step loss -> because of that I cannot check whether the average loss is descending
+- training with small learning rate `8e-06` seem to be too small
+    - learning very slowly and probably will stop lower than `1e-05`
+- adding saving the best model and using it in the last evaluation

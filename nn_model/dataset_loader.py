@@ -27,6 +27,7 @@ class SparseSpikeDataset(Dataset):
         output_layers: Dict[str, int],
         is_test: bool = False,
         model_subset_path: str = "",
+        experiment_selection_path: str = "",
     ):
         """
         Initializes class attributes, loads model subset indices and all
@@ -42,6 +43,9 @@ class SparseSpikeDataset(Dataset):
         (for multi-trial evaluation).
         :param model_subset_path: path to file where indices of the model subset
         are stored (size defined in `globals.py`). If empty string then no subset.
+        :param experiment_selection_path: path of the file where experiment filenames for
+        loading only subset of the dataset are stored. It is pickle file with list of
+        selected filenames that should be loaded by the dataset.
         """
         # Define basic attributes.
         self.spikes_dir = spikes_dir
@@ -50,18 +54,40 @@ class SparseSpikeDataset(Dataset):
 
         # Flag if we are storing multi-trial dataset (for evaluation).
         self.is_test = is_test
+        # Flag if use `self.experiment_selection` as source of filenames of the dataset.
+        self.use_experiment_selection = False
 
         # Load subset indices (subset of neurons). Dictionary of np.array of indices.
         self.model_subset_indices = self._load_model_subset_indices(model_subset_path)
 
         # Load all filenames of experiments to use in dataset.
         self.experiments = self._load_all_spikes_filenames()
+        # Define selected experiments for final evaluation.
+        self.selected_experiments = self._init_experiment_selection(
+            experiment_selection_path
+        )
 
     def __len__(self):
         """
-        :return: returns number of all filenames (number of data).
+        Function used by `DataLoader` class to determine the size of the dataset to load from.
+        :return: returns number of all experiments or number of selected experiments based on
+        the `self.use_experiment_selection` flag.
         """
-        return len(self.experiments)
+        return (
+            len(self.selected_experiments)
+            if self.use_experiment_selection
+            else len(self.experiments)
+        )
+
+    def switch_dataset_selection(self, selected_experiments: bool = False):
+        """
+        Switch dataset selection to either load from all provided experiments or to
+        load only selected subset of experiments.
+
+        :param selected_experiments: flag whether use only selected subset of experiments,
+        otherwise use the all provided experiments
+        """
+        self.use_experiment_selection = selected_experiments
 
     def _load_all_spikes_filenames(self, subdir: str = "X_ON") -> List[List[str]]:
         """
@@ -103,6 +129,51 @@ class SparseSpikeDataset(Dataset):
 
         # Convert the dictionary values (lists of files) to a list of lists
         return list(coupled_files.values())
+
+    def _load_selected_experiments(self, experiment_list_path: str) -> List[str]:
+        with open(experiment_list_path, "rb") as pickle_file:
+            return pickle.load(pickle_file)
+
+    def _init_experiment_selection(
+        self, experiment_selection_path: str
+    ) -> List[List[str]]:
+        """
+        Loads the filenames of the selected experiments (all trials of these experiments).
+
+        There is a list of filenames of selected experiments provided. This list should
+        contain only one filename of each experiment (not multiple trials). If any
+        of the experiment filenames is provided (any trial) then it adds list of all
+        filenames of the experiment (all trials) to the list of the selected experiments.
+
+        These selected experiments are typically used for model performance analysis during
+        the last evaluation step on the best model.
+
+        :param experiment_selection_path: Path of the pickled file where the selected
+        experiments are stored in the list.
+        :return: Returns list of list of filenames of trials of the selected experiments.
+        """
+
+        if not experiment_selection_path:
+            # No experiment selection provided -> selection is empty
+            return []
+
+        selected_experiments_filenames = self._load_selected_experiments(
+            experiment_selection_path
+        )
+
+        # for exp_list in self.experiments:
+        #     for filename in exp_list:
+        #         if filename in selected_experiments_filenames:
+        #             print("Here I am")
+
+        # Select those lists of experiment names that have one of selected experiment
+        # filenames inside it (in each list there are same experiments but different trials).
+        return [
+            exp_list  # List of same experiments but different trial
+            for exp_list in self.experiments  # Iterate through experiments
+            if any(filename in selected_experiments_filenames for filename in exp_list)
+            # If selected filename is inside the list of experiment trials -> add it
+        ]
 
     def _load_train_test_indices(self, path: str):
         """
@@ -205,6 +276,13 @@ class SparseSpikeDataset(Dataset):
         The directory keys are names of the layers, the values are `np.array`s
         of the spikes for the corresponding layer.
         """
+        # Choose the experiment list based on the use_selected flag
+        experiment_list = (
+            self.selected_experiments
+            if self.use_experiment_selection
+            else self.experiments
+        )
+        exp_name = experiment_list[idx]
         exp_name = self.experiments[idx]
 
         # Load inputs and outputs for the given id.

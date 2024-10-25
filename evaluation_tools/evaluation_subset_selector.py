@@ -6,13 +6,13 @@ import sys
 import pickle
 
 # Add the parent directory to the Python path to access globals.py
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../nn_model")))
 import globals
 
 
 def get_exp_number(filename):
-    """Extract the exp_number from the filename."""
-    return filename.split("_")[-1].replace(".npz", "")
+    """Extract the exp_number from the filename. We expect: spikes_trial_{num_trial}_{image_id}_summed.npz"""
+    return filename.split("_")[-2]
 
 
 def select_random_subset(model_sizes, data_files, num_indices, num_examples):
@@ -72,7 +72,7 @@ def main(args):
     example_subset_path = "".join(
         [
             args.output_examples_path,
-            f"examples_subset_{args.num_examples}",
+            f"experiments_subset_{args.num_examples}",
             ".pkl",
         ]
     )
@@ -96,19 +96,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_path",
         type=str,
-        default="/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/trimmed_spikes/X_ON",
+        default="/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_20/X_ON",
         help="Path to the dataset directory.",
     )
     parser.add_argument(
         "--output_indices_path",
         type=str,
-        default=f"/home/beinhaud/diplomka/mcs-source/nn_model/evaluation_tools/evaluation_subsets/neurons/",
+        default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/",
         help="Path to save the selected indices pickle file.",
     )
     parser.add_argument(
         "--output_examples_path",
         type=str,
-        default=f"/home/beinhaud/diplomka/mcs-source/nn_model/evaluation_tools/evaluation_subsets/examples/",
+        default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/",
         help="Path to save the selected examples pickle file.",
     )
 

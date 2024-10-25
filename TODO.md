@@ -2,18 +2,13 @@
 - think about model hyper-parameters
 - figures + random neurons - plot responses
     - for the meeting to see what the neurons does in the response
-    - select random neurons
-    - select random images
-    - select best CC results
     - plot these for each layer
-- neuron NN 
-    - smaller size of the layer
-    - higher number of layers
+        - probably do in form of jupyter notebook for now
 - try other bins (now trying on size 20)
-- saving the best model based on the CC metric
-    - select the predictions on the selected part of the dataset during the last evaluation on all results for the best model (load the best model and do the evaluation + save the best results of it)
-- compute loss for all layers at once (do not add losses for each layer prediction)
-    - in `_compute_loss` function in `model_executer.py`
+- code refinement of the new features
+    - evaluation on the subset of experiments and neurons
+
+
 
 
 # Future steps
@@ -27,6 +22,7 @@
 - tools for summarizing training results
 - different evaluation metrics
 - different losses
+- try different models for neurons
 
 
 # In longer time period:
@@ -38,6 +34,7 @@
 - add documentation for the repository structure
 - add globals for common paths and prefixes for extraction tools
 - documentation for random subset selector
-
+- create global variables for paths used in the model 
+- probably separate model executer and argparse to separate source
 
 # Notes for the meeting
