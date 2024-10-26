@@ -718,11 +718,11 @@ def main(arguments):
     model_executer.train(
         continuous_evaluation_kwargs={
             "epoch_offset": 1,
-            "evaluation_subset_size": 4,
+            "evaluation_subset_size": 1,
         },
-        debugging_stop_index=4,
+        debugging_stop_index=2,
     )
-    model_executer.evaluation()
+    model_executer.evaluation(subset_for_evaluation=2)
 
     # TODO: better code for selection evaluation and storing the selection results
     selected_predictions, selected_targets = model_executer.selections_evaluation()
