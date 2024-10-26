@@ -640,7 +640,12 @@ class ModelExecuter:
 
                 if i % print_each_step == 0:
                     print(
-                        f"Average cross correlation after step {i+1} is: {correlation_sum/num_examples:.4f}"
+                        "".join(
+                            [
+                                f"Average cross correlation after step {i+1} is: ",
+                                f"{correlation_sum/num_examples:.4f}",
+                            ]
+                        )
                     )
 
         avg_correlation = correlation_sum / num_examples
@@ -648,19 +653,58 @@ class ModelExecuter:
 
         return avg_correlation
 
-    def selections_evaluation(self):
+    def _select_neurons_and_trials_mean(
+        self, data: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Takes prediction/target tensors, selects the neurons for further analysis
+        (`neuron_selection`), and computes the average over trials.
+
+        :param data: Prediction/target tensor to perform the operations on.
+        :return: Returns subset of input data in neurons dimension for selected neurons
+        subset for further evaluation. This subset is averaged over the trials dimension.
+        """
+        return {
+            layer: torch.mean(data[layer][:, :, :, self.neuron_selection[layer]], dim=1)
+            for layer in RNNCellModel.layers_input_parameters
+            if layer in data
+        }
+
+    def _prepare_selected_data_for_analysis(
+        self, all_data_batches: Dict[str, List[torch.Tensor]]
+    ) -> Dict:
+        """
+        Takes all selected data batches (subset of neurons for analysis) and
+        concatenates them to one `np.array`.
+
+        :param all_data_batches: Dictionary of list of all batches of selected data for analysis.
+        :return: Returns dictionary of numpy arrays of all data selected for further
+        evaluation analysis.
+        """
+        return {
+            layer: torch.cat(all_data_batches[layer], dim=0).cpu().numpy()
+            for layer in all_data_batches
+        }
+
+    def selections_evaluation(self) -> Tuple[Dict, Dict]:
+        """
+        Runs evaluation on the selected subset of experiments (images). After that it
+        takes only the selected neurons, computes average over trials and returns
+        `np.array` of predictions and targets for these for each layer.
+
+        :return: Returns tuple of predictions and targets for all selected neurons on the
+        selected experiments averaged over trials.
+        """
         self.model.eval()
         self.test_dataset.switch_dataset_selection(selected_experiments=True)
 
-        # neuron_indices = {
-        #     "layer_name_1": [0, 2, 3],  # Replace with actual layer names and indices
-        #     "layer_name_2": [1, 4, 5],
-        #     # Add other layers as needed
-        # }
-
         # Store all batches' data for each layer
-        all_predictions = {layer: [] for layer in RNNCellModel.layers_input_parameters}
-        all_targets = {layer: [] for layer in RNNCellModel.layers_input_parameters}
+        all_prediction_batches: Dict[str, List[torch.Tensor]] = {
+            layer: [] for layer in RNNCellModel.layers_input_parameters
+        }
+        all_target_batches: Dict[str, List[torch.Tensor]] = {
+            layer: [] for layer in RNNCellModel.layers_input_parameters
+        }
 
         with torch.no_grad():
             for inputs, targets in tqdm(self.test_loader):
@@ -669,40 +713,28 @@ class ModelExecuter:
                     inputs, targets, inputs[LayerType.X_ON.value].shape[1]
                 )
 
-                # Select neurons and average across trials
-                selected_predictions = {
-                    layer: torch.mean(
-                        predictions[layer][:, :, :, self.neuron_selection[layer]], dim=1
-                    )
-                    for layer in RNNCellModel.layers_input_parameters
-                    if layer in predictions
-                }
-                selected_targets = {
-                    layer: torch.mean(
-                        targets[layer][:, :, :, self.neuron_selection[layer]], dim=1
-                    )
-                    for layer in RNNCellModel.layers_input_parameters
-                    if layer in targets
-                }
+                # Select neurons and average their responses over trials.
+                selected_predictions = self._select_neurons_and_trials_mean(predictions)
+                selected_targets = self._select_neurons_and_trials_mean(targets)
 
                 # Append each layer's data to the corresponding list
                 for layer in RNNCellModel.layers_input_parameters:
-                    all_predictions[layer].append(selected_predictions[layer])
-                    all_targets[layer].append(selected_targets[layer])
+                    all_prediction_batches[layer].append(selected_predictions[layer])
+                    all_target_batches[layer].append(
+                        selected_targets[layer][
+                            :, 1:, :
+                        ]  # Get rid of the first target time step (not used in prediction)
+                    )
 
         self.test_dataset.switch_dataset_selection(selected_experiments=False)
 
-        # Concatenate all batches for each layer along batch size dimension
-        concatenated_predictions = {
-            layer: torch.cat(all_predictions[layer], dim=0).cpu().numpy()
-            for layer in all_predictions
-        }
-        concatenated_targets = {
-            layer: torch.cat(all_targets[layer], dim=0).cpu().numpy()
-            for layer in all_targets
-        }
+        selected_predictions = self._prepare_selected_data_for_analysis(
+            all_prediction_batches
+        )
+        selected_targets = self._prepare_selected_data_for_analysis(all_target_batches)
 
-        return concatenated_predictions, concatenated_targets
+        # Convert all selected neurons and image predictions/targets to numpy array.
+        return selected_predictions, selected_targets
 
 
 def main(arguments):
@@ -720,25 +752,20 @@ def main(arguments):
             "epoch_offset": 1,
             "evaluation_subset_size": 1,
         },
-        debugging_stop_index=2,
+        debugging_stop_index=1,
     )
-    model_executer.evaluation(subset_for_evaluation=2)
+    # model_executer.evaluation(subset_for_evaluation=1)
 
-    # TODO: better code for selection evaluation and storing the selection results
+    # TODO: better code structure
+    # Selection evaluation and storing these results to corresponding path.
     selected_predictions, selected_targets = model_executer.selections_evaluation()
-
-    # Create a dictionary to hold both predictions and targets
-
     data_to_save = {"predictions": selected_predictions, "targets": selected_targets}
-
     filename = arguments.selection_results_dir + arguments.model_filename.replace(
         ".pth", ".pkl"
     )
     # Save to a pickle file
     with open(filename, "wb") as f:
         pickle.dump(data_to_save, f)
-    # print(selected_predictions.shape)
-    # print(selected_targets.shape)
 
 
 if __name__ == "__main__":
@@ -747,14 +774,12 @@ if __name__ == "__main__":
         "--train_dir",
         type=str,
         default=f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}",
-        # default="/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/trimmed_spikes",
         help="Directory where train dataset is stored.",
     )
     parser.add_argument(
         "--test_dir",
         type=str,
         default=f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}",
-        # default="/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/trimmed_spikes",
         help="Directory where tests dataset is stored.",
     )
     parser.add_argument(
@@ -828,7 +853,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_epochs",
         type=int,
-        default=2,
+        default=1,
         help="Number of epochs for training the model.",
     )
 

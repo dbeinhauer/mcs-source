@@ -417,3 +417,10 @@ Notes after the meeting:
 - training with small learning rate `8e-06` seem to be too small
     - learning very slowly and probably will stop lower than `1e-05`
 - adding saving the best model and using it in the last evaluation
+
+# 26.10.2024
+- changed naming without `_summed`
+    - it might be possible to merge time slots while loading the file
+        - probably not use it -> much slower (have to load bigger data)
+- it is needed to have different model sizes preprocessed before running
+    - unfortunately it lead to higher memory storage demand

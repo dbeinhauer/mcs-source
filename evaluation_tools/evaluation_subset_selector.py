@@ -11,8 +11,8 @@ import globals
 
 
 def get_exp_number(filename):
-    """Extract the exp_number from the filename. We expect: spikes_trial_{num_trial}_{image_id}_summed.npz"""
-    return filename.split("_")[-2]
+    """Extract the exp_number from the filename. We expect: spikes_trial_{num_trial}_{image_id}.npz"""
+    return filename.split("_")[-1]
 
 
 def select_random_subset(model_sizes, data_files, num_indices, num_examples):
