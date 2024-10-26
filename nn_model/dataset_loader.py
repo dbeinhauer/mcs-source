@@ -115,14 +115,15 @@ class SparseSpikeDataset(Dataset):
         coupled_files = defaultdict(list)
 
         for file in all_files:
-            if file.endswith(".npz") and "_summed" in file:
+            if file.endswith(".npz"):  # TODO:  # and "_summed" in file:
                 # Split the filename by underscores
                 file_without_ext = file.replace(".npz", "")
                 parts = file_without_ext.split("_")
 
+                # TODO: removing '_summed_part'
                 # Ensure the filename ends with 'summed' and spike_id is the second-to-last part
-                if len(parts) >= 3 and parts[-2].isdigit():
-                    spike_id = parts[-2]  # Extract spike_id as the second-to-last part
+                if len(parts) >= 2 and parts[-1].isdigit():
+                    spike_id = parts[-1]  # Extract spike_id as the second-to-last part
 
                     # Add the file to the list of files with the same spike_id
                     coupled_files[spike_id].append(file)
@@ -221,14 +222,36 @@ class SparseSpikeDataset(Dataset):
         Where `num_trials` is always 1 (new dimension).
         """
         # Load the data from the file and convert to dense representation.
-        data = load_npz(file_path)
-        data = data.toarray()
+        # data = load_npz(file_path)
+        # data = data.toarray()
+        # TODO: Change to pytorch
+        data = torch.tensor(
+            load_npz(file_path).toarray(), dtype=torch.half  # , device=globals.device0
+        )
+
+        # # TODO: New part of code for loading the original 1ms time step
+        # # -> merging the interval bins while loading -> more space saved
+        # num_neurons, time_duration = data.shape
+        # new_time_duration = time_duration // globals.TIME_STEP
+
+        # # Reshape the matrix to sum over the specified time interval
+        # data = (
+        #     data[:, : new_time_duration * globals.TIME_STEP]
+        #     .reshape(num_neurons, new_time_duration, globals.TIME_STEP)
+        #     .sum(dim=2)
+        # )
+
+        # # data = data.sum(axis=2)
+
+        # # TODO: End of the new part
 
         # Create trials dimension.
-        data = np.expand_dims(data, axis=0)
+        # data = np.expand_dims(data, axis=0) # TODO
+        data = data.unsqueeze(0)
 
         # Transpose to have the shape: (trials, time, neurons)
-        data = data.transpose(0, 2, 1)
+        # data = data.transpose(0, 2, 1) # TODO:
+        data = data.permute(0, 2, 1)
 
         # If there is a model subset, apply it.
         if self.model_subset_indices is not None:
@@ -261,7 +284,9 @@ class SparseSpikeDataset(Dataset):
             all_data.append(data)
 
         # Concatenate all loaded data along the trials dimension (axis 0).
-        combined_data = np.concatenate(all_data, axis=0)
+        # combined_data = np.concatenate(all_data, axis=0) # TODO:
+
+        combined_data = torch.cat(all_data, dim=0)
 
         return combined_data
 
@@ -289,19 +314,20 @@ class SparseSpikeDataset(Dataset):
         inputs = {
             layer: self._load_experiment(exp_name, layer) for layer in self.input_layers
         }
-        inputs = {
-            layer: torch.tensor(input_data, dtype=torch.half)
-            for layer, input_data in inputs.items()
-        }
+        # TODO: changes from np.array -> torch.Tensor
+        # inputs = {
+        #     layer: torch.tensor(input_data, dtype=torch.half)
+        #     for layer, input_data in inputs.items()
+        # }
 
         outputs = {
             layer: self._load_experiment(exp_name, layer)
             for layer in self.output_layers
         }
-        outputs = {
-            layer: torch.tensor(output_data, dtype=torch.half)
-            for layer, output_data in outputs.items()
-        }
+        # outputs = {
+        #     layer: torch.tensor(output_data, dtype=torch.half)
+        #     for layer, output_data in outputs.items()
+        # }
 
         return inputs, outputs
 

@@ -718,9 +718,9 @@ def main(arguments):
     model_executer.train(
         continuous_evaluation_kwargs={
             "epoch_offset": 1,
-            "evaluation_subset_size": 10,
+            "evaluation_subset_size": 4,
         },
-        debugging_stop_index=-1,
+        debugging_stop_index=4,
     )
     model_executer.evaluation()
 
@@ -747,12 +747,14 @@ if __name__ == "__main__":
         "--train_dir",
         type=str,
         default=f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}",
+        # default="/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/trimmed_spikes",
         help="Directory where train dataset is stored.",
     )
     parser.add_argument(
         "--test_dir",
         type=str,
         default=f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{globals.TIME_STEP}",
+        # default="/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/trimmed_spikes",
         help="Directory where tests dataset is stored.",
     )
     parser.add_argument(
