@@ -115,14 +115,14 @@ class SparseSpikeDataset(Dataset):
         coupled_files = defaultdict(list)
 
         for file in all_files:
-            if file.endswith(".npz") and "_summed" in file:
+            if file.endswith(".npz"):  # and "_summed" in file:
                 # Split the filename by underscores
                 file_without_ext = file.replace(".npz", "")
                 parts = file_without_ext.split("_")
 
                 # Ensure the filename ends with 'summed' and spike_id is the second-to-last part
-                if len(parts) >= 3 and parts[-2].isdigit():
-                    spike_id = parts[-2]  # Extract spike_id as the second-to-last part
+                if len(parts) >= 2 and parts[-1].isdigit():
+                    spike_id = parts[-1]  # Extract spike_id as the second-to-last part
 
                     # Add the file to the list of files with the same spike_id
                     coupled_files[spike_id].append(file)
