@@ -66,7 +66,7 @@ def main():
     )
 
     args = parser.parse_args()
-    if args.template == None:
+    if args.template is None:
         args.template = SPIKES_PREFIX
         if args.multitrial:
             args.template += TRIALS_PREFIX + "{trial_id}_"

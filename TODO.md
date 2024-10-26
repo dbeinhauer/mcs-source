@@ -36,5 +36,7 @@
 - documentation for random subset selector
 - create global variables for paths used in the model 
 - probably separate model executer and argparse to separate source
+- think about model_executor architecture
+    - it might be useful to change it in order to make the source readable
 
 # Notes for the meeting

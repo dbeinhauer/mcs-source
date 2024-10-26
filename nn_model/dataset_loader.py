@@ -5,7 +5,7 @@ This source code defines dataset class for storing the experiment data.
 import os
 import pickle
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 from scipy.sparse import load_npz
@@ -97,12 +97,12 @@ class SparseSpikeDataset(Dataset):
 
         It expects that the directory contains the files with filenames
         in either of the two provided formats:
-            `spikes_{experiment_id}_summed.npz`
+            `spikes_{experiment_id}.npz`
             or
-            `spikes_trial_{trial_id}_{experiment_id}_summed.npz`
+            `spikes_trial_{trial_id}_{experiment_id}npz`
         The necessary is that the `experiment_id` is in second-to-last
         position when we split by `_` symbol. And that there are at least
-        3 part while splitting by `_` symbol.
+        2 parts while splitting by `_` symbol.
 
         :param subdir: name of the layer subdirectory containing the spikes files.
         :return: Returns list of lists that contain all filenames of all
@@ -115,22 +115,30 @@ class SparseSpikeDataset(Dataset):
         coupled_files = defaultdict(list)
 
         for file in all_files:
-            if file.endswith(".npz"):  # and "_summed" in file:
+            if file.endswith(".npz"):
                 # Split the filename by underscores
                 file_without_ext = file.replace(".npz", "")
                 parts = file_without_ext.split("_")
 
-                # Ensure the filename ends with 'summed' and spike_id is the second-to-last part
+                # Ensure the filename has the image id is the last number in the filename
                 if len(parts) >= 2 and parts[-1].isdigit():
-                    spike_id = parts[-1]  # Extract spike_id as the second-to-last part
+                    image_id = parts[-1]  # Extract image id
 
-                    # Add the file to the list of files with the same spike_id
-                    coupled_files[spike_id].append(file)
+                    # Add the file to the list of files with the same image_ids
+                    coupled_files[image_id].append(file)
 
         # Convert the dictionary values (lists of files) to a list of lists
         return list(coupled_files.values())
 
     def _load_selected_experiments(self, experiment_list_path: str) -> List[str]:
+        """
+        Loads list of selected experiment ids that should be used in further
+        evaluation analysis after the model is trained.
+
+        :param experiment_list_path: path to the pickle file where the experiment list is stored.
+        :return: Returns the loaded list of selected experiment filenames (only 1 trial,
+        other trials should be derived).
+        """
         with open(experiment_list_path, "rb") as pickle_file:
             return pickle.load(pickle_file)
 
@@ -161,13 +169,8 @@ class SparseSpikeDataset(Dataset):
             experiment_selection_path
         )
 
-        # for exp_list in self.experiments:
-        #     for filename in exp_list:
-        #         if filename in selected_experiments_filenames:
-        #             print("Here I am")
-
-        # Select those lists of experiment names that have one of selected experiment
-        # filenames inside it (in each list there are same experiments but different trials).
+        # Select those lists of experiment names that have one of selected experiment filenames
+        # (trials) inside it (in each list there are same experiments but different trials).
         return [
             exp_list  # List of same experiments but different trial
             for exp_list in self.experiments  # Iterate through experiments
@@ -181,7 +184,7 @@ class SparseSpikeDataset(Dataset):
 
         NOTE: Not used now, as we do not have multiple trials in all examples.
 
-        :param path: path to file where all ids of the given subset are stored.
+        :param path: path to pickle file where all ids of the given subset are stored.
         :return: returns numpy array of all experiment ids of the given subset.
         """
         with open(path, "rb") as pickle_file:
@@ -207,28 +210,27 @@ class SparseSpikeDataset(Dataset):
 
         return None
 
-    def _prepare_experiment_data(self, file_path: str, layer: str):
+    def _prepare_experiment_data(self, file_path: str, layer: str) -> torch.Tensor:
         """
-        Loads spikes data from sparse scipy representation for
+        Loads spikes data from sparse `scipy` representation for
         the given experiment. Converts to dense representation
-        (`np.array`), expands it with new dimension (for trials)
+        (`torch.Tensor`), expands it with new dimension (for trials)
         and extracts only subset of neurons (if the subset provided).
 
         :param file_path: path where the spikes data are stored.
         :param layer: layer subdirectory name.
-        :return: Returns loaded spikes data as `np.array` of shape
+        :return: Returns loaded spikes data as tensor of shape
         (num_trials, time, num_neurons).
         Where `num_trials` is always 1 (new dimension).
         """
         # Load the data from the file and convert to dense representation.
-        data = load_npz(file_path)
-        data = data.toarray()
+        data = torch.tensor(load_npz(file_path).toarray(), dtype=torch.half)
 
         # Create trials dimension.
-        data = np.expand_dims(data, axis=0)
+        data = data.unsqueeze(0)
 
         # Transpose to have the shape: (trials, time, neurons)
-        data = data.transpose(0, 2, 1)
+        data = data.permute(0, 2, 1)
 
         # If there is a model subset, apply it.
         if self.model_subset_indices is not None:
@@ -237,7 +239,7 @@ class SparseSpikeDataset(Dataset):
 
         return data
 
-    def _load_experiment(self, exp_names, layer: str):
+    def _load_experiment(self, exp_names: List[str], layer: str) -> torch.Tensor:
         """
         Loads all spikes data for the provided experiment for all
         the trials and converts the data to proper format for further
@@ -246,7 +248,7 @@ class SparseSpikeDataset(Dataset):
         :param exp_names: list of names of experiment files on same
         data but different trials.
         :param layer: name of the layer to extract (subdirectory name).
-        :return: Returns `np.array` of prepared spikes data for the given
+        :return: Returns tensor of prepared spikes data for the given
         experiment and layer. The shape of the array is:
             `(num_trials, time, num_neurons)`
         """
@@ -261,11 +263,13 @@ class SparseSpikeDataset(Dataset):
             all_data.append(data)
 
         # Concatenate all loaded data along the trials dimension (axis 0).
-        combined_data = np.concatenate(all_data, axis=0)
+        combined_data = torch.cat(all_data, dim=0)
 
         return combined_data
 
-    def __getitem__(self, idx):
+    def __getitem__(
+        self, idx
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """
         Loads spikes data for the given experiment splitted on input and
         output layers.
@@ -273,7 +277,7 @@ class SparseSpikeDataset(Dataset):
         :param idx: ID of the experiment to load.
         :return: Returns tuple of two dictionaries. First stands for input
         data (input layers). Second is stands for output data (output layers).
-        The directory keys are names of the layers, the values are `np.array`s
+        The directory keys are names of the layers, the values are tensors
         of the spikes for the corresponding layer.
         """
         # Choose the experiment list based on the use_selected flag
@@ -283,24 +287,15 @@ class SparseSpikeDataset(Dataset):
             else self.experiments
         )
         exp_name = experiment_list[idx]
-        exp_name = self.experiments[idx]
 
         # Load inputs and outputs for the given id.
         inputs = {
             layer: self._load_experiment(exp_name, layer) for layer in self.input_layers
         }
-        inputs = {
-            layer: torch.tensor(input_data, dtype=torch.half)
-            for layer, input_data in inputs.items()
-        }
 
         outputs = {
             layer: self._load_experiment(exp_name, layer)
             for layer in self.output_layers
-        }
-        outputs = {
-            layer: torch.tensor(output_data, dtype=torch.half)
-            for layer, output_data in outputs.items()
         }
 
         return inputs, outputs
