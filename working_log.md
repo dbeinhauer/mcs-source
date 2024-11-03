@@ -424,3 +424,22 @@ Notes after the meeting:
         - probably not use it -> much slower (have to load bigger data)
 - it is needed to have different model sizes preprocessed before running
     - unfortunately it lead to higher memory storage demand
+
+# 1.11.2024
+Notes after meetings:
+- the training acts strangely
+    - it fluctuates in CC_NORM - should not if training properly
+    - we should add classical CC_ABS (Pearson's CC) to check whether the normalization does not lead to strange results
+- it seems that the model does not learn that good spatio-temporal behavior of the neurons
+- we should check whether the data processing is in correct format:
+    - it should be some blank time step -> stimulus -> additional blank
+    - should check for test dataset -> we are sure that for train it is correctly defined
+        - it looks it is correct
+    - we should check the histogram of the number of neurons per number of spikes
+        - it should exponentially decrease
+- create plot of mean spatio-temporal response through all neurons in the layer
+    - to see the mean behavior of the neuronal response makes sense
+        - it should go from down (blank) to stimuli (steeply up) -> lower -> down (blank)
+- select few neurons and plot it together to show its behavior throughout the images
+    - also add its mean response
+- implement `weights and biases` tool to the training - to see what it does during training

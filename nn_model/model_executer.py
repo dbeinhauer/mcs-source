@@ -98,7 +98,9 @@ class ModelExecuter:
                     f"_step-{globals.TIME_STEP}",
                     f"_lr-{str(arguments.learning_rate)}",
                     f"_{arguments.model}",
-                    f"_residual_{not arguments.neuron_not_residual}",
+                    f"_residual-{not arguments.neuron_not_residual}",
+                    f"_neuron-layers-{arguments.neuron_num_layers}",
+                    f"_neuron-size-{arguments.neuron_layer_size}",
                     ".pth",
                 ]
             )
@@ -695,6 +697,8 @@ class ModelExecuter:
         :return: Returns tuple of predictions and targets for all selected neurons on the
         selected experiments averaged over trials.
         """
+        self._load_best_model()  # TODO: Maybe solve better
+
         self.model.eval()
         self.test_dataset.switch_dataset_selection(selected_experiments=True)
 
@@ -746,15 +750,17 @@ def main(arguments):
     """
     model_executer = ModelExecuter(arguments)
 
-    # Train the model used the given parameters.
-    model_executer.train(
-        continuous_evaluation_kwargs={
-            "epoch_offset": 1,
-            "evaluation_subset_size": 1,
-        },
-        debugging_stop_index=1,
-    )
-    # model_executer.evaluation(subset_for_evaluation=1)
+    if not arguments.best_model_evaluation:
+        # Train the model used the given parameters.
+        model_executer.train(
+            continuous_evaluation_kwargs={
+                "epoch_offset": 1,
+                "evaluation_subset_size": 10,
+            },
+            debugging_stop_index=-1,
+        )
+
+        model_executer.evaluation()
 
     # TODO: better code structure
     # Selection evaluation and storing these results to corresponding path.
@@ -855,6 +861,12 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Number of epochs for training the model.",
+    )
+    parser.set_defaults(best_model_evaluation=False)
+    parser.add_argument(
+        "--best_model_evaluation",
+        action="store_true",
+        help="",
     )
 
     args = parser.parse_args()
