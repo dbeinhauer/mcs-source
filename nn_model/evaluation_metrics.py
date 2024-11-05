@@ -3,6 +3,8 @@ This source code contains implementations of all evaluation metrics used
 in our model.
 """
 
+from typing import Tuple
+
 import torch
 
 
@@ -169,7 +171,7 @@ class NormalizedCrossCorrelation:
         std_target,
         target,
         denom_offset: float = 1e-8,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Calculates CC_NORM from the paper.
 
@@ -179,26 +181,28 @@ class NormalizedCrossCorrelation:
         :param std_target: standard deviation of trial mean targets across neurons.
         :param target: target tensor.
         :param denom_offset: offset for sanity of the division.
-        :return: Returns value of CC_NORM.
+        :return: Returns tuple of CC_NORM and CC_ABS (Pearson's CC).
         """
         cc_abs = self._cc_abs(avg_prediction, avg_target, std_pred, std_target)
         cc_max = self._cc_max(target, std_target * std_target, self.num_trials)
 
         cc_norm = cc_abs / (cc_max + denom_offset)
 
-        # return cc_abs / (cc_max + denom_offset)
-        return torch.clamp(cc_norm, min=-1.0, max=1.0)
+        # Return tuple of CC_NORM and CC_ABS (Pearson's CC)
+        return torch.clamp(cc_norm, min=-1.0, max=1.0), torch.clamp(
+            cc_abs, min=-1.0, max=1.0
+        )
 
-    def _batch_mean(self, cc_norm):
+    def _batch_mean(self, cc_vector):
         """
-        Calculates mean across batch for CC_NORM values.
+        Calculates mean across batch for cross correlation values.
 
-        :param cc_norm: values of CC_NORM for all batch examples.
-        :return: Returns mean of CC_NORM across batch.
+        :param cc_vector: values of CC for all batch examples.
+        :return: Returns mean of given CC across batch.
         """
-        return cc_norm.mean(dim=0).item()
+        return cc_vector.mean(dim=0).item()
 
-    def calculate(self, prediction, target) -> float:
+    def calculate(self, prediction, target) -> Tuple[float, float]:
         """
         Calculates normalized cross correlation between predictions and targets.
 
@@ -210,7 +214,7 @@ class NormalizedCrossCorrelation:
 
         :param prediction: model predictions. In silico responses, `r` from the paper.
         :param target: target values. In vivo responses, `y` from the paper.
-        :return: Returns normalized cross correlation value.
+        :return: Returns tuple normalized and absolute (Pearson's CC) cross correlation value.
         """
         # Assuming prediction and target are PyTorch tensors.
         self.batch_size, self.num_trials, self.time_duration, self.num_neurons = (
@@ -231,7 +235,7 @@ class NormalizedCrossCorrelation:
         std_pred, std_target = self._neurons_std(avg_prediction, avg_target)
 
         # Calculate CC_NORM.
-        cc_norm = self._cc_norm(
+        cc_norm, cc_abs = self._cc_norm(
             avg_prediction,
             avg_target,
             std_pred,
@@ -239,4 +243,4 @@ class NormalizedCrossCorrelation:
             target,
         )
 
-        return self._batch_mean(cc_norm)
+        return self._batch_mean(cc_norm), self._batch_mean(cc_abs)

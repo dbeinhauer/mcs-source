@@ -67,6 +67,7 @@ class ModelExecuter:
         self.best_metric = -float("inf")
 
         self.best_model_path = self._init_model_path(arguments)
+        self.full_evaluation_directory = arguments.full_evaluation_dir
 
         # Selected neurons for evaluation analysis
         self.neuron_selection = self._load_neurons_selection(
@@ -563,7 +564,7 @@ class ModelExecuter:
 
     def compute_evaluation_score(
         self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor]
-    ) -> float:
+    ) -> Tuple[float, float]:
         """
         Computes evaluation score between vectors of all prediction
         and all target layers.
@@ -573,10 +574,8 @@ class ModelExecuter:
 
         :param targets: dictionary of targets for all layers.
         :param predictions: dictionary of predictions for all layers.
-        :return: Returns evaluation score (CC_NORM) of the predictions.
+        :return: Returns tuple of evaluation score (CC_NORM) and Pearson's CC of the predictions.
         """
-        cross_correlation = 0
-
         # Concatenate predictions and targets across all layers.
         all_predictions = torch.cat(
             [prediction for prediction in predictions.values()],
@@ -587,17 +586,52 @@ class ModelExecuter:
         )
 
         # Run the calculate function once on the concatenated tensors.
-        cross_correlation = self.evaluation_metrics.calculate(
+        cc_norm, cc_abs = self.evaluation_metrics.calculate(
             all_predictions, all_targets
         )
 
-        return cross_correlation
+        return cc_norm, cc_abs
+
+    def _save_predictions_batch(
+        self,
+        batch_index: int,
+        predictions: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
+        filename: str = "",
+    ):
+        """
+        Saves averaged predictions and targets across the trials for the provided batch.
+
+        :param batch_index: Index of the batch (just used for naming).
+        :param predictions: Dictionary of predictions of the batch for all layers.
+        Shape of tensor:(batch_size, time, num_neurons)
+        :param targets: Dictionary of targets of the batch for all layers.
+        Shape of tensor:(batch_size, time, num_neurons)
+        :param filename: optional path of the file, if empty string then use default filename.
+        Default filename:
+            f"{args.full_evaluation_directory}/{args.model_filename}/batch_{batch_index}.pkl"
+        """
+        if not filename:
+            # If the filename is not defined -> use the default one
+            # Path: {full_evaluation_directory}/{model_filename}/batch_{batch_index}.pkl
+            filename = "".join(
+                [
+                    self.full_evaluation_directory,
+                    self.best_model_path.split("/")[-1].replace(".sth", "/"),
+                    f"batch_{batch_index}.pkl",
+                ]
+            )
+
+        # Save to a pickle file
+        with open(filename, "wb") as f:
+            pickle.dump({"predictions": predictions, "targets": targets}, f)
 
     def evaluation(
         self,
         subset_for_evaluation: int = -1,
         print_each_step: int = 10,
         final_evaluation: bool = True,
+        save_predictions: bool = False,
     ) -> float:
         """
         Performs model evaluation.
@@ -614,6 +648,8 @@ class ModelExecuter:
         :param print_each_step: After how many test batches print current evaluation results.
         :param final_evaluation: Flag whether we want to run final evaluation
         (the best model on all testing dataset).
+        :param save_predictions: Flag whether we want to save all model predictions and targets
+        averaged through the trials.
         :return: Average cross correlation along all tried examples.
         """
         if final_evaluation:
@@ -621,7 +657,8 @@ class ModelExecuter:
 
         self.model.eval()
 
-        correlation_sum = 0.0
+        cc_norm_sum = 0.0
+        cc_abs_sum = 0.0
         num_examples = 0
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
@@ -633,27 +670,51 @@ class ModelExecuter:
                 predictions = self._predict_for_evaluation(
                     inputs, targets, inputs[LayerType.X_ON.value].shape[1]
                 )
-                correlation_sum += self.compute_evaluation_score(
+
+                if save_predictions:
+                    self._save_predictions_batch(
+                        i,
+                        {
+                            layer: torch.mean(
+                                prediction, dim=0
+                            )  # Trials dimension is the first because we reshape it during prediction step.
+                            for layer, prediction in predictions.items()
+                        },
+                        {
+                            layer: torch.mean(
+                                target[:, :, 1:, :], dim=1
+                            )  # We want to skip the first time step + the trials dimension is the second.
+                            for layer, target in targets.items()
+                        },
+                    )
+                cc_norm, cc_abs = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
                     {layer: target[:, :, 1:, :] for layer, target in targets.items()},
                     predictions,
                 )
+                cc_norm_sum += cc_norm
+                cc_abs_sum += cc_abs
                 num_examples += 1
 
                 if i % print_each_step == 0:
                     print(
                         "".join(
                             [
-                                f"Average cross correlation after step {i+1} is: ",
-                                f"{correlation_sum/num_examples:.4f}",
+                                f"Average normalized cross correlation after step {i+1} is: ",
+                                f"{cc_norm_sum/num_examples:.4f}",
+                                "\n",
+                                f"Average Pearson's CC is: ",
+                                f"{cc_abs_sum/num_examples:.4f}",
                             ]
                         )
                     )
 
-        avg_correlation = correlation_sum / num_examples
-        print(f"Final average cross correlation is: {avg_correlation:.4f}")
+        avg_cc_norm = cc_norm_sum / num_examples
+        avg_cc_abs = cc_abs_sum / num_examples
+        print(f"Final average normalized cross correlation is: {avg_cc_norm:.4f}")
+        print(f"Final average Pearson's CC is: {avg_cc_abs:.4f}")
 
-        return avg_correlation
+        return avg_cc_norm
 
     def _select_neurons_and_trials_mean(
         self, data: Dict[str, torch.Tensor]
@@ -866,6 +927,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--best_model_evaluation",
         action="store_true",
+        help="Runs only evaluation on the best saved model for the given parameters.",
+    )
+    parser.set_defaults(save_all_predictions=False)
+    parser.add_argument(
+        "--save_all_predictions",
+        action="store_true",
+        help="Whether we want to store all model predictions in final evaluation.",
+    )
+    parser.add_argument(
+        "--full_evaluation_dir",
+        type=str,
+        default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
         help="",
     )
 

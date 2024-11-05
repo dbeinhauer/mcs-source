@@ -12,7 +12,8 @@
         - or/and move the trained models somewhere else in to ensure not overwriting
     - option only for analyzing selected experiments and neurons
 - check the time of blank/stimulus for evaluation set
-
+- debug new training using both CC_NORM and CC_ABS for sanity check
+- debug saving evaluation results
 
 
 # Future steps
