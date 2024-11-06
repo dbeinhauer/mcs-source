@@ -12,7 +12,7 @@ from scipy.sparse import load_npz
 import torch
 from torch.utils.data import Dataset
 
-import globals
+import nn_model.globals
 
 
 class SparseSpikeDataset(Dataset):
@@ -307,6 +307,7 @@ def different_times_collate_fn(batch):
     duration (there are fragments of dataset that are slightly different
     in time duration (the start and end parts of the experiment run)).
     It pads the missing time with zeros (pads missing blank stage).
+
     :param batch: batch of data to pad (tuple of input and output).
     :return: Returns tuple of padded batch of input and output data.
     """
@@ -344,3 +345,68 @@ def different_times_collate_fn(batch):
 
     # Convert the list of dictionaries into a tuple
     return tuple(result)
+
+
+# def different_times_collate_fn(batch):
+
+#     max_size = max([next(iter(item[0].values())).size(1) for item in batch])
+
+#     # Initialize a list to hold the result dictionaries.
+#     normal_num_time_steps = nn_model.globals.NORMAL_NUM_TIME_STEPS
+
+#     num_dicts = len(batch[0])
+#     result = [{} for _ in range(num_dicts)]
+
+#     # Loop over each index in the tuples
+#     for i in range(num_dicts):
+#         # Get all dictionaries at the current index across all tuples
+#         dicts_at_index = [tup[i] for tup in batch]
+
+#         # Get the keys (assuming all dictionaries have the same keys)
+#         keys = dicts_at_index[0].keys()
+
+#         # For each key, process the tensors
+#         for key in keys:
+#             tensors_to_pad = [d[key] for d in dicts_at_index]
+#             padded_tensors = []
+
+#             for tensor in tensors_to_pad:
+#                 current_size = tensor.size(1)
+
+#                 if current_size >= normal_num_time_steps:
+#                     # Pad from the beginning if current size is greater than or equal
+#                     pad_size = max_size - current_size
+
+#                     padded_tensor = torch.nn.functional.pad(
+#                         tensor, (0, 0, pad_size, 0), "constant", 0
+#                     )
+
+#                 else:
+
+#                     # Pad from the end
+#                     pad_size = normal_num_time_steps - current_size
+#                     if max_size <= normal_num_time_steps:
+#                         pad_size = max_size - current_size
+
+#                     padded_tensor = torch.nn.functional.pad(
+#                         tensor, (0, 0, 0, pad_size), "constant", 0
+#                     )
+
+#                     # If still not enough, additionally pad from the beginning
+
+#                     if padded_tensor.size(1) < max_size:
+
+#                         additional_pad = max_size - padded_tensor.size(1)
+#                         padded_tensor = torch.nn.functional.pad(
+#                             padded_tensor, (0, 0, additional_pad, 0), "constant", 0
+#                         )
+
+#                 padded_tensors.append(padded_tensor)
+
+#             # Stack padded tensors along a new dimension (e.g., dimension 0)
+
+#             result[i][key] = torch.stack(padded_tensors, dim=0)
+
+#     # Convert the list of dictionaries into a tuple
+
+#     return tuple(result)

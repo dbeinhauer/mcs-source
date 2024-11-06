@@ -7,18 +7,18 @@ from typing import List, Dict, Tuple
 import torch
 import torch.nn as nn
 
-import globals
-from type_variants import LayerType, TimeStepVariant, ModelTypes
-from weights_constraints import (
+import nn_model.globals
+from nn_model.type_variants import LayerType, TimeStepVariant, ModelTypes
+from nn_model.weights_constraints import (
     WeightTypes,
     ExcitatoryWeightConstraint,
     InhibitoryWeightConstraint,
 )
-from layers import (
+from nn_model.layers import (
     ConstrainedRNNCell,
     # ComplexConstrainedRNNCell,
 )
-from neurons import FeedForwardNeuron
+from nn_model.neurons import FeedForwardNeuron
 
 
 class LayerConfig:
@@ -69,7 +69,7 @@ class LayerConfig:
         """
         return [
             {
-                "part_size": globals.MODEL_SIZES[layer[0]],
+                "part_size": nn_model.globals.MODEL_SIZES[layer[0]],
                 "part_type": self._get_constraint_type(layer[0]),
             }
             for layer in self.input_layers_parameters
@@ -82,9 +82,9 @@ class LayerConfig:
         :param layer_type: name of the layer. Should be value from `LayerType`.
         :return: Returns identifier of constraint type (value from `WeightTypes`).
         """
-        if layer_type in globals.EXCITATORY_LAYERS:
+        if layer_type in nn_model.globals.EXCITATORY_LAYERS:
             return WeightTypes.EXCITATORY.value
-        if layer_type in globals.INHIBITORY_LAYERS:
+        if layer_type in nn_model.globals.INHIBITORY_LAYERS:
             return WeightTypes.INHIBITORY.value
 
         class WrongLayerException(Exception):
@@ -106,10 +106,10 @@ class LayerConfig:
         :return: Returns appropriate `WeightConstraint` object,
         or `None` if we do not want to use the weight constraint.
         """
-        if layer_type in globals.EXCITATORY_LAYERS:
+        if layer_type in nn_model.globals.EXCITATORY_LAYERS:
             # Excitatory neurons.
             return ExcitatoryWeightConstraint(input_constraints)
-        if layer_type in globals.INHIBITORY_LAYERS:
+        if layer_type in nn_model.globals.INHIBITORY_LAYERS:
             # Inhibitory neurons.
             return InhibitoryWeightConstraint(input_constraints)
 
@@ -345,7 +345,8 @@ class RNNCellModel(nn.Module):
         if not self.training:
             # Evaluation step. Use only time step 0 as initialization of hidden states.
             return {
-                layer: hidden.to(globals.device0) for layer, hidden in targets.items()
+                layer: hidden.to(nn_model.globals.device0)
+                for layer, hidden in targets.items()
             }
         # Training mode. Hidden layers are last steps from targets for each time step.
         # Assign the values in each training step (not in this function).
@@ -366,7 +367,7 @@ class RNNCellModel(nn.Module):
             # In case we train, move all targets to CUDA
             # (will be used as hidden states during training)
             return {
-                layer: target.clone().to(globals.device0)
+                layer: target.clone().to(nn_model.globals.device0)
                 for layer, target in targets.items()
             }
         return {}
@@ -405,7 +406,7 @@ class RNNCellModel(nn.Module):
         return torch.cat(
             current_parts + previous_parts,
             dim=1,
-        ).to(globals.device0)
+        ).to(nn_model.globals.device0)
 
     def _get_list_by_time_variant(
         self,

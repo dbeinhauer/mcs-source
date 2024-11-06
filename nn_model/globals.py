@@ -4,7 +4,7 @@ are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
-from type_variants import LayerType
+from nn_model.type_variants import LayerType
 
 # Model Parameters:
 
@@ -46,6 +46,8 @@ ORIGINAL_SIZES = {
 # Number of time steps
 BLANK_DURATION = 151
 IMAGE_DURATION = 561
+
+NORMAL_NUM_TIME_STEPS = (BLANK_DURATION + IMAGE_DURATION) // TIME_STEP
 
 # Our Model Parameters
 MODEL_SIZES = {

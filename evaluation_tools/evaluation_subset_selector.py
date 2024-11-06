@@ -7,7 +7,7 @@ import pickle
 
 # Add the parent directory to the Python path to access globals.py
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../nn_model")))
-import globals
+import nn_model.globals
 
 
 def get_exp_number(filename):
@@ -42,7 +42,7 @@ def select_random_subset(model_sizes, data_files, num_indices, num_examples):
 
 def main(args):
     # Get model sizes from globals.MODEL_SIZES
-    model_sizes = globals.MODEL_SIZES
+    model_sizes = nn_model.globals.MODEL_SIZES
 
     # Load dataset examples
     data_files = os.listdir(args.dataset_path)
@@ -63,7 +63,7 @@ def main(args):
     neuron_indices_path = "".join(
         [
             args.output_indices_path,
-            f"model_size_{int(globals.SIZE_MULTIPLIER*100)}",
+            f"model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
             f"_subset_{args.num_indices}",
             ".pkl",
         ]

@@ -5,11 +5,13 @@ from typing import List
 import pickle
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../nn_model")))
-
-from type_variants import LayerType
-from dataset_loader import SparseSpikeDataset, different_times_collate_fn
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import nn_model.globals
+from nn_model.type_variants import LayerType
+from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
+from nn_model.model_executer import ModelExecuter
 
 
 class ResponseAnalyzer:
@@ -44,28 +46,51 @@ class ResponseAnalyzer:
         # Dictionary of `neuron ids` and its dictionary of responses on selected images (key is `image_id`)
         self.selected_neurons_responses = {}
 
-    def create_spikes_histogram(self):
+    def create_spikes_histogram(
+        self, processed_layer: str = "", subset: int = -1
+    ):  # , spikes_directory: str):
         """
         Creates histogram of number of neurons per number of spikes bins for all targets.
         """
+        input_layers, output_layers = ModelExecuter._split_input_output_layers(
+            nn_model.globals.ORIGINAL_SIZES
+        )
+
         test_dataset = SparseSpikeDataset(
             self.dataset_dir,
             input_layers,
             output_layers,
             is_test=True,
-            model_subset_path=arguments.subset_dir,
-            experiment_selection_path=arguments.experiment_selection_path,
         )
 
         test_loader = DataLoader(
-            self.test_dataset,
-            batch_size=globals.test_batch_size,
+            test_dataset,
+            batch_size=nn_model.globals.test_batch_size,
             shuffle=False,  # Load the test dataset always in the same order
             collate_fn=different_times_collate_fn,
         )
 
-        for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
-            pass
+        # dict_flattened_data = {layer: [] for layer in output_layers}
+        all_flattened_data = []
+
+        for i, (_, targets) in enumerate(tqdm(test_loader)):
+            if i == subset:
+                break
+            for layer, target in targets.items():
+                if processed_layer and processed_layer != layer:
+                    continue
+                summed_data = torch.sum(target, dim=2)
+                summed_data = summed_data.view(-1)
+                all_flattened_data.append(summed_data)
+
+        final_flattened_data = torch.cat(all_flattened_data).float()
+
+        return final_flattened_data.numpy()
+        # number_bins = int(final_flattened_data.max().item())
+        # hist, bin_edges = torch.histogram(final_flattened_data, bins=number_bins)
+
+        # return hist, bin_edges
+        # print(bin_edges)
 
     def load_pickle_file(self, filename: str):
         """
@@ -85,29 +110,65 @@ class ResponseAnalyzer:
         layer: str,
     ):
         time_sum = torch.sum(torch.sum(layer_data, axis=2), axis=0)
+
+        # return time_sum
+
         if layer not in layer_responses_sum[identifier]:
             layer_responses_sum[identifier][layer] = time_sum
         else:
+            if layer_responses_sum[identifier][layer].shape[0] < time_sum.shape[0]:
+                layer_responses_sum[identifier][layer] = torch.nn.functional.pad(
+                    layer_responses_sum[identifier][layer],
+                    (
+                        0,
+                        abs(
+                            layer_responses_sum[identifier][layer].shape[0]
+                            - time_sum.shape[0]
+                        ),
+                        # 0,
+                    ),
+                    "constant",
+                    0,
+                )
+            else:
+                time_sum = torch.nn.functional.pad(
+                    time_sum,
+                    (
+                        0,
+                        abs(
+                            layer_responses_sum[identifier][layer].shape[0]
+                            - time_sum.shape[0]
+                        ),
+                    ),
+                    "constant",
+                    0,
+                )
+
             layer_responses_sum[identifier][layer] += time_sum
 
-    def iterate_through_all_responses(
-        self,
-    ):
+    def iterate_through_all_responses(self, subset: int = -1):
         """
         Iterates through all mean responses (both predictions and targets).
         While iterating performs selected task.
 
         """
         layer_responses_sum = {}
-
         all_batch_response_filenames = os.listdir(os.path.join(self.responses_dir))
-
         self.num_responses = len(all_batch_response_filenames)
 
         # counter =
-        for response_filename in all_batch_response_filenames:
-            all_predictions_and_targets = self.load_pickle_file(response_filename)
-            counter += 1
+
+        # sizes = set()
+
+        # dict_sizes = {}
+
+        for i, response_filename in enumerate(tqdm(all_batch_response_filenames)):
+            if i == subset:
+                break
+            all_predictions_and_targets = self.load_pickle_file(
+                self.responses_dir + "/" + response_filename
+            )
+            # counter += 1
             for identifier, data in all_predictions_and_targets.items():
                 # TODO: it should be probably somehow done functionally.
                 if identifier not in layer_responses_sum:
@@ -118,11 +179,23 @@ class ResponseAnalyzer:
                     self._update_mean_layer_responses(
                         layer_data, layer_responses_sum, identifier, layer
                     )
+                    # # sizes.add(times.shape[0])
+                    # num_time_steps = times.shape[0]
 
-        counter = len(all_batch_response_filenames)
+                    # # if num_time_steps
+
+                    # if num_time_steps not in dict_sizes:
+                    #     dict_sizes[num_time_steps] = 1
+                    # else:
+                    #     dict_sizes[num_time_steps] += 1
+
+        # print(dict_sizes)
+
+        counter = len(all_batch_response_filenames) * nn_model.globals.test_batch_size
         self.mean_layer_responses = {
             identifier: {
-                layer: layer_data / counter for layer, layer_data in data.items()
+                layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
+                for layer, layer_data in data.items()
             }
             for identifier, data in layer_responses_sum.items()
         }  # all_predictions_and_targets / counter
@@ -163,3 +236,14 @@ class ResponseAnalyzer:
         :param selected_images_ids: list of image ids that we are interested to plot.
         """
         pass
+
+
+if __name__ == "__main__":
+    dataset_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
+    responses_dir = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10"
+    response_analyzer = ResponseAnalyzer(dataset_dir, responses_dir)
+
+    # response_analyzer.create_spikes_histogram()
+    response_analyzer.iterate_through_all_responses()
+    print(response_analyzer.mean_layer_responses)
+    print(response_analyzer.mean_layer_responses["predictions"]["V1_Exc_L4"].shape)

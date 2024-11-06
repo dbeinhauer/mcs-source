@@ -12,8 +12,8 @@ from typing import Dict
 
 import numpy as np
 
-import globals
-from type_variants import LayerType
+import nn_model.globals
+from nn_model.type_variants import LayerType
 
 
 def random_subset(layer_size, sample_size):
@@ -36,22 +36,22 @@ def random_model_layers() -> Dict:
     """
     return {
         LayerType.X_ON.value: random_subset(
-            globals.ORIGINAL_X_ON_SIZE, globals.X_ON_SIZE
+            nn_model.globals.ORIGINAL_X_ON_SIZE, nn_model.globals.X_ON_SIZE
         ),
         LayerType.X_OFF.value: random_subset(
-            globals.ORIGINAL_X_OFF_SIZE, globals.X_OFF_SIZE
+            nn_model.globals.ORIGINAL_X_OFF_SIZE, nn_model.globals.X_OFF_SIZE
         ),
         LayerType.V1_Exc_L4.value: random_subset(
-            globals.ORIGINAL_L4_EXC_SIZE, globals.L4_EXC_SIZE
+            nn_model.globals.ORIGINAL_L4_EXC_SIZE, nn_model.globals.L4_EXC_SIZE
         ),
         LayerType.V1_Inh_L4.value: random_subset(
-            globals.ORIGINAL_L4_INH_SIZE, globals.L4_INH_SIZE
+            nn_model.globals.ORIGINAL_L4_INH_SIZE, nn_model.globals.L4_INH_SIZE
         ),
         LayerType.V1_Exc_L23.value: random_subset(
-            globals.ORIGINAL_L23_EXC_SIZE, globals.L23_EXC_SIZE
+            nn_model.globals.ORIGINAL_L23_EXC_SIZE, nn_model.globals.L23_EXC_SIZE
         ),
         LayerType.V1_Inh_L23.value: random_subset(
-            globals.ORIGINAL_L23_INH_SIZE, globals.L23_INH_SIZE
+            nn_model.globals.ORIGINAL_L23_INH_SIZE, nn_model.globals.L23_INH_SIZE
         ),
     }
 
@@ -65,7 +65,7 @@ def generate_model_subset(arguments):
     """
     if arguments.filename is None:
         # Filename not defined -> use default: "size_{model_size}.pkl"
-        arguments.filename = f"size_{int(globals.SIZE_MULTIPLIER*100)}.pkl"
+        arguments.filename = f"size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}.pkl"
 
     file_path = os.path.join(arguments.output_directory, arguments.filename)
 

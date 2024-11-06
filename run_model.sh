@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Set Weights and Biases API Key
+source ./.wandb_api_key.sh
+
 # Check if the correct number of arguments is passed
 if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <output_dir> <model> <learning_rate> <num_epochs>"
@@ -15,7 +18,7 @@ NUM_EPOCHS=$4
 OUTPUT_DIR=$1
 
 # Command to execute, including the learning rate and number of epochs
-COMMAND="python nn_model/model_executer.py --model=$MODEL --learning_rate=$LEARNING_RATE --num_epochs=$NUM_EPOCHS"
+COMMAND="python execute_model.py --model=$MODEL --learning_rate=$LEARNING_RATE --num_epochs=$NUM_EPOCHS"
 
 # Print the command to be run
 echo "Running command: $COMMAND"
