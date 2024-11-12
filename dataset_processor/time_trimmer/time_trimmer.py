@@ -18,8 +18,11 @@ import scipy.sparse as sp
 FILE_POSTFIX = ".npz"
 
 
-def trim_sparse_matrix(matrix, interval_size: int = 712, start_offset: int = 76):
+def trim_sparse_matrix(
+    matrix, interval_size: int = 712, start_offset: int = 151
+):  # TODO: = 76):
     """
+    TODO: Redo description and refine code (skipping first blank part)
     Trims the sparse matrix into sub-matrices of a given interval size.
 
     NOTE: If the matrix cannot be evenly divided, the last sub-matrix will be smaller.
@@ -35,14 +38,16 @@ def trim_sparse_matrix(matrix, interval_size: int = 712, start_offset: int = 76)
     trimmed_matrices = []
     num_time_steps, _ = matrix.shape
 
-    # Start counting from the offset, trim the matrix in time dimension.
+    # Start counting from the offset (we want to start from the first stimulus -> skip first blank).
+    # Trim the matrix in time dimension.
     for i in range(start_offset, num_time_steps, interval_size):
         # For each new matrix switch dimensions (for future processing).
-        if i == start_offset:
-            # First matrix (include also part before offset).
-            trimmed_matrices.append(matrix[: i + interval_size, :].transpose(1, 0))
-        else:
-            trimmed_matrices.append(matrix[i : i + interval_size, :].transpose(1, 0))
+        trimmed_matrices.append(matrix[i : i + interval_size, :].transpose(1, 0))
+        # if i == start_offset:
+        #     # First matrix (include also part before offset).
+        #     trimmed_matrices.append(matrix[: i + interval_size, :].transpose(1, 0))
+        # else:
+        #     trimmed_matrices.append(matrix[i : i + interval_size, :].transpose(1, 0))
 
     return trimmed_matrices
 
@@ -112,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sheet",
         type=str,
-        default=None,
+        default="",
         help="Extract only 1 sheet from: [V1_Exc_L23, V1_Exc_L4, V1_Inh_L23, V1_Inh_L4, X_OFF, X_ON]",
     )
 
@@ -127,7 +132,7 @@ if __name__ == "__main__":
         "X_ON",
     ]
 
-    if args.sheet != None:
+    if args.sheet:
         if args.sheet in SUBDIRECTORIES:
             SUBDIRECTORIES = [args.sheet]
 

@@ -443,3 +443,32 @@ Notes after meetings:
 - select few neurons and plot it together to show its behavior throughout the images
     - also add its mean response
 - implement `weights and biases` tool to the training - to see what it does during training
+
+
+# 8.11.2024
+- we should get rid of leading blank stage in the data
+    - these might be the reasons of strange behavior at the beginning of the prediction
+        - the responses might be still influenced by the previous one
+    - I will also solve the problem of padding
+        - I will just need to pad the last stimuli with blanks
+- Also need to inspect the behavior at the end
+    - it should slightly spike at the stimulus/blank border
+- change blank/stimulus order
+    - start with stimulus -> whole blank
+        - it might be problematic that when starting with blanks it learns random spikes and do not perform well
+            - we can see it from the data
+    - also good because the padding would be needed only for the end examples
+        - only 1% of examples with padded zeros at the end
+    - need to redo trimming process
+        - also need to run time merger again for regenerating the data
+- add initial time step to plots (to see where it all starts)
+- look at the time back-propagation
+    - how to it works in pytorch
+    - additional step might be adding this between time steps
+        - artificial time steps between the targets
+            - model might learn more the dynamics
+                - it is pretty complicated to learn the dynamics that is so sharp
+- inspect what happens at the end
+    - there should be slight increase at the end
+    - same problem also with trained responses
+        - it predictions went downwards and targets upwards (strange )

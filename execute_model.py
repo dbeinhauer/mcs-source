@@ -1,8 +1,5 @@
 import argparse
 
-# import os
-import pickle
-
 import nn_model.globals
 from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import ModelTypes
@@ -63,23 +60,6 @@ def main(arguments):
             model_executer.evaluation()
 
     wandb.finish()
-    # else:
-    #     # TODO: better code structure
-    #     # Selection evaluation and storing these results to corresponding path.
-    #     selected_predictions, selected_targets = (
-    #         model_executer.selections_evaluation()
-    #     )
-    #     data_to_save = {
-    #         "predictions": selected_predictions,
-    #         "targets": selected_targets,
-    #     }
-    #     filename = (
-    #         arguments.selection_results_dir
-    #         + arguments.model_filename.replace(".pth", ".pkl")
-    #     )
-    #     # Save to a pickle file
-    #     with open(filename, "wb") as f:
-    #         pickle.dump(data_to_save, f)
 
 
 if __name__ == "__main__":
@@ -151,8 +131,8 @@ if __name__ == "__main__":
         default=10,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
-    # parser.set_defaults(neuron_not_residual=False)
-    parser.set_defaults(neuron_not_residual=True)
+    parser.set_defaults(neuron_not_residual=False)
+    # parser.set_defaults(neuron_not_residual=True)
     parser.add_argument(
         "--neuron_not_residual",
         action="store_true",

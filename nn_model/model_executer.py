@@ -9,15 +9,15 @@ import os
 import pickle
 from typing import Tuple, Dict, List, Optional
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-import wandb
 import torch.nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import wandb
 import nn_model.globals
 from nn_model.type_variants import LayerType, ModelTypes
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
@@ -26,6 +26,9 @@ from nn_model.models import (
     ConstrainedRNNCell,
 )
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
 class ModelExecuter:
@@ -427,17 +430,13 @@ class ModelExecuter:
         :param debugging_stop_step: number of steps (batches) to be performed in debugging
         run of the training. If `-1` then train on all provided data.
         """
-        # best_metric = -float("inf")
-
         wandb.watch(
             self.model,
             self.criterion,
         )
-
         self.model.train()
         for epoch in range(self.num_epochs):
             loss_sum = 0.0
-            # num_steps = 0
             for i, (input_batch, target_batch) in enumerate(tqdm(self.train_loader)):
                 if debugging_stop_index != -1 and i > debugging_stop_index:
                     # Train only for few batches in case of debugging.
@@ -459,7 +458,6 @@ class ModelExecuter:
                 # Compute loss of the model predictions.
                 loss = self._compute_loss(predictions, target_batch)
                 loss_sum += loss.item()
-                # num_steps += 1
 
                 del target_batch, predictions
                 torch.cuda.empty_cache()
@@ -669,7 +667,7 @@ class ModelExecuter:
             },
             {
                 layer: torch.mean(
-                    target[:, :, 1:, :], dim=1
+                    target, dim=1
                 )  # We want to skip the first time step + the trials dimension is the second.
                 for layer, target in targets.items()
             },
@@ -730,7 +728,6 @@ class ModelExecuter:
                 )
                 cc_norm_sum += cc_norm
                 cc_abs_sum += cc_abs
-                # num_examples += 1
 
                 # Where the magic happens
                 wandb.log({"batch_cc_norm": cc_norm})
@@ -749,8 +746,12 @@ class ModelExecuter:
                         )
                     )
 
-        avg_cc_norm = cc_norm_sum / len(self.test_loader)  # / num_examples
-        avg_cc_abs = cc_abs_sum / len(self.test_loader)  # / num_examples
+        num_examples = subset_for_evaluation + 1
+        if subset_for_evaluation == -1:
+            num_examples = len(self.test_loader)
+
+        avg_cc_norm = cc_norm_sum / num_examples
+        avg_cc_abs = cc_abs_sum / num_examples
         print(f"Final average normalized cross correlation is: {avg_cc_norm:.4f}")
         print(f"Final average Pearson's CC is: {avg_cc_abs:.4f}")
         wandb.log({"CC_NORM": avg_cc_norm})
@@ -793,6 +794,7 @@ class ModelExecuter:
 
     def selections_evaluation(self) -> Tuple[Dict, Dict]:
         """
+        TODO: maybe get rid of it
         Runs evaluation on the selected subset of experiments (images). After that it
         takes only the selected neurons, computes average over trials and returns
         `np.array` of predictions and targets for these for each layer.
@@ -842,156 +844,3 @@ class ModelExecuter:
 
         # Convert all selected neurons and image predictions/targets to numpy array.
         return selected_predictions, selected_targets
-
-
-# def main(arguments):
-#     """
-#     Perform model training and evaluation for the given setup specified
-#     in command line arguments.
-
-#     :param arguments: command line arguments.
-#     """
-#     model_executer = ModelExecuter(arguments)
-
-#     if not arguments.best_model_evaluation:
-#         # Train the model used the given parameters.
-#         model_executer.train(
-#             continuous_evaluation_kwargs={
-#                 "epoch_offset": 1,
-#                 "evaluation_subset_size": 2,
-#             },
-#             debugging_stop_index=-1,
-#         )
-
-#         model_executer.evaluation(subset_for_evaluation=-1)
-#     else:
-#         if arguments.save_all_predictions:
-#             model_executer.evaluation(subset_for_evaluation=-1, save_predictions=True)
-#         else:
-#             # TODO: better code structure
-#             # Selection evaluation and storing these results to corresponding path.
-#             selected_predictions, selected_targets = (
-#                 model_executer.selections_evaluation()
-#             )
-#             data_to_save = {
-#                 "predictions": selected_predictions,
-#                 "targets": selected_targets,
-#             }
-#             filename = (
-#                 arguments.selection_results_dir
-#                 + arguments.model_filename.replace(".pth", ".pkl")
-#             )
-#             # Save to a pickle file
-#             with open(filename, "wb") as f:
-#                 pickle.dump(data_to_save, f)
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description="")
-#     parser.add_argument(
-#         "--train_dir",
-#         type=str,
-#         default=f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}",
-#         help="Directory where train dataset is stored.",
-#     )
-#     parser.add_argument(
-#         "--test_dir",
-#         type=str,
-#         default=f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}",
-#         help="Directory where tests dataset is stored.",
-#     )
-#     parser.add_argument(
-#         "--subset_dir",
-#         type=str,
-#         default=f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}.pkl",
-#         help="Directory where model subset indices are stored.",
-#     )
-#     parser.add_argument(
-#         "--model_dir",
-#         type=str,
-#         default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/best_models/",
-#         help="Directory where to store the best model parameters.",
-#     )
-#     parser.add_argument(
-#         "--model_filename",
-#         type=str,
-#         default="",
-#         help="Filename where to store the best model.",
-#     )
-#     parser.add_argument(
-#         "--experiment_selection_path",
-#         type=str,
-#         default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
-#         help="Path to selected experiments used for model analysis during evaluation.",
-#     )
-#     parser.add_argument(
-#         "--neuron_selection_path",
-#         type=str,
-#         default=f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl",
-#         help="Path to selected neuron IDs used for model analysis during evaluation.",
-#     )
-#     parser.add_argument(
-#         "--selection_results_dir",
-#         type=str,
-#         default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
-#         help="Path to selected neuron IDs used for model analysis during evaluation.",
-#     )
-#     parser.add_argument(
-#         "--model",
-#         type=str,
-#         default="simple",
-#         choices=[model_type.value for model_type in ModelTypes],
-#         help="Model variant that we want to use.",
-#     )
-#     parser.add_argument(
-#         "--neuron_num_layers",
-#         type=int,
-#         default=5,
-#         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
-#     )
-#     parser.add_argument(
-#         "--neuron_layer_size",
-#         type=int,
-#         default=10,
-#         help="Size of the layers we want to use in feed-forward model of a neuron.",
-#     )
-#     # parser.set_defaults(neuron_not_residual=False)
-#     parser.set_defaults(neuron_not_residual=True)
-#     parser.add_argument(
-#         "--neuron_not_residual",
-#         action="store_true",
-#         help="Whether we want to use residual connections in feed-forward model of a neuron.",
-#     )
-#     parser.add_argument(
-#         "--learning_rate",
-#         type=float,
-#         default=0.00001,
-#         help="Learning rate to use in model training.",
-#     )
-#     parser.add_argument(
-#         "--num_epochs",
-#         type=int,
-#         default=1,
-#         help="Number of epochs for training the model.",
-#     )
-#     parser.set_defaults(best_model_evaluation=False)
-#     parser.add_argument(
-#         "--best_model_evaluation",
-#         action="store_true",
-#         help="Runs only evaluation on the best saved model for the given parameters.",
-#     )
-#     parser.set_defaults(save_all_predictions=False)
-#     parser.add_argument(
-#         "--save_all_predictions",
-#         action="store_true",
-#         help="Whether we want to store all model predictions in final evaluation.",
-#     )
-#     parser.add_argument(
-#         "--full_evaluation_dir",
-#         type=str,
-#         default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
-#         help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
-#     )
-
-#     args = parser.parse_args()
-#     main(args)

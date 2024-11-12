@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 # File postfixes.
 ORIGINAL_FILE_POSTFIX = ".npz"
-NEW_FILE_POSTFIX = "_summed.npz"
+NEW_FILE_POSTFIX = ".npz"
 
 # Sheets subdirectory.
 SUBDIRECTORIES = [

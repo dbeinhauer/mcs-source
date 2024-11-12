@@ -1,9 +1,5 @@
 # Now
 - think about model hyper-parameters
-- figures + random neurons - plot responses
-    - for the meeting to see what the neurons does in the response
-    - plot these for each layer
-        - probably do in form of jupyter notebook for now
 - try other bins (now trying on size 20)
 - code refinement of the new features
     - evaluation on the subset of experiments and neurons
@@ -12,8 +8,6 @@
         - or/and move the trained models somewhere else in to ensure not overwriting
     - option only for analyzing selected experiments and neurons
 - check the time of blank/stimulus for evaluation set
-- debug saving evaluation results
-- integrate weights and biases for the model training (currently unable to connect)
 
 
 # Future steps
@@ -28,11 +22,13 @@
 - different evaluation metrics
 - different losses
 - try different models for neurons
+- make plotting more convenient
 
 
 # In longer time period:
 - install the model to computational cluster
     - need to create docker image
+
 
 # When is time:
 - add documentation to existing code
@@ -44,15 +40,15 @@
 - think about model_executor architecture
     - it might be useful to change it in order to make the source readable
 
+
 # Notes for the meeting
-- plots for:
-    - histogram of number of spikes & number of neurons across the model
-    - plot of time evolution of spiking per layer
-    - plot of average neuron response per all images
-        - also generally for population
-    - select very active & not-active neurons and plot their responses together
-        - add also the points where the blank/stimulus parts are
-- look at the start and end of the activity (there should be drops down)
-- the activity should go from low to peak at the beginning of the stimulus then drop down at the end
-- add also classical correlation alongside with CC_NORM
-- implement with `weights and biases` -> to better orient during training
+- look at the time back-propagation
+    - how to it works in pytorch
+    - additional step might be adding this between time steps
+        - artificial time steps between the targets
+            - model might learn more the dynamics
+                - it is pretty complicated to learn the dynamics that is so sharp
+- inspect what happens at the end
+    - there should be slight increase at the end
+    - same problem also with trained responses
+        - predictions went downwards and targets upwards (strange)
