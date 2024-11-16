@@ -4,6 +4,7 @@ typically in some form of `RNNCell` module with additional
 operations and complexities.
 """
 
+import torch
 import torch.nn as nn
 
 
@@ -44,6 +45,8 @@ class ConstrainedRNNCell(nn.Module):
             # Reshape the layer output to [batch_size * hidden_size, 1] for batch processing
             complexity_result = rnn_output.view(batch_size * layer_size, 1)
 
+            # torch.cuda.empty_cache
+
             # Apply the small network to all elements in parallel
             # processed_output = self.layers_configs[layer].neuron_model(reshaped_input)
             complexity_result = self.shared_complexity(complexity_result)
@@ -66,6 +69,9 @@ class ConstrainedRNNCell(nn.Module):
         """
         hidden = self.rnn_cell(input_data, hidden)
         return self._apply_complexity(hidden)
+
+        # torch.cuda.empty_cache()
+
         # return hidden
 
     def apply_constraints(self):

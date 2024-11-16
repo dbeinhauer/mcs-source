@@ -5,7 +5,7 @@ and dataset analysis.
 
 import sys
 import os
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import random
 
 import pickle
@@ -19,6 +19,19 @@ import nn_model.globals
 from nn_model.type_variants import LayerType
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.model_executer import ModelExecuter
+
+
+# import pickle
+# import numpy as np
+import matplotlib.pyplot as plt
+
+# import os
+# import seaborn as sns
+# from matplotlib.ticker import MultipleLocator
+
+# import nn_model.globals
+
+# from response_analyzer import ResponseAnalyzer
 
 
 class ResponseAnalyzer:
@@ -50,6 +63,11 @@ class ResponseAnalyzer:
         # Initialize batch size (for loader) as default batch size for test dataset.
         self.batch_size = nn_model.globals.test_batch_size
 
+        # Number of time-step in which there is the overlap of stimuli and blank part
+        self.stimulus_blank_step = int(
+            nn_model.globals.IMAGE_DURATION // nn_model.globals.TIME_STEP
+        )
+
         # Raw data loaders
         self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
         self.test_dataset, self.test_loader = self._init_dataloader()
@@ -63,14 +81,12 @@ class ResponseAnalyzer:
         # Total number of responses batches to analysis
         self.num_responses = 0
 
-        # self.responses_time_evolution = {
-        #     "layer_mean": {},
-        #     "neuron_means": {},
-        #     "image_means": {},
-        # }
-
-        # Dictionary of layers and its mean neural responses through time (all examples, all neurons)
+        # Dictionary of layers and its mean neural responses through time
+        # (all examples, all neurons). For both targets and predictions.
         self.mean_layer_responses = {}
+        # Dictionary of layers and its mean neural responses through time
+        # (all examples, all neurons). Only for targets (loading from Dataloader).
+        self.mean_input_layer_responses = {}
         # Dictionary of `neuron ids` and its mean responses through time
         self.mean_neurons_responses = {}
         # Dictionary of `neuron ids` and its dictionary of responses on selected images (key is `image_id`)
@@ -315,13 +331,32 @@ class ResponseAnalyzer:
             )
 
     @staticmethod
-    def _compute_mean_responses(total_number_examples, subset=-1):
-        counter = len(self.test_loader) * nn_model.globals.test_batch_size * 20
+    def _compute_mean_responses(
+        responses_sum: Dict,
+        total_number_examples: int,
+        batch_multiplier: int,
+        subset: int = -1,
+    ) -> Dict:
+        """
+        Computes mean response of each provided layer in time.
+
+        :param responses_sum: Dictionary of sums of spikes in each layer in time.
+        :param total_number_examples: Total number of examples in the dataset
+        for which we compute the mean spike rate.
+        :param batch_multiplier: How many examples are there in one batch. Typically
+        `self.test_batch_size` for train dataset and
+        `self.test_batch_size * num_trials` per test dataset.
+        :param subset: Size of the subset to compute the mean response
+        (number of batches used). If `-1` then we use all examples.
+        :return: Returns dictionary of mean neuronal responses per each layer in time.
+        """
+
+        counter = total_number_examples * batch_multiplier
         if subset != -1:
-            counter = subset * nn_model.globals.test_batch_size * 20
+            counter = subset * batch_multiplier
         return {
             layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
-            for layer, layer_data in layer_responses_sum.items()
+            for layer, layer_data in responses_sum.items()
         }
 
     def get_original_data_mean_over_time(
@@ -331,11 +366,22 @@ class ResponseAnalyzer:
         include_input: bool = True,
         include_output: bool = False,
     ):
+        """
+        Iterates through provided data
+
+        :param subset: _description_, defaults to -1ta
+        :param process_test: _description_, defaults to True
+        :param include_input: _description_, defaults to True
+        :param include_output: _description_, defaults to False
+        """
         layer_responses_sum = {}
 
+        trials_multiplier = 20
         loader = self.test_loader
         if not process_test:
+            # Processing train set -> use train loader and number of trials is 1.
             loader = self.train_loader
+            trials_multiplier = 1
 
         for i, (inputs, targets) in enumerate(tqdm(loader)):
             if i == subset:
@@ -356,13 +402,12 @@ class ResponseAnalyzer:
                 layer_responses_sum,
             )
 
-        counter = len(self.test_loader) * nn_model.globals.test_batch_size * 20
-        if subset != -1:
-            counter = subset * nn_model.globals.test_batch_size * 20
-        self.mean_input_layer_responses = {
-            layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
-            for layer, layer_data in layer_responses_sum.items()
-        }
+        self.mean_input_layer_responses = self._compute_mean_responses(
+            layer_responses_sum,
+            len(self.test_loader),
+            nn_model.globals.test_batch_size * trials_multiplier,
+            subset=subset,
+        )
 
     def get_mean_from_evaluated_data(self, subset: int = -1):
         """
@@ -388,30 +433,15 @@ class ResponseAnalyzer:
 
                 ResponseAnalyzer._update_time_sum(data, layer_responses_sum[identifier])
 
-        counter = len(all_batch_response_filenames) * nn_model.globals.test_batch_size
         self.mean_layer_responses = {
-            identifier: {
-                layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
-                for layer, layer_data in data.items()
-            }
-            for identifier, data in layer_responses_sum.items()
-        }  # all_predictions_and_targets / counter
-
-    def plot_mean_neural_response_per_populations(self):
-        """
-        Plots mean spatio-temporal responses of all the neurons from population.
-        For both averaged predictions and targets.
-        """
-
-        counter = len(all_batch_response_filenames)
-        average_responses = {
-            identifier: {
-                layer: layer_data / counter for layer, layer_data in data.items()
-            }
-            for identifier, data in all_data.items()
-        }  # all_predictions_and_targets / counter
-
-        return average_responses
+            identifier: self._compute_mean_responses(
+                layer_sum,
+                len(all_batch_response_filenames),
+                nn_model.globals.test_batch_size,
+                subset=subset,
+            )
+            for identifier, layer_sum in layer_responses_sum.items()
+        }
 
     def compute_mean_neuron_response_per_all_images(self, neuron_id: int, layer: str):
         """
@@ -434,6 +464,141 @@ class ResponseAnalyzer:
         """
         pass
 
+    def _init_mean_response_in_time_plot_object(self, num_layers: int) -> List:
+        """
+        Initializes plot object where we would plot the results of each layer.
+
+        :param num_layers: Number of layers that we want to plot.
+        :return: Returns initializes subplots list of `axs` objects.
+        """
+
+        # Create subplots for each layer.
+        _, axs = plt.subplots(num_layers, 1, figsize=(10, 5 * num_layers))
+
+        # If there's only one layer, we ensure axs is a list for easier handling
+        if num_layers == 1:
+            axs = [axs]
+
+        return axs
+
+    def _set_mean_response_in_time_plot_variables(
+        self,
+        axs,
+        idx: int,
+        layer: str,
+        y_range: Optional[Tuple[float, float]],
+        stimulus_blank_border: Optional[float],
+    ):
+        """
+        Sets all necessary parameters of the plot of mean response in time.
+
+        :param axs: Axis object where we want to plot the results.
+        :param idx: Index of the subplot where we want to plot the results.
+        :param layer: Name of the layer that we want to plot.
+        :param y_range: Range in y-axis to plot. If `None` then use the default.
+        :param stimuli_blank_border: Time step of stimulus/blank border.
+        If `None` then use default time step computed from the stimulus duration
+        and time step length defined in `nn_model.globals`.
+        """
+
+        if not stimulus_blank_border:
+            # Stimuli/blank border time step not provided
+            # -> use default time step computed from the stimulus duration
+            # and time step length defined in `nn_model.globals`.
+            stimulus_blank_border = self.stimulus_blank_step
+
+        # Set line defining stimulus/blank border
+        axs[idx].axvline(
+            x=stimulus_blank_border,
+            color="green",
+            linestyle="--",
+            label="Stimulus/Blank border",
+        )
+
+        # Adding titles and labels
+        axs[idx].set_title(f"Layer {layer} - Mean neural response through time")
+        axs[idx].set_xlabel("Time")
+        axs[idx].set_ylabel("Mean response")
+        if y_range:
+            # y range defined
+            axs[idx].set_ylim(*y_range)  # y axis limit
+        axs[idx].legend()
+
+    def _plot_execution(self, save_fig_path: str):
+        """
+        Either show the plot or save it to given path.
+
+        :param save_fig_path: Path where to store the figure. If empty string
+        then do not save the figure (only show it).
+        """
+        plt.tight_layout()
+        if save_fig_path:
+            # Path specified (not empty) -> save the figure
+            plt.savefig(save_fig_path)
+        else:
+            # Path not specified -> only show the plot
+            plt.show()
+
+    def plot_mean_layer_data(
+        self,
+        data: Dict,
+        include_predictions: bool,
+        identifier: str = "",
+        y_range: Optional[Tuple[float, float]] = None,
+        save_fig_path: str = "",
+        stimuli_blank_border: Optional[float] = None,
+    ):
+        """
+        Plots mean layer responses either only mean targets or also together with mean predictions.
+
+        :param data: Data to be plotted. Either dictionary of `predictions` and `targets`
+        or just layers of targets.
+        :param include_predictions: Flag whether we want to include predictions in the plot creation.
+        The plot should include both mean prediction and mean target in time.
+        :param identifier: Identifier of the specific computed means to plot.
+        Possible options are: `['prediction_mean', input_mean']`. If everything else then plot the `data`.
+        :param y_range: Range in y-axis to plot. If `None` then use the default.
+        :param save_fig_path: Path where we want to store the created figure.
+        If empty string then do not save the figure and just show it.
+        :param stimuli_blank_border: Time step where is the border between stimulus
+        and blank stage.
+        """
+
+        if identifier == "prediction_mean":
+            data = self.mean_layer_responses
+        elif identifier == "input_mean":
+            data = self.mean_input_layer_responses
+
+        predictions = {}
+        targets = data
+        if include_predictions:
+            predictions = data["predictions"]
+            targets = data["targets"]
+
+        axs = self._init_mean_response_in_time_plot_object(len(targets))
+
+        # Iterate over each layer
+        for idx, layer in enumerate(targets.keys()):
+            # pred_tensor = predictions[layer].detach().numpy()
+            target_tensor = targets[layer].detach().numpy()
+
+            if include_predictions:
+                pred_tensor = predictions[layer].detach().numpy()
+                axs[idx].plot(
+                    # Insert first target value (starting point of the predictions)
+                    np.insert(pred_tensor, 0, target_tensor[0], axis=0),
+                    label="Predictions",
+                    color="blue",
+                )
+
+            axs[idx].plot(target_tensor, label="Targets", color="red")
+
+            self._set_mean_response_in_time_plot_variables(
+                axs, idx, layer, y_range, stimuli_blank_border
+            )
+
+        self._plot_execution(save_fig_path)
+
 
 if __name__ == "__main__":
     train_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
@@ -447,12 +612,10 @@ if __name__ == "__main__":
         test_spikes_dir,
         all_responses_dir,
         neuron_ids_path,
-        images_ids_path,
+        # images_ids_path,
     )
 
-    # response_analyzer.create_spikes_histogram()
-    response_analyzer.get_all_input_sums(subset=1)
-    print(response_analyzer.mean_input_layer_responses)
-    # response_analyzer.iterate_through_all_responses()
-    # print(response_analyzer.mean_layer_responses)
-    # print(response_analyzer.mean_layer_responses["predictions"]["V1_Exc_L4"].shape)
+    # response_analyzer.get_mean_from_evaluated_data()
+    response_analyzer.get_original_data_mean_over_time(subset=2)
+    # response_analyzer.plot_mean_layer_data(response_analyzer.mean_layer_responses, True)
+    response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")

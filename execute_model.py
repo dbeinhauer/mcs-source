@@ -1,15 +1,23 @@
+"""
+This script serves as the interface that is used to execute experiments and evaluations.
+"""
+
+import os
 import argparse
+
+import wandb
 
 import nn_model.globals
 from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import ModelTypes
 
 
-# import the library
-import wandb
-
-
 def init_wandb(arguments):
+    """
+    Initializes Weights and Biases tracking.
+
+    :param arguments: Command line arguments.
+    """
 
     config = {
         "learning_rate": arguments.learning_rate,
@@ -18,12 +26,22 @@ def init_wandb(arguments):
         "model": arguments.model,
         "neuron_model_num_layers": arguments.neuron_num_layers,
         "neuron_model_layer_size": arguments.neuron_layer_size,
-        "neuron_model_is_residual": not arguments.neuron_not_residual,
+        "neuron_model_is_residual": arguments.neuron_residual,
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
+        "num_hidden_time_steps": arguments.num_hidden_time_steps,
     }
 
-    wandb.init(project="V1_spatio_temporal_model", config=config)
+    if arguments.best_model_evaluation:
+        # Disable weights and biases tracking if there is only evaluation.
+        os.environ["WANDB_DISABLED"] = "true"
+    else:
+        os.environ["WANDB_DISABLED"] = "false"
+
+    wandb.init(
+        project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+        config=config,
+    )
     # wandb.config = {"learning_rate": 0.001, "epochs": 100, "batch_size": 128}
 
 
@@ -47,7 +65,7 @@ def main(arguments):
         model_executer.train(
             continuous_evaluation_kwargs={
                 "epoch_offset": 1,
-                "evaluation_subset_size": 10,
+                "evaluation_subset_size": 1,
             },
             debugging_stop_index=-1,
         )
@@ -122,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=5,
+        default=9,
         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
     )
     parser.add_argument(
@@ -131,17 +149,23 @@ if __name__ == "__main__":
         default=10,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
-    parser.set_defaults(neuron_not_residual=False)
-    # parser.set_defaults(neuron_not_residual=True)
+    # parser.set_defaults(neuron_residual=False)
+    parser.set_defaults(neuron_residual=True)
     parser.add_argument(
-        "--neuron_not_residual",
+        "--neuron_residual",
         action="store_true",
         help="Whether we want to use residual connections in feed-forward model of a neuron.",
     )
     parser.add_argument(
+        "--num_hidden_time_steps",
+        type=int,
+        default=1,
+        help="Number of hidden time steps in RNN (to use backtracking through time (not just use known targets)).",
+    )
+    parser.add_argument(
         "--learning_rate",
         type=float,
-        default=0.00001,
+        default=0.007,
         help="Learning rate to use in model training.",
     )
     parser.add_argument(

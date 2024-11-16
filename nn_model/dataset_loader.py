@@ -62,6 +62,7 @@ class SparseSpikeDataset(Dataset):
 
         # Load all filenames of experiments to use in dataset.
         self.experiments = self._load_all_spikes_filenames()
+
         # Define selected experiments for final evaluation.
         self.selected_experiments = self._init_experiment_selection(
             experiment_selection_path

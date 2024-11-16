@@ -4,13 +4,9 @@ This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
-# import argparse
 import os
 import pickle
 from typing import Tuple, Dict, List, Optional
-
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
-# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import torch.nn
 import torch.optim as optim
@@ -103,9 +99,10 @@ class ModelExecuter:
                     f"_step-{nn_model.globals.TIME_STEP}",
                     f"_lr-{str(arguments.learning_rate)}",
                     f"_{arguments.model}",
-                    f"_residual-{not arguments.neuron_not_residual}",
+                    f"_residual-{arguments.neuron_residual}",
                     f"_neuron-layers-{arguments.neuron_num_layers}",
                     f"_neuron-size-{arguments.neuron_layer_size}",
+                    f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
                     ".pth",
                 ]
             )
@@ -207,7 +204,7 @@ class ModelExecuter:
                 ModelTypes.COMPLEX.value: {
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
-                    "residual": arguments.neuron_not_residual,
+                    "residual": arguments.neuron_residual,
                 }
             }
 
@@ -224,6 +221,7 @@ class ModelExecuter:
         """
         return RNNCellModel(
             self.layer_sizes,
+            arguments.num_hidden_time_steps,
             arguments.model,
             neuron_model_kwargs=self._get_neuron_model_kwargs(arguments),
         )
@@ -260,7 +258,7 @@ class ModelExecuter:
                     f"Model variant: {argument.model}",
                     f"Neuron number of layers: {argument.neuron_num_layers}",
                     f"Neurons layer sizes: {argument.neuron_layer_size}",
-                    f"Neuron use residual connection: {not argument.neuron_not_residual}",
+                    f"Neuron use residual connection: {argument.neuron_residual}",
                     f"Batch size: {nn_model.globals.train_batch_size}",
                     f"Learning rate: {argument.learning_rate}",
                     f"Num epochs: {argument.num_epochs}",
@@ -707,6 +705,7 @@ class ModelExecuter:
         cc_norm_sum = 0.0
         cc_abs_sum = 0.0
         # num_examples = 0
+
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
                 if subset_for_evaluation != -1 and i > subset_for_evaluation:

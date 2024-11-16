@@ -4,6 +4,7 @@ that can be used in the model. Neuron here is represented by
 some small model.
 """
 
+import torch
 import torch.nn as nn
 
 
@@ -49,4 +50,8 @@ class FeedForwardNeuron(nn.Module):
         if self.residual:
             out += hidden
         # Pass the input through the network
+
+        # del hidden
+        # torch.cuda.empty_cache
+
         return out

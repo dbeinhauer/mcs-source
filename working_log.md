@@ -471,4 +471,24 @@ Notes after meetings:
 - inspect what happens at the end
     - there should be slight increase at the end
     - same problem also with trained responses
-        - it predictions went downwards and targets upwards (strange )
+        - it predictions went downwards and targets upwards (strange)
+
+
+# 15.11.2024
+- strangely after dataset correction it looks that simple model is at least as good as complex one
+    - the highest correlation of simple model is `0.86`
+        - the best complex has correlation `0.84`
+        - it helps to use more complex neuron model (for now 7 layers is the best)
+- the training looks stable
+    - once it starts to continually grow in correlation it stays at that level
+        - major improvement in comparison to previous data
+- while training the model with time step 10 -> I get smaller loss
+    - the correlation seems to be comparable to time step 20
+- residual connections seems be still worse than model without it
+    - it trains quickly but it reaches the correlation about `0.05` smaller in average
+
+- it looks that I wrongly defined residuals (I interchanged residuals for not-residuals)
+    - residuals are indeed better than non-residuals
+- we need to focus on DNN module
+    - the model should be able to transfer the information between inhibitory and excitatory layers
+    - if the 

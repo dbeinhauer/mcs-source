@@ -201,6 +201,7 @@ class RNNCellModel(nn.Module):
     def __init__(
         self,
         layer_sizes: Dict[str, int],
+        num_hidden_time_steps: int,
         neuron_type: str,
         neuron_model_kwargs: Dict,
     ):
@@ -208,11 +209,17 @@ class RNNCellModel(nn.Module):
         Initializes model parameters, sets weights constraints and creates model architecture.
 
         :param layer_sizes: sizes of all model layers (input included).
+        :param num_hidden_time_steps: Number of hidden time steps in RNN model
+        (where we do not know the targets).
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
         :param neuron_model_kwargs: kwargs of the used neuronal models (if any).
         """
         super(RNNCellModel, self).__init__()
+
+        # Number of hidden time steps (between individual targets) that we want to use
+        # during training and evaluation (in order to learn the dynamics better).
+        self.num_hidden_time_steps = num_hidden_time_steps
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -537,26 +544,80 @@ class RNNCellModel(nn.Module):
         # Start from the second step, because the first one is
         # the initial one (we predict all time steps but the 0-th one).
         time_length = inputs[LayerType.X_ON.value].size(1)
-        for t in range(1, time_length):
+
+        total_time_steps = (
+            time_length - 1 + (time_length - 2) * self.num_hidden_time_steps
+        )
+
+        # print(total_time_steps)
+
+        # current_input_index = 1
+
+        for visible_time in range(1, time_length):
+            # for t in range(total_time_steps):
             if self.training:
                 # In case we are in the train mode, we assign new hidden
                 # layers based on the previous target in each time step.
                 hidden_states = self._assign_training_step_hidden_states(
-                    t, all_hidden_states
+                    # t, all_hidden_states
+                    # current_input_index,
+                    visible_time,
+                    all_hidden_states,
                 )
 
-            # Perform model step prediction.
-            current_time_outputs = self._perform_model_time_step(
-                inputs, hidden_states, t
-            )
+            # is_hidden_step = (t % (self.num_hidden_time_steps + 1)) != 0
+            for _ in range(self.num_hidden_time_steps):
+                # # if not is_hidden_step:
+                # if self.training:
+                #     # In case we are in the train mode, we assign new hidden
+                #     # layers based on the previous target in each time step.
+                #     hidden_states = self._assign_training_step_hidden_states(
+                #         # t, all_hidden_states
+                #         current_input_index,
+                #         all_hidden_states,
+                #     )
 
-            # Append time step prediction to list of all predictions.
-            self._append_outputs(all_time_outputs, current_time_outputs)
+                # Perform model step prediction.
+                # current_time_outputs = self._perform_model_time_step(
+                #     inputs,
+                #     hidden_states,
+                #     # t,
+                #     current_input_index,
+                # )
+                current_time_outputs = self._perform_model_time_step(
+                    inputs,
+                    hidden_states,
+                    # t,
+                    # current_input_index,
+                    visible_time,
+                )
 
-            if not self.training:
-                # If we are in the evaluation mode
-                # -> assign new hidden states as the current model outputs.
+                del hidden_states
+                torch.cuda.empty_cache()
+
                 hidden_states = current_time_outputs
+
+                # Append time step prediction to list of all predictions.
+                # self._append_outputs(all_time_outputs, current_time_outputs)
+                # self._append_outputs(all_time_outputs, hidden_states)
+
+                # current_input_index += 1
+
+                # if not self.training:
+                #     # If we are in the evaluation mode
+                #     # -> assign new hidden states as the current model outputs.
+                #     hidden_states = current_time_outputs
+
+            self._append_outputs(all_time_outputs, hidden_states)
+            torch.cuda.empty_cache()
+
+            # else:
+            #     hidden_states = self._perform_model_time_step(
+            #         inputs,
+            #         hidden_states,
+            #         # t,
+            #         current_input_index,
+            #     )
 
         # Clear caches
         del inputs

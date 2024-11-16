@@ -1,13 +1,13 @@
 # Now
-- think about model hyper-parameters
-- try other bins (now trying on size 20)
+- inspect different neuron models
+    - different number of layers/layer sizes
 - code refinement of the new features
     - evaluation on the subset of experiments and neurons
-- loading the best model and running evaluation option
-    - this connects to asking whether we want to save the best model
-        - or/and move the trained models somewhere else in to ensure not overwriting
-    - option only for analyzing selected experiments and neurons
-- check the time of blank/stimulus for evaluation set
+- adding additional hidden time steps between each target
+    - the model might learn the dynamics better
+- make plot of DNN responses
+
+- it is very probably that there has been bug and I have been using residual as not residual 
 
 
 # Future steps
@@ -24,7 +24,6 @@
 - try different models for neurons
 - make plotting more convenient
 
-
 # In longer time period:
 - install the model to computational cluster
     - need to create docker image
@@ -39,6 +38,14 @@
 - probably separate model executer and argparse to separate source
 - think about model_executor architecture
     - it might be useful to change it in order to make the source readable
+- disable weights and biases for evaluation of best model
+- make it possible to change all model parameters from `run_model.sh` script
+    - some of the parameters might be optional
+    - also change residual to optional
+- improve response analysis 
+    - add option to select neurons for analysis
+    - add option to select images for analysis
+- option for selecting the device (GPU) where we want to run the experiment
 
 
 # Notes for the meeting
@@ -52,3 +59,4 @@
     - there should be slight increase at the end
     - same problem also with trained responses
         - predictions went downwards and targets upwards (strange)
+
