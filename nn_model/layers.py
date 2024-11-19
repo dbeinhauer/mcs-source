@@ -37,6 +37,11 @@ class ConstrainedRNNCell(nn.Module):
         self.constraint = weight_constraint
         self.shared_complexity = shared_complexity
 
+        self.return_recurrent_state = False
+
+    def switch_to_return_recurrent_state(self):
+        self.return_recurrent_state = True
+
     def _apply_complexity(self, rnn_output):
         if self.shared_complexity:
             batch_size = rnn_output.size(0)
@@ -68,8 +73,12 @@ class ConstrainedRNNCell(nn.Module):
         :return: Returns the output of the forward step.
         """
         hidden = self.rnn_cell(input_data, hidden)
-        return self._apply_complexity(hidden)
+        complexity_result = self._apply_complexity(hidden)
 
+        if not self.return_recurrent_state:
+            return complexity_result, None
+
+        return complexity_result, hidden
         # torch.cuda.empty_cache()
 
         # return hidden
@@ -79,32 +88,3 @@ class ConstrainedRNNCell(nn.Module):
         Applies the layer constraint on the weights.
         """
         self.constraint.apply(self.rnn_cell)
-
-
-# class ComplexConstrainedRNNCell(ConstrainedRNNCell):
-#     """
-#     TODO: Applying shared complexity.
-#     """
-
-#     def __init__(self, input_size, hidden_size, weight_constraint, shared_complexity):
-#         # Inherit from ConstrainedRNNCell
-#         super(ComplexConstrainedRNNCell, self).__init__(
-#             input_size, hidden_size, weight_constraint
-#         )
-#         self.shared_complexity = shared_complexity  # Shared complexity module
-
-#     def forward(self, input_data, hidden):
-#         # Apply the RNN operation
-#         hidden = self.rnn_cell(input_data, hidden)
-
-#         # Apply the shared complexity transformation
-#         complex_hidden = self.shared_complexity(hidden)
-
-#         # Combine the original hidden state and the transformed one
-#         combined_hidden = hidden + complex_hidden
-
-#         return combined_hidden
-
-#     def apply_constraints(self):
-#         # Apply weight constraints inherited from ConstrainedRNNCell
-#         self.constraint.apply(self.rnn_cell)

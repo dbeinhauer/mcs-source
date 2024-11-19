@@ -65,7 +65,7 @@ def main(arguments):
         model_executer.train(
             continuous_evaluation_kwargs={
                 "epoch_offset": 1,
-                "evaluation_subset_size": 1,
+                "evaluation_subset_size": 10,
             },
             debugging_stop_index=-1,
         )
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=9,
+        default=7,
         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
     )
     parser.add_argument(
@@ -149,8 +149,8 @@ if __name__ == "__main__":
         default=10,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
-    # parser.set_defaults(neuron_residual=False)
-    parser.set_defaults(neuron_residual=True)
+    parser.set_defaults(neuron_residual=False)
+    # parser.set_defaults(neuron_residual=True)
     parser.add_argument(
         "--neuron_residual",
         action="store_true",
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_hidden_time_steps",
         type=int,
-        default=1,
+        default=5,
         help="Number of hidden time steps in RNN (to use backtracking through time (not just use known targets)).",
     )
     parser.add_argument(
@@ -179,6 +179,12 @@ if __name__ == "__main__":
         "--best_model_evaluation",
         action="store_true",
         help="Runs only evaluation on the best saved model for the given parameters.",
+    )
+    parser.add_argument(
+        "--best_model_dir",
+        type=str,
+        default="",
+        help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
     )
     parser.set_defaults(save_all_predictions=False)
     parser.add_argument(

@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 import wandb
 import nn_model.globals
-from nn_model.type_variants import LayerType, ModelTypes
+from nn_model.type_variants import LayerType, ModelTypes, EvaluationFields
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
     RNNCellModel,
@@ -67,6 +67,8 @@ class ModelExecuter:
         self.best_metric = -float("inf")
 
         self.best_model_path = self._init_model_path(arguments)
+        if arguments.best_model_dir:
+            self.best_model_path = arguments.best_model_dir
         self.full_evaluation_directory = arguments.full_evaluation_dir
 
         # Selected neurons for evaluation analysis
@@ -445,7 +447,7 @@ class ModelExecuter:
                 self.optimizer.zero_grad()
 
                 # Get model prediction.
-                predictions = self.model(
+                predictions, _ = self.model(
                     input_batch,
                     target_batch,
                 )
@@ -497,7 +499,8 @@ class ModelExecuter:
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-    ) -> Dict[str, List[torch.Tensor]]:
+        # get_rnn_predictions: bool = False,
+    ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
         """
         Computes predictions for all trials (used for evaluation usually).
 
@@ -509,6 +512,7 @@ class ModelExecuter:
         :return: Returns dictionary of lists of predictions for all trials with key layer name.
         """
         dict_predictions = {}
+        rnn_predictions = {}
 
         # Get predictions for each trial.
         for trial in range(num_trials):
@@ -522,26 +526,32 @@ class ModelExecuter:
                 # in evaluation we do not want to reset hidden states).
                 for layer, layer_hidden in targets.items()
             }
-            trial_predictions = self.model(
+            trial_predictions, trial_rnn_predictions = self.model(
                 trial_inputs,
                 trial_hidden,
             )
             for layer, prediction in trial_predictions.items():
                 # For each layer add the predictions to corresponding list of all predictions.
                 prediction = torch.cat(prediction, dim=1)
+                rnn_prediction = None
+                if self.model.return_recurrent_state:
+                    rnn_prediction = torch.cat(trial_rnn_predictions[layer], dim=1)
                 if layer not in dict_predictions:
                     dict_predictions[layer] = [prediction]
+                    rnn_predictions[layer] = [rnn_prediction]
                 else:
                     dict_predictions[layer].append(prediction)
+                    rnn_predictions[layer].append(rnn_prediction)
 
-        return dict_predictions
+        return dict_predictions, rnn_predictions
 
     def _predict_for_evaluation(
         self,
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-    ) -> Dict[str, torch.Tensor]:
+        # get_rnn_predictions: bool = False,
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """
         Performs prediction of the model for each trial. Then stacks the predictions
         into one tensors of size `(num_trials, batch_size, time, num_neurons)` and
@@ -556,7 +566,9 @@ class ModelExecuter:
         """
 
         # Get predictions for all trials.
-        dict_predictions = self._get_all_trials_predictions(inputs, targets, num_trials)
+        dict_predictions, rnn_predictions = self._get_all_trials_predictions(
+            inputs, targets, num_trials
+        )
         torch.cuda.empty_cache()
 
         # Stack all predictions into one torch array.
@@ -571,7 +583,18 @@ class ModelExecuter:
             for layer, predictions in dict_stacked_predictions.items()
         }
 
-        return dict_stacked_predictions
+        stacked_rnn_predictions = {}
+        if self.model.return_recurrent_state:
+            stacked_rnn_predictions = {
+                key: torch.stack(value_list, dim=0)
+                for key, value_list in rnn_predictions.items()
+            }
+            stacked_rnn_predictions = {
+                layer: predictions.permute(1, 0, 2, 3)
+                for layer, predictions in stacked_rnn_predictions.items()
+            }
+
+        return dict_stacked_predictions, stacked_rnn_predictions
 
     def compute_evaluation_score(
         self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor]
@@ -608,6 +631,7 @@ class ModelExecuter:
         batch_index: int,
         predictions: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
+        rnn_predictions: Dict[str, torch.Tensor],
         filename: str = "",
     ):
         """
@@ -637,13 +661,21 @@ class ModelExecuter:
 
         # Save to a pickle file
         with open(filename, "wb") as f:
-            pickle.dump({"predictions": predictions, "targets": targets}, f)
+            pickle.dump(
+                {
+                    EvaluationFields.PREDICTIONS.value: predictions,
+                    EvaluationFields.TARGETS.value: targets,
+                    EvaluationFields.RNN_PREDICTIONS.value: rnn_predictions,
+                },
+                f,
+            )
 
     def _save_full_evaluation(
         self,
         batch_index: int,
         predictions: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
+        rnn_predictions: Dict[str, torch.Tensor],
     ):
         """
         Saves all evaluation results together with its targets in appropriate format to
@@ -668,6 +700,12 @@ class ModelExecuter:
                     target, dim=1
                 )  # We want to skip the first time step + the trials dimension is the second.
                 for layer, target in targets.items()
+            },
+            {
+                layer: torch.mean(
+                    rnn_prediction, dim=0
+                )  # Trials dimension is the first because we reshape it during prediction step.
+                for layer, rnn_prediction in rnn_predictions.items()
             },
         )
 
@@ -700,6 +738,9 @@ class ModelExecuter:
         if final_evaluation:
             self._load_best_model()
 
+        if save_predictions:
+            self.model.switch_to_return_recurrent_state()
+
         self.model.eval()
 
         cc_norm_sum = 0.0
@@ -713,12 +754,12 @@ class ModelExecuter:
                     break
 
                 inputs, targets = self._get_data(inputs, targets, test=True)
-                predictions = self._predict_for_evaluation(
+                predictions, rnn_predictions = self._predict_for_evaluation(
                     inputs, targets, inputs[LayerType.X_ON.value].shape[1]
                 )
 
                 if save_predictions:
-                    self._save_full_evaluation(i, predictions, targets)
+                    self._save_full_evaluation(i, predictions, targets, rnn_predictions)
 
                 cc_norm, cc_abs = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
@@ -817,7 +858,7 @@ class ModelExecuter:
         with torch.no_grad():
             for inputs, targets in tqdm(self.test_loader):
                 inputs, targets = self._get_data(inputs, targets, test=True)
-                predictions = self._predict_for_evaluation(
+                predictions, rnn_predictions = self._predict_for_evaluation(
                     inputs, targets, inputs[LayerType.X_ON.value].shape[1]
                 )
 

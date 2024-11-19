@@ -16,9 +16,9 @@ SIZE_MULTIPLIER = 0.1
 
 # Model time step size
 # TIME_STEP = 5
-TIME_STEP = 10
+# TIME_STEP = 10
 # TIME_STEP = 15
-# TIME_STEP = 20
+TIME_STEP = 20
 
 
 # Will return values as its names
@@ -32,7 +32,6 @@ INHIBITORY_LAYERS = {
     LayerType.V1_INH_L4.value,
     LayerType.V1_INH_L23.value,
 }
-
 
 ORIGINAL_SIZES = {
     LayerType.X_ON.value: 7200,
@@ -53,6 +52,8 @@ NORMAL_NUM_TIME_STEPS = (BLANK_DURATION + IMAGE_DURATION) // TIME_STEP
 MODEL_SIZES = {
     layer: int(size * SIZE_MULTIPLIER) for layer, size in ORIGINAL_SIZES.items()
 }
+
+"model-10_step-20_lr-7e-06_complex_residual-True_neuron-layers-7_neuron-size-10_num-hidden-time-steps-1.pth"
 
 # GPU Devices:
 device0 = "cuda:1"

@@ -51,3 +51,13 @@ class MetricTypes(Enum):
     """
 
     CC_NORM = "cc_norm"
+
+
+class EvaluationFields(Enum):
+    """
+    All evaluation fields names.
+    """
+
+    PREDICTIONS = "predictions"
+    TARGETS = "targets"
+    RNN_PREDICTIONS = "rnn_predictions"

@@ -19,6 +19,7 @@ import nn_model.globals
 from nn_model.type_variants import LayerType
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.model_executer import ModelExecuter
+from nn_model.type_variants import EvaluationFields
 
 
 # import pickle
@@ -40,6 +41,15 @@ class ResponseAnalyzer:
     """
 
     target_subdirectory_prefix = "V1_"
+
+    mean_responses_fields = [
+        EvaluationFields.PREDICTIONS.value,
+        EvaluationFields.TARGETS.value,
+    ]
+    rnn_to_neuron_fields = [
+        EvaluationFields.PREDICTIONS.value,
+        EvaluationFields.RNN_PREDICTIONS.value,
+    ]
 
     def __init__(
         self,
@@ -81,6 +91,8 @@ class ResponseAnalyzer:
         # Total number of responses batches to analysis
         self.num_responses = 0
 
+        self._load_responses_filenames()
+
         # Dictionary of layers and its mean neural responses through time
         # (all examples, all neurons). For both targets and predictions.
         self.mean_layer_responses = {}
@@ -91,6 +103,8 @@ class ResponseAnalyzer:
         self.mean_neurons_responses = {}
         # Dictionary of `neuron ids` and its dictionary of responses on selected images (key is `image_id`)
         self.selected_neurons_responses = {}
+        # Dictionary of RNN responses and its transformations from DNN neuron for each layer.
+        self.rnn_to_prediction_responses = {}
 
     @staticmethod
     def load_selected_neurons(path: str) -> Dict:
@@ -162,6 +176,10 @@ class ResponseAnalyzer:
         )
 
         return dataset, loader
+
+    def _load_responses_filenames(self):
+        self.responses_filenames = os.listdir(os.path.join(self.responses_dir))
+        self.num_responses = len(self.responses_filenames)
 
     def create_spikes_histogram(
         self,
@@ -409,39 +427,113 @@ class ResponseAnalyzer:
             subset=subset,
         )
 
+    def _get_data_from_responses_file(self, filename, keys_to_select):
+        return {
+            key: value
+            for key, value in self.load_pickle_file(
+                self.responses_dir + "/" + filename
+            ).items()
+            if key in keys_to_select
+        }
+
+    # def _load_responses_filenames(self):
+    #     self.responses_filenames = os.listdir(os.path.join(self.responses_dir))
+    #     self.num_responses = len(self.responses_filenames)
+
     def get_mean_from_evaluated_data(self, subset: int = -1):
         """
         Iterates through all mean responses (both predictions and targets).
         While iterating performs selected task.
 
         """
-        layer_responses_sum = {}
-        all_batch_response_filenames = os.listdir(os.path.join(self.responses_dir))
-        self.num_responses = len(all_batch_response_filenames)
+        layer_responses_sum: Dict[str, Dict] = {
+            identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
+        }
+        # all_batch_response_filenames = os.listdir(os.path.join(self.responses_dir))
+        # self.num_responses = len(all_batch_response_filenames)
 
-        for i, response_filename in enumerate(tqdm(all_batch_response_filenames)):
+        for i, response_filename in enumerate(tqdm(self.responses_filenames)):
             if i == subset:
                 break
-            all_predictions_and_targets = self.load_pickle_file(
-                self.responses_dir + "/" + response_filename
+            # all_predictions_and_targets = {
+            #     self.load_pickle_file(self.responses_dir + "/" + response_filename)
+            # }
+
+            # all_predictions_and_targets = {
+            #     key: value
+            #     for key, value in self.load_pickle_file(
+            #         self.responses_dir + "/" + response_filename
+            #     ).items()
+            #     if key in ResponseAnalyzer.mean_responses_fields
+            # }
+            all_predictions_and_targets = self._get_data_from_responses_file(
+                response_filename, ResponseAnalyzer.mean_responses_fields
             )
 
             for identifier, data in all_predictions_and_targets.items():
-                # TODO: it should be probably somehow done functionally.
-                if identifier not in layer_responses_sum:
-                    layer_responses_sum[identifier] = {}
+                # # TODO: it should be probably somehow done functionally.
+                # if identifier not in layer_responses_sum:
+                #     layer_responses_sum[identifier] = {}
 
                 ResponseAnalyzer._update_time_sum(data, layer_responses_sum[identifier])
 
         self.mean_layer_responses = {
             identifier: self._compute_mean_responses(
                 layer_sum,
-                len(all_batch_response_filenames),
+                self.num_responses,
+                # len(all_batch_response_filenames),
                 nn_model.globals.test_batch_size,
                 subset=subset,
             )
             for identifier, layer_sum in layer_responses_sum.items()
         }
+
+    def get_rnn_responses_to_neuron_responses(self, subset: int = -1):
+        self.rnn_to_prediction_responses = {
+            identifier: {} for identifier in ResponseAnalyzer.rnn_to_neuron_fields
+        }
+        for i, response_filename in enumerate(tqdm(self.responses_filenames)):
+            if i == subset:
+                break
+            # all_predictions_and_targets = {
+            #     self.load_pickle_file(self.responses_dir + "/" + response_filename)
+            # }
+
+            # all_predictions_and_targets = {
+            #     key: value
+            #     for key, value in self.load_pickle_file(
+            #         self.responses_dir + "/" + response_filename
+            #     ).items()
+            #     if key in ResponseAnalyzer.mean_responses_fields
+            # }
+            rnn_and_normal_predictions = self._get_data_from_responses_file(
+                response_filename, ResponseAnalyzer.rnn_to_neuron_fields
+            )
+
+            for identifier, batch_data in rnn_and_normal_predictions.items():
+                for layer, layer_values in batch_data.items():
+                    print(layer_values)
+                    layer_values_1d = layer_values.ravel()
+                    if layer not in self.rnn_to_prediction_responses[identifier]:
+                        self.rnn_to_prediction_responses[identifier][layer] = np.zeros(
+                            0
+                        )
+
+                    self.rnn_to_prediction_responses[identifier][layer] = (
+                        np.concatenate(
+                            (
+                                self.rnn_to_prediction_responses[identifier][layer],
+                                layer_values_1d,
+                            ),
+                            axis=0,
+                        )
+                    )
+
+        return self.rnn_to_prediction_responses
+
+    def plot_rnn_to_prediction_responses(self, responses_data):
+        rnn_responses = responses_data[EvaluationFields.RNN_PREDICTIONS.value]
+        predictions = responses_data[EvaluationFields.PREDICTIONS.value]
 
     def compute_mean_neuron_response_per_all_images(self, neuron_id: int, layer: str):
         """
@@ -616,6 +708,7 @@ if __name__ == "__main__":
     )
 
     # response_analyzer.get_mean_from_evaluated_data()
-    response_analyzer.get_original_data_mean_over_time(subset=2)
+    # response_analyzer.get_original_data_mean_over_time(subset=2)
+    response_analyzer.get_rnn_responses_to_neuron_responses(subset=1)
     # response_analyzer.plot_mean_layer_data(response_analyzer.mean_layer_responses, True)
-    response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")
+    # response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")
