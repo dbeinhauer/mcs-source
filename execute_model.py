@@ -140,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=7,
+        default=9,
         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
     )
     parser.add_argument(
@@ -149,8 +149,8 @@ if __name__ == "__main__":
         default=10,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
-    parser.set_defaults(neuron_residual=False)
-    # parser.set_defaults(neuron_residual=True)
+    # parser.set_defaults(neuron_residual=False)
+    parser.set_defaults(neuron_residual=True)
     parser.add_argument(
         "--neuron_residual",
         action="store_true",
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_hidden_time_steps",
         type=int,
-        default=5,
+        default=1,
         help="Number of hidden time steps in RNN (to use backtracking through time (not just use known targets)).",
     )
     parser.add_argument(

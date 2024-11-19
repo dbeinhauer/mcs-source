@@ -447,7 +447,7 @@ class ModelExecuter:
                 self.optimizer.zero_grad()
 
                 # Get model prediction.
-                predictions, _ = self.model(
+                predictions, _, hidden_predictions = self.model(
                     input_batch,
                     target_batch,
                 )
@@ -459,12 +459,15 @@ class ModelExecuter:
                 loss = self._compute_loss(predictions, target_batch)
                 loss_sum += loss.item()
 
-                del target_batch, predictions
-                torch.cuda.empty_cache()
+                # del target_batch, predictions, hidden_predictions
+                # torch.cuda.empty_cache()
 
                 # Perform backward step.
                 loss.backward()
                 self.optimizer.step()
+
+                del target_batch, predictions, hidden_predictions
+                torch.cuda.empty_cache()
 
                 # Apply weight constrains (excitatory/inhibitory) for all the layers.
                 self._apply_model_constraints()
@@ -526,7 +529,7 @@ class ModelExecuter:
                 # in evaluation we do not want to reset hidden states).
                 for layer, layer_hidden in targets.items()
             }
-            trial_predictions, trial_rnn_predictions = self.model(
+            trial_predictions, trial_rnn_predictions, _ = self.model(
                 trial_inputs,
                 trial_hidden,
             )

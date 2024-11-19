@@ -520,7 +520,11 @@ class RNNCellModel(nn.Module):
 
     def forward(
         self, inputs: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
-    ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
+    ) -> Tuple[
+        Dict[str, List[torch.Tensor]],
+        Dict[str, List[torch.Tensor]],
+        Dict[str, List[torch.Tensor]],
+    ]:
         """
         Performs forward step of the model iterating through all time steps of the provided
         inputs and targets.
@@ -558,6 +562,10 @@ class RNNCellModel(nn.Module):
         }
         recurrent_outputs = {}
 
+        all_hidden_outputs: Dict[str, List[torch.Tensor]] = {
+            layer: [] for layer in RNNCellModel.layers_input_parameters
+        }
+
         for visible_time in range(1, time_length):
             # for t in range(total_time_steps):
             if self.training:
@@ -589,7 +597,7 @@ class RNNCellModel(nn.Module):
                 #     # t,
                 #     current_input_index,
                 # )
-                current_time_outputs, recurrent_outputs = self._perform_model_time_step(
+                hidden_states, recurrent_outputs = self._perform_model_time_step(
                     inputs,
                     hidden_states,
                     # t,
@@ -600,7 +608,8 @@ class RNNCellModel(nn.Module):
                 # del hidden_states
                 # torch.cuda.empty_cache()
 
-                hidden_states = current_time_outputs
+                self._append_outputs(all_hidden_outputs, hidden_states)
+                # hidden_states = current_time_outputs
 
                 # Append time step prediction to list of all predictions.
                 # self._append_outputs(all_time_outputs, current_time_outputs)
@@ -634,4 +643,4 @@ class RNNCellModel(nn.Module):
         del inputs
         torch.cuda.empty_cache()
 
-        return all_time_outputs, all_recurrent_outputs
+        return all_time_outputs, all_recurrent_outputs, all_hidden_outputs
