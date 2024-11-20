@@ -5,12 +5,10 @@
     - evaluation on the subset of experiments and neurons
 - adding additional hidden time steps between each target
     - the model might learn the dynamics better
-- make plot of DNN responses
 
-- it is very probable that there has been bug and I have been using residual as not residual 
-- need to check the training with hidden time steps
-    - it seems it does not train at all
-        - probably some bug
+- it seems that the backpropagation through time is wrongly defined
+    - I probably need to do optimizer steps each time step predicted
+        - because I predict the whole time series
 
 
 # Future steps

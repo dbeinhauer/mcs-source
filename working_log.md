@@ -491,4 +491,15 @@ Notes after meetings:
     - residuals are indeed better than non-residuals
 - we need to focus on DNN module
     - the model should be able to transfer the information between inhibitory and excitatory layers
-    - if the 
+    - now it looks that the model DNN module does not learn anything
+        - based on the plot of rnn_output -> dnn_output function it looks that the model just does addition
+            - it is almost identity with slight shift    
+
+# 19.11.2024
+- now implementing the hidden time steps to improve the model learning
+    - we want to do back-propagation through time
+        - it is not clear what it does when we have each time step visible
+
+# 20.11.2024
+- as it seems now it looks that there is backpropagation through time problem
+    - it seems the state reset during training to target is the problem

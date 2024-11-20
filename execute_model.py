@@ -26,7 +26,7 @@ def init_wandb(arguments):
         "model": arguments.model,
         "neuron_model_num_layers": arguments.neuron_num_layers,
         "neuron_model_layer_size": arguments.neuron_layer_size,
-        "neuron_model_is_residual": arguments.neuron_residual,
+        "neuron_model_is_residual": not arguments.neuron_not_residual,
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=9,
+        default=5,
         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
     )
     parser.add_argument(
@@ -149,10 +149,10 @@ if __name__ == "__main__":
         default=10,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
-    # parser.set_defaults(neuron_residual=False)
-    parser.set_defaults(neuron_residual=True)
+    parser.set_defaults(neuron_not_residual=False)
+    # parser.set_defaults(neuron_not_residual=True)
     parser.add_argument(
-        "--neuron_residual",
+        "--neuron_not_residual",
         action="store_true",
         help="Whether we want to use residual connections in feed-forward model of a neuron.",
     )
