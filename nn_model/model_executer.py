@@ -23,7 +23,7 @@ from nn_model.models import (
 )
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
@@ -551,14 +551,24 @@ class ModelExecuter:
                     #     for layer, prediction in all_predictions.items()
                     # }  # Take the last time step (last time step prediction is the actual prediction of the time step).
 
-                    # Compute loss of the model predictions.
-                    # loss = self._compute_loss(predictions, target_batch)
-                    loss = self._compute_loss(selected_predictions, current_targets)
-                    time_loss_sum += loss.item()
+                    # # Compute loss of the model predictions.
+                    # # loss = self._compute_loss(predictions, target_batch)
+                    # loss = self._compute_loss(selected_predictions, current_targets)
+                    # time_loss_sum += loss.item()
 
-                    # Perform backward step.
-                    loss.backward()
-                    self.optimizer.step()
+                    # # Perform backward step.
+                    # loss.backward()
+                    # self.optimizer.step()
+
+                    for layer in selected_predictions:
+                        loss = self.criterion(
+                            selected_predictions[layer],
+                            current_targets[layer],
+                        )
+                        time_loss_sum += loss.item()
+
+                        loss.backward()
+                        self.optimizer.step()
 
                     # Delete predictions after the backward steps (to correctly compute the gradients).
                     # del target_batch, predictions, hidden_predictions

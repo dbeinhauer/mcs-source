@@ -9,6 +9,9 @@
 - it seems that the backpropagation through time is wrongly defined
     - I probably need to do optimizer steps each time step predicted
         - because I predict the whole time series
+    - maybe do optimizer step after each layer?
+
+- remove time_loss (have only batch loss)
 
 
 # Future steps
