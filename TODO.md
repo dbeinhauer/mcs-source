@@ -27,6 +27,15 @@
 - different losses
 - try different models for neurons
 - make plotting more convenient
+- think about possibility to create class for storing the
+layers data
+    - there is always a dictionary of tensors (layers)
+    - if we have class of these we can create class of 
+    custom operations with the layers
+    - `_get_data` and `_get_time_step_for_all_layers` are basically the same functions
+    - `selected_predictions` also needs to iterate through dictionaries
+    - might be needed in the `_get_all_trials_predictions` 
+        - the general form of this will definitely help
 
 # In longer time period:
 - install the model to computational cluster

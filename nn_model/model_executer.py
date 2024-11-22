@@ -15,7 +15,12 @@ from tqdm import tqdm
 
 import wandb
 import nn_model.globals
-from nn_model.type_variants import LayerType, ModelTypes, EvaluationFields
+from nn_model.type_variants import (
+    LayerType,
+    ModelTypes,
+    EvaluationFields,
+    PredictionTypes,
+)
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
     RNNCellModel,
@@ -23,7 +28,7 @@ from nn_model.models import (
 )
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
@@ -34,12 +39,6 @@ class ModelExecuter:
 
     # Input layer keys (LGN).
     input_layers = [LayerType.X_ON.value, LayerType.X_OFF.value]
-
-    # Default kwargs for continuous evaluation (evaluation after training steps).
-    continuous_evaluation_kwargs = {
-        "epoch_offset": 1,
-        "evaluation_subset_size": 10,
-    }
 
     def __init__(self, arguments):
         """
@@ -66,15 +65,14 @@ class ModelExecuter:
         # Placeholder for the best evaluation result value.
         self.best_metric = -float("inf")
 
+        # Path of where the best model parameters are stored.
         self.best_model_path = self._init_model_path(arguments)
         if arguments.best_model_dir:
+            # In case we specify the path of the best model -> use it
             self.best_model_path = arguments.best_model_dir
-        self.full_evaluation_directory = arguments.full_evaluation_dir
 
-        # Selected neurons for evaluation analysis
-        self.neuron_selection = self._load_neurons_selection(
-            arguments.neuron_selection_path
-        )
+        # Directory where the results of the evaluation should be stored.
+        self.full_evaluation_directory = arguments.full_evaluation_dir
 
         # Print experiment setup
         self._print_experiment_info(arguments)
@@ -84,7 +82,16 @@ class ModelExecuter:
         Initializes path where to store the best model parameters.
 
         By default (if not specified other version in `arguments`) the path is in format:
-            `arguments.model_dir/model_lr_{learning_rate}_{model_type}_residual_{True/False}.pth`
+            ```
+            arguments.model_dir/ +
+                model_lr-{learning_rate} +
+                _{model_type} +
+                _residual-{True/False} +
+                _neuron_layers-{num_neuron_layers} +
+                _neuron-size-{size_neuron_layer} +
+                _num-hidden-time-steps-{num_hidden_time_steps} +
+                .pth
+            ```
             or in case `arguments.model_filename` is defined:
             `arguments.model_dir/arguments.model_filename`
 
@@ -111,15 +118,6 @@ class ModelExecuter:
 
         # Path where to store the best model parameter.
         return arguments.model_dir + arguments.model_filename
-
-    def _load_neurons_selection(self, neuron_selection_path: str):
-        """
-
-        :param arguments: _description_
-        """
-
-        with open(neuron_selection_path, "rb") as pickle_file:
-            return pickle.load(pickle_file)
 
     @staticmethod
     def _split_input_output_layers(
@@ -271,8 +269,8 @@ class ModelExecuter:
 
     def _get_data(
         self,
-        inputs: Dict,
-        targets: Dict,
+        inputs: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
         test: bool = False,
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """
@@ -309,45 +307,35 @@ class ModelExecuter:
 
         return inputs, targets
 
-    def _compute_loss(
-        self,
-        predictions: Dict[str, torch.Tensor],  # List[torch.Tensor]],
-        targets: Dict[str, torch.Tensor],
-    ) -> torch.Tensor:
-        """
-        Computes model loss of all model layer predictions.
+    # def _compute_loss(
+    #     self,
+    #     predictions: Dict[str, torch.Tensor],
+    #     targets: Dict[str, torch.Tensor],
+    # ) -> torch.Tensor:
+    #     """
+    #     TODO: probably just compute the loss only for one layer itself (makes more sense)
+    #     Computes model loss of all model layer predictions.
 
-        :param predictions: list of model predictions for each time step (without the first one).
-        :param targets: tensor of model targets of all time steps
-        (we want to omit the first one in computation of the loss).
-        :return: Loss of model predictions concatenated to one vector.
-        """
-        # Concatenate predictions and targets across all layers
-        # all_predictions = (
-        #     torch.cat(
-        #         [torch.cat(predictions[layer], dim=1) for layer in targets.keys()],
-        #         dim=2,
-        #     )
-        #     .float()
-        #     .cpu()
-        # )
-        # all_targets = torch.cat(
-        #     [target[:, 1:, :].float() for target in targets.values()], dim=2
-        # )
-        all_predictions = (
-            torch.cat(
-                [predictions[layer] for layer in targets.keys()],
-                dim=1,
-            )
-            .float()
-            .cpu()
-        )
-        all_targets = torch.cat([target.float() for target in targets.values()], dim=1)
+    #     :param predictions: list of model predictions for each time step (without the first one).
+    #     :param targets: tensor of model targets of all time steps
+    #     (we want to omit the first one in computation of the loss).
+    #     :return: Loss of model predictions concatenated to one vector.
+    #     """
 
-        # Compute the loss for all layers at once
-        loss = self.criterion(all_predictions, all_targets)
+    #     all_predictions = (
+    #         torch.cat(
+    #             [predictions[layer] for layer in targets.keys()],
+    #             dim=1,
+    #         )
+    #         .float()
+    #         .cpu()
+    #     )
+    #     all_targets = torch.cat([target.float() for target in targets.values()], dim=1)
 
-        return loss
+    #     # Compute the loss for all layers at once
+    #     loss = self.criterion(all_predictions, all_targets)
+
+    #     return loss
 
     def _apply_model_constraints(self):
         """
@@ -422,42 +410,209 @@ class ModelExecuter:
             )
 
     @staticmethod
-    def _move_targets_to_cuda(
-        targets: Dict[str, torch.Tensor]
+    def _move_data_to_cuda(
+        data_dict: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
         """
-        Moves targets to CUDA if in training mode as they will be used as hidden states.
-        We want to convert it once at the start of the training.
+        Moves given data for all layers to CUDA.
 
-        :param targets: targets to be moved to CUDA.
-        :return: Returns dictionary of targets moved to CUDA if in training mode, otherwise
-        (in evaluation mode) returns empty dictionary (we do not need targets in CUDA).
+        NOTE: This function is used in training mode while we want to use all targets
+        as hidden states. We do it all at once because this operation is very time-consuming.
+
+        :param data_dict: Dictionary of data to be moved to CUDA (for each layer).
+        :return: Returns dictionary of given data moved to CUDA.
         """
-
         return {
-            layer: target.clone().to(nn_model.globals.device0)
-            for layer, target in targets.items()
+            layer: data.clone().to(nn_model.globals.device0)
+            for layer, data in data_dict.items()
         }
 
     def _get_time_step_for_all_layers(
-        self, time: int, dict_tensors: Dict[str, torch.Tensor]
+        self,
+        time: int,
+        dict_tensors: Dict[str, torch.Tensor],
+        # self, tensor_slice, dict_tensors: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
         """
-        Assigns hidden layer values based on the previous time step that is defined
-        in the targets.
+        TODO: maybe make this function more general.
+        Retrieves only selected time step from the dictionary of data for the
+        layer.
 
-        NOTE: This function is used during training for assigning previous time steps
-        of the model layers. While training on the next time step. It should be used
-        from the second time step (first time step is skipped
-        (we do not have initial values for it)).
+        NOTE: It expects that the tensors in the dictionaries have the corresponding
+        values defined in the slicing dimension. It expects that there is a 3D
+        tensor in the input and the time step dimension is second dimension.
 
-        :param time: current time step in the training (from second time step).
-        :param targets: model targets of all time steps.
-        :return: Returns dictionary of hidden layer values as values from targets
-        from previous time step.
+        :param time: Time step we want to retrieve.
+        :param dict_tensors: Dictionary of tensors we want to slice from.
+        :return: Returns dictionary of the given slices of all tensors from the input
+        dictionary.
         """
         # Assign previous time step from targets.
         return {layer: tensor[:, time, :] for layer, tensor in dict_tensors.items()}
+
+    def _retrieve_current_time_step_batch_data(
+        self,
+        time: int,
+        input: Dict[str, torch.Tensor],
+        target: Dict[str, torch.Tensor],
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        """
+        Retrieves current time slice of the provided batch data.
+
+        :param time: Current time index.
+        :param input: Input batch data.
+        :param target: Output batch data.
+        :return: Returns tuple of sliced input and output data.
+        """
+        current_inputs = self._get_time_step_for_all_layers(time, input)
+        current_targets = self._get_time_step_for_all_layers(time, target)
+
+        return current_inputs, current_targets
+
+    def _get_train_current_time_data(
+        self,
+        time: int,
+        input_batch: Dict[str, torch.Tensor],
+        target_batch: Dict[str, torch.Tensor],
+        all_hidden_states: Dict[str, torch.Tensor],
+    ) -> Tuple[
+        Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, torch.Tensor]
+    ]:
+        """
+        Retrieves data that are needed in train step for current time step.
+
+        We want to take current time step for inputs and targets and
+        previous time step for the hidden states.
+
+        :param time: Current time step index.
+        :param input_batch: Batch of input layers data.
+        :param target_batch: Batch of target layers data.
+        :param all_hidden_states: All hidden states in CUDA
+        (we want to take the previous time step for these).
+        :return: Returns slices of the provided data for the next training time step.
+        """
+        # Initialize hidden states as the previous time step targets.
+        current_hidden_states = self._get_time_step_for_all_layers(
+            time - 1,
+            all_hidden_states,
+        )
+        # Retrieve data batch data for the current time step.
+        current_inputs, current_targets = self._retrieve_current_time_step_batch_data(
+            time, input_batch, target_batch
+        )
+
+        return current_inputs, current_targets, current_hidden_states
+
+    def _predict_visible_time_step(
+        self, inputs: Dict[str, torch.Tensor], hidden_states: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Perform model step for 1 visible time step.
+
+        Performs model steps for hidden time steps until the next visible
+        time step is reached. At the end selects the last time step prediction
+        (next visible time step prediction).
+
+        :param inputs: Inputs of the appropriate time step of the model.
+        :param hidden_states: Hidden states of the appropriate time step.
+        :return: Returns model prediction of the next visible time step
+        (next target/last hidden prediction time step).
+        """
+        # Get model prediction.
+        # Predict all time steps (including the hidden time steps).
+        # Our target prediction is the last time step.
+        all_predictions, _ = self.model(
+            inputs,  # input of time t
+            # Hidden states based on the layer (some of them from t,
+            # some of them form t-1). The time step is assigned based
+            # on the model architecture during the forward function call.
+            hidden_states,
+        )
+        # TODO: check if problem with all_predictions
+
+        return self._get_time_step_for_all_layers(
+            # Take time 0 because each prediction predicts data for exactly 1 time step.
+            # We just want to get rid of the time dimension using this trick.
+            0,
+            {layer: predictions[-1] for layer, predictions in all_predictions.items()},
+        )  # Take the last time step prediction (target prediction).
+
+    def _optimizer_step(
+        self, predictions: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
+    ) -> float:
+        """
+        Performs optimizer step for all model layers.
+
+        :param predictions: Predictions of the next visible time step.
+        :param targets: Targets of the next visible time step.
+        :return: Returns sum of losses of each layer predictions.
+        """
+        # Loss calculation and backward steps.
+        # TODO: Need to check the correctness of this approach and
+        # ideally move this to separate function.
+        loss_sum = 0.0
+        for layer in predictions:
+            loss = self.criterion(
+                predictions[layer],
+                targets[layer],
+            )
+            loss_sum += loss.item()
+
+            loss.backward()
+            self.optimizer.step()
+
+        return loss_sum
+
+    def _train_perform_visible_time_step(
+        self,
+        input_batch: Dict[str, torch.Tensor],
+        target_batch: Dict[str, torch.Tensor],
+    ) -> float:
+        """
+        Performs train steps for all visible time steps.
+
+        :param input_batch: Input layers batch of data.
+        :param target_batch: Output layers batch of data.
+        :return: Returns average loss value through all predicted time steps.
+        """
+        # Determine time length of the current batch of data.
+        time_length = input_batch[LayerType.X_ON.value].size(1)
+
+        # Move all targets to CUDA - we will use them as hidden states during
+        # training. Moving them all at once significantly reduces time complexity.
+        all_hidden_states = ModelExecuter._move_data_to_cuda(target_batch)
+        time_loss_sum = 0.0
+        for visible_time in range(
+            1, time_length
+        ):  # We skip the first time step because we do not have initial hidden values for them.
+            inputs, targets, hidden_states = self._get_train_current_time_data(
+                visible_time, input_batch, target_batch, all_hidden_states
+            )
+
+            # Zeroing gradient for each batch of data.
+            self.optimizer.zero_grad()
+
+            predictions = self._predict_visible_time_step(inputs, hidden_states)
+            time_loss_sum += self._optimizer_step(predictions, targets)
+
+            # Save CUDA memory. Delete not needed variables.
+            del (
+                hidden_states,
+                inputs,
+                targets,
+                predictions,
+            )
+            torch.cuda.empty_cache()
+
+            # Apply weight constrains (excitatory/inhibitory) for all the layers.
+            self._apply_model_constraints()
+            torch.cuda.empty_cache()
+
+        del all_hidden_states
+        torch.cuda.empty_cache()
+
+        # Return average loss in each time step.
+        return time_loss_sum / (time_length - 1)
 
     def train(
         self,
@@ -471,6 +626,8 @@ class ModelExecuter:
             1. It skips first time step (we do not have hidden states).
             2. Hidden states are targets from the previous step.
                 - in the training step it makes sense (we want to learn only the next step)
+                - it is possibility to have hidden time steps (we do not have targets for them)
+                    - we learn "hidden" dynamics of the model
             3. Prediction of the model is the following (current) hidden state (output layer).
 
         :param continuous_evaluation_kwargs: kwargs for continuous evaluation setup
@@ -478,15 +635,16 @@ class ModelExecuter:
         :param debugging_stop_step: number of steps (batches) to be performed in debugging
         run of the training. If `-1` then train on all provided data.
         """
+        # We want weights and biases library to log the training procedure.
         wandb.watch(
             self.model,
             self.criterion,
         )
         self.model.train()
         for epoch in range(self.num_epochs):
-            loss_sum = 0.0
+            # Iterate through all epochs.
+            epoch_loss_sum = 0.0
             for i, (input_batch, target_batch) in enumerate(tqdm(self.train_loader)):
-                time_loss_sum = 0.0
                 if debugging_stop_index != -1 and i > debugging_stop_index:
                     # Train only for few batches in case of debugging.
                     break
@@ -494,111 +652,23 @@ class ModelExecuter:
                 # Retrieve the batch of data.
                 input_batch, target_batch = self._get_data(input_batch, target_batch)
 
-                time_length = input_batch[LayerType.X_ON.value].size(1)
+                avg_time_loss = self._train_perform_visible_time_step(
+                    input_batch, target_batch
+                )
+                wandb.log({"batch_loss": avg_time_loss})
+                epoch_loss_sum += avg_time_loss
 
-                # In case of training mode -> move the targets to CUDA.
-                all_hidden_states = ModelExecuter._move_targets_to_cuda(target_batch)
-
-                for visible_time in range(1, time_length):
-                    current_hidden_states = self._get_time_step_for_all_layers(
-                        # t, all_hidden_states
-                        # current_input_index,
-                        # visible_time,
-                        visible_time - 1,  # Fro
-                        all_hidden_states,
-                    )
-
-                    # Zeroing gradient for each batch of data.
-                    self.optimizer.zero_grad()
-
-                    current_inputs = self._get_time_step_for_all_layers(
-                        visible_time, input_batch
-                    )
-                    # Get model prediction.
-                    # predictions, _, hidden_predictions = self.model(
-                    all_predictions, _ = (
-                        self.model(  # predict all time steps (including the hidden time steps)
-                            # our target prediction is the last time step.
-                            # input_batch,
-                            # target_batch,
-                            # input_batch[:, visible_time, :],  # input of time t
-                            current_inputs,  # input of time t
-                            current_hidden_states,  # hidden states based on the layer (some of them from t, some of them form t-1)
-                        )
-                    )
-
-                    # del input_batch
-                    # torch.cuda.empty_cache()
-
-                    # current_targets = {
-                    #     layer: targets[:, visible_time, :]
-                    #     for layer, targets in target_batch.items()
-                    # }  # Get targets for the current time step
-
-                    current_targets = self._get_time_step_for_all_layers(
-                        visible_time, target_batch
-                    )  # Get targets for the current time step
-                    selected_predictions = self._get_time_step_for_all_layers(
-                        0,
-                        {
-                            layer: predictions[-1]
-                            for layer, predictions in all_predictions.items()
-                        },
-                    )  # Take the last time step (last time step prediction is the actual prediction of the time step).
-
-                    # selected_predictions = {
-                    #     layer: prediction[:, -1, :]
-                    #     for layer, prediction in all_predictions.items()
-                    # }  # Take the last time step (last time step prediction is the actual prediction of the time step).
-
-                    # # Compute loss of the model predictions.
-                    # # loss = self._compute_loss(predictions, target_batch)
-                    # loss = self._compute_loss(selected_predictions, current_targets)
-                    # time_loss_sum += loss.item()
-
-                    # # Perform backward step.
-                    # loss.backward()
-                    # self.optimizer.step()
-
-                    for layer in selected_predictions:
-                        loss = self.criterion(
-                            selected_predictions[layer],
-                            current_targets[layer],
-                        )
-                        time_loss_sum += loss.item()
-
-                        loss.backward()
-                        self.optimizer.step()
-
-                    # Delete predictions after the backward steps (to correctly compute the gradients).
-                    # del target_batch, predictions, hidden_predictions
-                    del (
-                        current_hidden_states,
-                        current_inputs,
-                        current_targets,
-                        selected_predictions,
-                    )
-                    torch.cuda.empty_cache()
-
-                    # Apply weight constrains (excitatory/inhibitory) for all the layers.
-                    self._apply_model_constraints()
-
-                    wandb.log({"time_loss": loss.item()})
-
-                    torch.cuda.empty_cache()
-
-                # avg_time_loss = time_loss_sum / (time_length - 1)
-                wandb.log({"batch_loss": time_loss_sum})
-                loss_sum += time_loss_sum
-
+            avg_epoch_loss = epoch_loss_sum / len(self.train_loader)
             wandb.log(
                 {
-                    "epoch_loss": loss_sum / len(self.train_loader),
+                    "epoch_loss": avg_epoch_loss,
                 }
             )
             print(
-                f"Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {loss_sum/len(self.train_loader):.4f}"
+                f"Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {avg_epoch_loss:.4f}"
             )
+            # Run evaluation after each epoch. In case the results are the best
+            # -> save model parameters.
             self._update_best_model(epoch, continuous_evaluation_kwargs)
 
     def _load_best_model(self):
@@ -612,12 +682,30 @@ class ModelExecuter:
             f"Running final evaluation on model with best CC_NORM value: {self.best_metric:.4f}"
         )
 
+    def _add_trial_predictions_to_list_of_all_predictions(
+        self,
+        predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+        all_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+    ):
+        for prediction_type, layers_predictions in predictions.items():
+            for layer, layers_prediction in layers_predictions.items():
+                current_prediction = torch.cat(layers_prediction, dim=1)
+                if (
+                    prediction_type == PredictionTypes.RNN_PREDICTION.value
+                    and not self.model.return_recurrent_state
+                ):
+                    current_prediction = torch.zeros(0)
+
+                all_predictions[prediction_type][layer].append(current_prediction)
+
     def _get_all_trials_predictions(
         self,
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-    ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
+    ) -> Dict[
+        str, Dict[str, List[torch.Tensor]]
+    ]:  # -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
         """
         Computes predictions for all trials (used for evaluation usually).
 
@@ -626,10 +714,16 @@ class ModelExecuter:
         :param hidden_states: dictionary of hidden states for each output (hidden) layer
         Of shape: `(batch_size, num_trials, num_time_steps, num_neurons)`
         :param num_trials: total number of trials in provided data.
-        :return: Returns dictionary of lists of predictions for all trials with key layer name.
+        :return: Returns tuple of all predictions of the model (also hidden steps) and
+        predictions before passing information through neuron model.
         """
-        dict_predictions = {}
-        rnn_predictions = {}
+        # Initialize dictionaries with the keys of all output layers names.
+        all_predictions: Dict[str, Dict[str, List[torch.Tensor]]] = {
+            prediction_type.value: {
+                layer: [] for layer in RNNCellModel.layers_input_parameters
+            }
+            for prediction_type in list(PredictionTypes)
+        }
 
         # Get predictions for each trial.
         for trial in range(num_trials):
@@ -637,7 +731,7 @@ class ModelExecuter:
                 layer: layer_input[:, trial, :, :]
                 for layer, layer_input in inputs.items()
             }
-            trial_hidden = ModelExecuter._move_targets_to_cuda(
+            trial_hidden = ModelExecuter._move_data_to_cuda(
                 {
                     layer: layer_hidden[:, trial, 0, :].clone()
                     # Pass slices of targets in time 0 (starting hidden step,
@@ -650,28 +744,24 @@ class ModelExecuter:
                 trial_inputs,
                 trial_hidden,
             )
-            for layer, prediction in trial_predictions.items():
-                # For each layer add the predictions to corresponding list of all predictions.
-                prediction = torch.cat(prediction, dim=1)
-                rnn_prediction = None
-                if self.model.return_recurrent_state:
-                    rnn_prediction = torch.cat(trial_rnn_predictions[layer], dim=1)
-                if layer not in dict_predictions:
-                    dict_predictions[layer] = [prediction]
-                    rnn_predictions[layer] = [rnn_prediction]
-                else:
-                    dict_predictions[layer].append(prediction)
-                    rnn_predictions[layer].append(rnn_prediction)
 
-        return dict_predictions, rnn_predictions
+            self._add_trial_predictions_to_list_of_all_predictions(
+                {
+                    PredictionTypes.FULL_PREDICTION.value: trial_predictions,
+                    PredictionTypes.RNN_PREDICTION.value: trial_rnn_predictions,
+                },
+                all_predictions,
+            )
+
+        # return dict_predictions, rnn_predictions
+        return all_predictions
 
     def _predict_for_evaluation(
         self,
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-        # get_rnn_predictions: bool = False,
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
         """
         Performs prediction of the model for each trial. Then stacks the predictions
         into one tensors of size `(num_trials, batch_size, time, num_neurons)` and
@@ -686,35 +776,34 @@ class ModelExecuter:
         """
 
         # Get predictions for all trials.
-        dict_predictions, rnn_predictions = self._get_all_trials_predictions(
-            inputs, targets, num_trials
-        )
+        # dict_predictions, rnn_predictions = self._get_all_trials_predictions(
+        all_predictions = self._get_all_trials_predictions(inputs, targets, num_trials)
         torch.cuda.empty_cache()
 
-        # Stack all predictions into one torch array.
-        dict_stacked_predictions = {
-            key: torch.stack(value_list, dim=0)
-            for key, value_list in dict_predictions.items()
+        return_predictions: Dict[str, Dict[str, torch.Tensor]] = {
+            prediction_type: {} for prediction_type in all_predictions
         }
 
-        # Reshape the prediction to shape:  `(num_trials, batch_size, time, num_neurons)`
-        dict_stacked_predictions = {
-            layer: predictions.permute(1, 0, 2, 3)
-            for layer, predictions in dict_stacked_predictions.items()
-        }
+        for prediction_type, all_layers_predictions in all_predictions.items():
+            if (
+                prediction_type == PredictionTypes.RNN_PREDICTION.value
+                and not self.model.return_recurrent_state
+            ):
+                return_predictions[prediction_type] = {}
+                continue
 
-        stacked_rnn_predictions = {}
-        if self.model.return_recurrent_state:
-            stacked_rnn_predictions = {
+            # Stack all predictions into one torch array.
+            dict_stacked_predictions = {
                 key: torch.stack(value_list, dim=0)
-                for key, value_list in rnn_predictions.items()
+                for key, value_list in all_layers_predictions.items()
             }
-            stacked_rnn_predictions = {
+            # Reshape the prediction to shape:  `(num_trials, batch_size, time, num_neurons)`
+            return_predictions[prediction_type] = {
                 layer: predictions.permute(1, 0, 2, 3)
-                for layer, predictions in stacked_rnn_predictions.items()
+                for layer, predictions in dict_stacked_predictions.items()
             }
 
-        return dict_stacked_predictions, stacked_rnn_predictions
+        return return_predictions
 
     def compute_evaluation_score(
         self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor]
@@ -749,9 +838,8 @@ class ModelExecuter:
     def _save_predictions_batch(
         self,
         batch_index: int,
-        predictions: Dict[str, torch.Tensor],
+        all_predictions: Dict[str, Dict[str, torch.Tensor]],
         targets: Dict[str, torch.Tensor],
-        rnn_predictions: Dict[str, torch.Tensor],
         filename: str = "",
     ):
         """
@@ -783,9 +871,13 @@ class ModelExecuter:
         with open(filename, "wb") as f:
             pickle.dump(
                 {
-                    EvaluationFields.PREDICTIONS.value: predictions,
+                    EvaluationFields.PREDICTIONS.value: all_predictions[
+                        PredictionTypes.FULL_PREDICTION.value
+                    ],
                     EvaluationFields.TARGETS.value: targets,
-                    EvaluationFields.RNN_PREDICTIONS.value: rnn_predictions,
+                    EvaluationFields.RNN_PREDICTIONS.value: all_predictions[
+                        PredictionTypes.RNN_PREDICTION.value
+                    ],
                 },
                 f,
             )
@@ -793,9 +885,8 @@ class ModelExecuter:
     def _save_full_evaluation(
         self,
         batch_index: int,
-        predictions: Dict[str, torch.Tensor],
+        all_predictions: Dict[str, Dict[str, torch.Tensor]],
         targets: Dict[str, torch.Tensor],
-        rnn_predictions: Dict[str, torch.Tensor],
     ):
         """
         Saves all evaluation results together with its targets in appropriate format to
@@ -810,10 +901,13 @@ class ModelExecuter:
         self._save_predictions_batch(
             batch_index,
             {
-                layer: torch.mean(
-                    prediction, dim=0
-                )  # Trials dimension is the first because we reshape it during prediction step.
-                for layer, prediction in predictions.items()
+                prediction_type: {
+                    layer: torch.mean(
+                        prediction, dim=0
+                    )  # Trials dimension is the first because we reshape it during prediction step.
+                    for layer, prediction in predictions.items()
+                }
+                for prediction_type, predictions in all_predictions.items()
             },
             {
                 layer: torch.mean(
@@ -821,12 +915,12 @@ class ModelExecuter:
                 )  # We want to skip the first time step + the trials dimension is the second.
                 for layer, target in targets.items()
             },
-            {
-                layer: torch.mean(
-                    rnn_prediction, dim=0
-                )  # Trials dimension is the first because we reshape it during prediction step.
-                for layer, rnn_prediction in rnn_predictions.items()
-            },
+            # {
+            #     layer: torch.mean(
+            #         rnn_prediction, dim=0
+            #     )  # Trials dimension is the first because we reshape it during prediction step.
+            #     for layer, rnn_prediction in rnn_predictions.items()
+            # },
         )
 
     def evaluation(
@@ -878,17 +972,20 @@ class ModelExecuter:
                 # time_length = inputs[LayerType.X_ON.value].size(1)
 
                 # for t in range(1, time_length):
-                predictions, rnn_predictions = self._predict_for_evaluation(
+                # predictions, rnn_predictions = self._predict_for_evaluation(
+                all_predictions = self._predict_for_evaluation(
                     inputs, targets, inputs[LayerType.X_ON.value].shape[1]
                 )
 
                 if save_predictions:
-                    self._save_full_evaluation(i, predictions, targets, rnn_predictions)
+                    self._save_full_evaluation(
+                        i, all_predictions, targets
+                    )  # predictions, targets, rnn_predictions)
 
                 cc_norm, cc_abs = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
                     {layer: target[:, :, 1:, :] for layer, target in targets.items()},
-                    predictions,
+                    all_predictions[PredictionTypes.FULL_PREDICTION.value],
                 )
                 cc_norm_sum += cc_norm
                 cc_abs_sum += cc_abs
@@ -923,23 +1020,6 @@ class ModelExecuter:
 
         return avg_cc_norm
 
-    def _select_neurons_and_trials_mean(
-        self, data: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Takes prediction/target tensors, selects the neurons for further analysis
-        (`neuron_selection`), and computes the average over trials.
-
-        :param data: Prediction/target tensor to perform the operations on.
-        :return: Returns subset of input data in neurons dimension for selected neurons
-        subset for further evaluation. This subset is averaged over the trials dimension.
-        """
-        return {
-            layer: torch.mean(data[layer][:, :, :, self.neuron_selection[layer]], dim=1)
-            for layer in RNNCellModel.layers_input_parameters
-            if layer in data
-        }
-
     def _prepare_selected_data_for_analysis(
         self, all_data_batches: Dict[str, List[torch.Tensor]]
     ) -> Dict:
@@ -955,56 +1035,3 @@ class ModelExecuter:
             layer: torch.cat(all_data_batches[layer], dim=0).cpu().numpy()
             for layer in all_data_batches
         }
-
-    # def selections_evaluation(self) -> Tuple[Dict, Dict]:
-    #     """
-    #     TODO: maybe get rid of it
-    #     Runs evaluation on the selected subset of experiments (images). After that it
-    #     takes only the selected neurons, computes average over trials and returns
-    #     `np.array` of predictions and targets for these for each layer.
-
-    #     :return: Returns tuple of predictions and targets for all selected neurons on the
-    #     selected experiments averaged over trials.
-    #     """
-    #     self._load_best_model()  # TODO: Maybe solve better
-
-    #     self.model.eval()
-    #     self.test_dataset.switch_dataset_selection(selected_experiments=True)
-
-    #     # Store all batches' data for each layer
-    #     all_prediction_batches: Dict[str, List[torch.Tensor]] = {
-    #         layer: [] for layer in RNNCellModel.layers_input_parameters
-    #     }
-    #     all_target_batches: Dict[str, List[torch.Tensor]] = {
-    #         layer: [] for layer in RNNCellModel.layers_input_parameters
-    #     }
-
-    #     with torch.no_grad():
-    #         for inputs, targets in tqdm(self.test_loader):
-    #             inputs, targets = self._get_data(inputs, targets, test=True)
-    #             predictions, rnn_predictions = self._predict_for_evaluation(
-    #                 inputs, targets, inputs[LayerType.X_ON.value].shape[1]
-    #             )
-
-    #             # Select neurons and average their responses over trials.
-    #             selected_predictions = self._select_neurons_and_trials_mean(predictions)
-    #             selected_targets = self._select_neurons_and_trials_mean(targets)
-
-    #             # Append each layer's data to the corresponding list
-    #             for layer in RNNCellModel.layers_input_parameters:
-    #                 all_prediction_batches[layer].append(selected_predictions[layer])
-    #                 all_target_batches[layer].append(
-    #                     selected_targets[layer][
-    #                         :, 1:, :
-    #                     ]  # Get rid of the first target time step (not used in prediction)
-    #                 )
-
-    #     self.test_dataset.switch_dataset_selection(selected_experiments=False)
-
-    #     selected_predictions = self._prepare_selected_data_for_analysis(
-    #         all_prediction_batches
-    #     )
-    #     selected_targets = self._prepare_selected_data_for_analysis(all_target_batches)
-
-    #     # Convert all selected neurons and image predictions/targets to numpy array.
-    #     return selected_predictions, selected_targets

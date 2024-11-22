@@ -53,6 +53,15 @@ class MetricTypes(Enum):
     CC_NORM = "cc_norm"
 
 
+class PredictionTypes(Enum):
+    """
+    All variants of predictions that are provided by the model.
+    """
+
+    FULL_PREDICTION = "full_prediction"
+    RNN_PREDICTION = "rnn_prediction"
+
+
 class EvaluationFields(Enum):
     """
     All evaluation fields names.

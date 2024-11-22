@@ -20,7 +20,6 @@ SIZE_MULTIPLIER = 0.1
 # TIME_STEP = 15
 TIME_STEP = 20
 
-
 # Will return values as its names
 EXCITATORY_LAYERS = {
     LayerType.X_ON.value,
