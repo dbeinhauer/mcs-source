@@ -538,28 +538,40 @@ class ModelExecuter:
         )  # Take the last time step prediction (target prediction).
 
     def _optimizer_step(
-        self, predictions: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
+        self, all_predictions: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
     ) -> float:
         """
         Performs optimizer step for all model layers.
 
-        :param predictions: Predictions of the next visible time step.
+        :param all_predictions: Predictions of the next visible time step.
         :param targets: Targets of the next visible time step.
         :return: Returns sum of losses of each layer predictions.
         """
         # Loss calculation and backward steps.
         # TODO: Need to check the correctness of this approach and
         # ideally move this to separate function.
+
+        predictions = self._get_time_step_for_all_layers(
+            # Take time 0 because each prediction predicts data for exactly 1 time step.
+            # We just want to get rid of the time dimension using this trick.
+            0,
+            {layer: predictions[-1] for layer, predictions in all_predictions.items()},
+        )  # Take the last time step prediction (target prediction).
+
+        self.optimizer.zero_grad()
+
         loss_sum = 0.0
         for layer in predictions:
+            # Zeroing gradient for each batch of data.
+            # self.optimizer.zero_grad()
             loss = self.criterion(
                 predictions[layer],
                 targets[layer],
             )
             loss_sum += loss.item()
 
-            loss.backward()
-            self.optimizer.step()
+        loss.backward()
+        self.optimizer.step()
 
         return loss_sum
 
@@ -589,18 +601,38 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            # Zeroing gradient for each batch of data.
-            self.optimizer.zero_grad()
+            # # Zeroing gradient for each batch of data.
+            # self.optimizer.zero_grad()
 
-            predictions = self._predict_visible_time_step(inputs, hidden_states)
-            time_loss_sum += self._optimizer_step(predictions, targets)
+            # predictions = self._predict_visible_time_step(inputs, hidden_states)
+
+            all_predictions, _ = self.model(
+                inputs,  # input of time t
+                # Hidden states based on the layer (some of them from t,
+                # some of them form t-1). The time step is assigned based
+                # on the model architecture during the forward function call.
+                hidden_states,
+            )
+            # TODO: check if problem with all_predictions
+
+            # self._get_time_step_for_all_layers(
+            #     # Take time 0 because each prediction predicts data for exactly 1 time step.
+            #     # We just want to get rid of the time dimension using this trick.
+            #     0,
+            #     {
+            #         layer: predictions[-1]
+            #         for layer, predictions in all_predictions.items()
+            #     },
+            # )  # Take the last time step prediction (target prediction).
+
+            time_loss_sum += self._optimizer_step(all_predictions, targets)
 
             # Save CUDA memory. Delete not needed variables.
             del (
                 hidden_states,
                 inputs,
                 targets,
-                predictions,
+                all_predictions,
             )
             torch.cuda.empty_cache()
 
@@ -689,12 +721,14 @@ class ModelExecuter:
     ):
         for prediction_type, layers_predictions in predictions.items():
             for layer, layers_prediction in layers_predictions.items():
-                current_prediction = torch.cat(layers_prediction, dim=1)
+                current_prediction = torch.zeros(0)  # RNN default
+                # current_prediction = torch.cat(layers_prediction, dim=1)
                 if (
-                    prediction_type == PredictionTypes.RNN_PREDICTION.value
-                    and not self.model.return_recurrent_state
+                    prediction_type == PredictionTypes.FULL_PREDICTION.value
+                    or self.model.return_recurrent_state
                 ):
-                    current_prediction = torch.zeros(0)
+                    # current_prediction = torch.zeros(0)
+                    current_prediction = torch.cat(layers_prediction, dim=1)
 
                 all_predictions[prediction_type][layer].append(current_prediction)
 

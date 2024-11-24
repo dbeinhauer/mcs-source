@@ -38,6 +38,9 @@ def init_wandb(arguments):
     else:
         os.environ["WANDB_DISABLED"] = "false"
 
+    if arguments.debug:
+        os.environ["WANDB_DISABLED"] = "true"
+
     wandb.init(
         project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
         config=config,
@@ -60,22 +63,36 @@ def main(arguments):
 
     model_executer = ModelExecuter(arguments)
 
+    evaluation_subset = 10
+    debugging_stop_index = -1
+    final_evaluation_subset = -1
+    best_model_evaluation_subset = -1
+
+    if arguments.debug:
+        evaluation_subset = 1
+        debugging_stop_index = 1
+        final_evaluation_subset = 1
+        best_model_evaluation_subset = 1
+
     if not arguments.best_model_evaluation:
         # Train the model used the given parameters.
         model_executer.train(
             continuous_evaluation_kwargs={
                 "epoch_offset": 1,
-                "evaluation_subset_size": 10,
+                "evaluation_subset_size": evaluation_subset,
             },
-            debugging_stop_index=-1,
+            debugging_stop_index=debugging_stop_index,
         )
 
-        model_executer.evaluation(subset_for_evaluation=-1)
+        model_executer.evaluation(subset_for_evaluation=final_evaluation_subset)
     else:
-        if arguments.save_all_predictions:
-            model_executer.evaluation(subset_for_evaluation=-1, save_predictions=True)
-        else:
-            model_executer.evaluation()
+        # if arguments.save_all_predictions:
+        model_executer.evaluation(
+            subset_for_evaluation=-best_model_evaluation_subset,
+            save_predictions=arguments.save_all_predictions,
+        )
+    # else:
+    #     model_executer.evaluation()
 
     wandb.finish()
 
@@ -197,6 +214,12 @@ if __name__ == "__main__":
         type=str,
         default="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
         help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
+    )
+    parser.set_defaults(debug=True)
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Start debugging mode.",
     )
 
     args = parser.parse_args()
