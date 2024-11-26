@@ -52,8 +52,6 @@ MODEL_SIZES = {
     layer: int(size * SIZE_MULTIPLIER) for layer, size in ORIGINAL_SIZES.items()
 }
 
-"model-10_step-20_lr-7e-06_complex_residual-True_neuron-layers-7_neuron-size-10_num-hidden-time-steps-1.pth"
-
 # GPU Devices:
 device0 = "cuda:1"
 device1 = "cuda:0"

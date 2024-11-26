@@ -25,21 +25,12 @@ class NormalizedCrossCorrelation:
     """
 
     def __init__(self):
-        self.batch_size = 0
-        self.num_trials = 0
-        self.time_duration = 0
-        self.num_neurons = 0
+        self.batch_size: int = 0
+        self.num_trials: int = 0
+        self.time_duration: int = 0
+        self.num_neurons: int = 0
 
-    def _convert_prediction_to_spikes(self, prediction):
-        """
-        Rounds the prediction to the closes integer (should represent spikes).
-
-        :param prediction: torch tensor of float prediction.
-        :return: Returns predictions rounded to integer.
-        """
-        return prediction.round()
-
-    def _merge_neuron_time_dim(self, data_tensor):
+    def _merge_neuron_time_dim(self, data_tensor: torch.Tensor) -> torch.Tensor:
         """
         Merges (reshapes) time and neuron dimension for metrics computation.
 
@@ -50,7 +41,9 @@ class NormalizedCrossCorrelation:
             self.batch_size, self.num_trials, self.time_duration * self.num_neurons
         )
 
-    def _trials_avg(self, prediction, target, dim: int = 1):
+    def _trials_avg(
+        self, prediction: torch.Tensor, target: torch.Tensor, dim: int = 1
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Calculates prediction and target averages over the trial.
 
@@ -65,7 +58,9 @@ class NormalizedCrossCorrelation:
 
         return avg_prediction, avg_target
 
-    def _neurons_std(self, avg_prediction, avg_target, dim: int = 1):
+    def _neurons_std(
+        self, avg_prediction: torch.Tensor, avg_target: torch.Tensor, dim: int = 1
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Calculates standard deviation over neurons for average
         predictions and targets over trials.
@@ -81,7 +76,9 @@ class NormalizedCrossCorrelation:
 
         return std_pred, std_target
 
-    def _covariance(self, avg_prediction, avg_target, dim: int = 1) -> float:
+    def _covariance(
+        self, avg_prediction: torch.Tensor, avg_target: torch.Tensor, dim: int = 1
+    ) -> torch.Tensor:
         """
         Calculates the covariance between predictions and targets
         averaged across trials.
@@ -102,10 +99,10 @@ class NormalizedCrossCorrelation:
 
     def _cc_abs(
         self,
-        avg_prediction,
-        avg_target,
-        std_pred,
-        std_target,
+        avg_prediction: torch.Tensor,
+        avg_target: torch.Tensor,
+        std_pred: torch.Tensor,
+        std_target: torch.Tensor,
         denom_offset: float = 1e-8,
     ) -> torch.Tensor:
         """
@@ -129,12 +126,12 @@ class NormalizedCrossCorrelation:
         )  # Assuring the denominator is reasonably large
         return cov / denom
 
-        # Calculate correlation coefficients:
-        #   Cov(r^dash, y^dash) / sqrt(Var(r^dash) * Var(y^dash))
-        # return cov / ((std_pred * std_target) + denom_offset)
-
     def _cc_max(
-        self, target, var_target, num_trials: int, denom_offset: float = 1e-8
+        self,
+        target: torch.Tensor,
+        var_target: torch.Tensor,
+        num_trials: int,
+        denom_offset: float = 1e-8,
     ) -> torch.Tensor:
         """
         Calculates CC_MAX value from the paper. It represents the upper bound
@@ -165,11 +162,11 @@ class NormalizedCrossCorrelation:
 
     def _cc_norm(
         self,
-        avg_prediction,
-        avg_target,
-        std_pred,
-        std_target,
-        target,
+        avg_prediction: torch.Tensor,
+        avg_target: torch.Tensor,
+        std_pred: torch.Tensor,
+        std_target: torch.Tensor,
+        target: torch.Tensor,
         denom_offset: float = 1e-8,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -193,7 +190,7 @@ class NormalizedCrossCorrelation:
             cc_abs, min=-1.0, max=1.0
         )
 
-    def _batch_mean(self, cc_vector):
+    def _batch_mean(self, cc_vector: torch.Tensor) -> float:
         """
         Calculates mean across batch for cross correlation values.
 
@@ -202,7 +199,9 @@ class NormalizedCrossCorrelation:
         """
         return cc_vector.mean(dim=0).item()
 
-    def calculate(self, prediction, target) -> Tuple[float, float]:
+    def calculate(
+        self, prediction: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[float, float]:
         """
         Calculates normalized cross correlation between predictions and targets.
 
@@ -220,9 +219,6 @@ class NormalizedCrossCorrelation:
         self.batch_size, self.num_trials, self.time_duration, self.num_neurons = (
             prediction.shape
         )
-
-        # Round the prediction to closest integer.
-        # prediction = self._convert_prediction_to_spikes(prediction)
 
         # Reshape to have time and neurons in one dimension.
         prediction = self._merge_neuron_time_dim(prediction)

@@ -16,7 +16,6 @@ from nn_model.weights_constraints import (
 )
 from nn_model.layers import (
     ConstrainedRNNCell,
-    # ComplexConstrainedRNNCell,
 )
 from nn_model.neurons import FeedForwardNeuron
 
@@ -240,6 +239,11 @@ class RNNCellModel(nn.Module):
         self._init_model_architecture()
 
     def switch_to_return_recurrent_state(self):
+        """
+        Function that is used to switch the model to return also RNN outputs.
+
+        NOTE: Typically used for evaluation analysis.
+        """
         self.return_recurrent_state = True
         for layer in self.layers.values():
             layer.switch_to_return_recurrent_state()
@@ -278,7 +282,6 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and
         appropriate neuron model (shared complexity).
         """
-        # if self.rnn_cell_cls == ComplexConstrainedRNNCell:
         if self.neuron_type == ModelTypes.COMPLEX.value:
             # Complex complexity.
             return self._init_complex_neuron_model(
@@ -366,46 +369,6 @@ class RNNCellModel(nn.Module):
         # Assign the values in each training step (not in this function).
         return {}
 
-    # def _move_targets_to_cuda(
-    #     self, targets: Dict[str, torch.Tensor]
-    # ) -> Dict[str, torch.Tensor]:
-    #     """
-    #     Moves targets to CUDA if in training mode as they will be used as hidden states.
-    #     We want to convert it once at the start of the training.
-
-    #     :param targets: targets to be moved to CUDA.
-    #     :return: Returns dictionary of targets moved to CUDA if in training mode, otherwise
-    #     (in evaluation mode) returns empty dictionary (we do not need targets in CUDA).
-    #     """
-    #     if self.training:
-    #         # In case we train, move all targets to CUDA
-    #         # (will be used as hidden states during training)
-    #         return {
-    #             layer: target.clone().to(nn_model.globals.device0)
-    #             for layer, target in targets.items()
-    #         }
-    #     return {}
-
-    # def _assign_training_step_hidden_states(
-    #     self, time: int, targets: Dict[str, torch.Tensor]
-    # ) -> Dict[str, torch.Tensor]:
-    #     """
-    #     Assigns hidden layer values based on the previous time step that is defined
-    #     in the targets.
-
-    #     NOTE: This function is used during training for assigning previous time steps
-    #     of the model layers. While training on the next time step. It should be used
-    #     from the second time step (first time step is skipped
-    #     (we do not have initial values for it)).
-
-    #     :param time: current time step in the training (from second time step).
-    #     :param targets: model targets of all time steps.
-    #     :return: Returns dictionary of hidden layer values as values from targets
-    #     from previous time step.
-    #     """
-    #     # Assign previous time step from targets.
-    #     return {layer: target[:, time - 1, :] for layer, target in targets.items()}
-
     def _get_layer_input_tensor(
         self, current_parts: List[torch.Tensor], previous_parts: List[torch.Tensor]
     ) -> torch.Tensor:
@@ -457,7 +420,7 @@ class RNNCellModel(nn.Module):
 
     def _perform_model_time_step(
         self,
-        model_inputs: Dict[str, torch.Tensor],
+        current_time_outputs: Dict[str, torch.Tensor],
         hidden_layers: Dict[str, torch.Tensor],
         # time: int,
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
@@ -465,22 +428,14 @@ class RNNCellModel(nn.Module):
         Performs model time step. It progresses the model architecture and
         computes next time step results of each layer of the model.
 
-        :param model_inputs: dictionary of input layers of the model (LGN inputs).
+        :param current_time_outputs: dictionary of input layers of the model (LGN inputs).
         :param hidden_layers: dictionary of all hidden layers values of the model
         from the previous time step (in our example those are all previous outputs).
         :param time: time of the current step. Should be at least second time step.
         During the first time step we do not have necessary hidden states.
         :return: Returns dictionary of model predictions for the current time step.
         """
-
         # We already have LGN inputs (assign them to current time layer outputs).
-        # current_time_outputs = {
-        #     layer: layer_tensor[:, time, :]
-        #     for layer, layer_tensor in model_inputs.items()
-        # }
-
-        # We already have LGN inputs (assign them to current time layer outputs).
-        current_time_outputs = model_inputs
         recurrent_outputs = {}
         for layer in RNNCellModel.layers_input_parameters:
             # Iterate through all output layers of the model.
@@ -493,7 +448,7 @@ class RNNCellModel(nn.Module):
                         layer,
                         TimeStepVariant.CURRENT.value,
                         current_time_outputs,
-                    ),  # inputs of the layer from time t
+                    ),  # inputs of the layer from time (t).
                     self._get_list_by_time_variant(
                         layer,
                         TimeStepVariant.PREVIOUS.value,
@@ -521,15 +476,8 @@ class RNNCellModel(nn.Module):
                 # For each output layer append output of the current time step.
                 all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
 
-    # def forward(
-    #     self, inputs: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
-    # ) -> Tuple[
-    #     Dict[str, List[torch.Tensor]],
-    #     Dict[str, List[torch.Tensor]],
-    #     Dict[str, List[torch.Tensor]],
-    # ]:
     def forward(
-        self, inputs, hidden_states
+        self, inputs: Dict[str, torch.Tensor], hidden_states: Dict[str, torch.Tensor]
     ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
         """
         Performs forward step of the model iterating through all time steps of the provided
@@ -549,41 +497,13 @@ class RNNCellModel(nn.Module):
         for training mode or `(batch, neurons)` for evaluation (we need only first time step).
         :return: Returns model predictions for all time steps.
         """
-        # Init dictionary of model outputs.
-        # all_time_outputs: Dict[str, List[torch.Tensor]] = {
-        #     layer: [] for layer in RNNCellModel.layers_input_parameters
-        # }
-
-        # Init placeholder for the hidden states.
-        # hidden_states = self._init_hidden_layers(targets)
-
-        # In case of training mode -> move the targets to CUDA.
-        # all_hidden_states = self._move_targets_to_cuda(targets)
-
-        # Start from the second step, because the first one is
-        # the initial one (we predict all time steps but the 0-th one).
-        # time_length = inputs[LayerType.X_ON.value].size(1)
-
+        # Initialize dictionaries of all model predictions.
         all_recurrent_outputs: Dict[str, List[torch.Tensor]] = {
             layer: [] for layer in RNNCellModel.layers_input_parameters
         }
-        recurrent_outputs = {}
-
         all_hidden_outputs: Dict[str, List[torch.Tensor]] = {
             layer: [] for layer in RNNCellModel.layers_input_parameters
         }
-
-        # for visible_time in range(1, time_length):
-        #     # for t in range(total_time_steps):
-        #     if self.training:
-        #         # In case we are in the train mode, we assign new hidden
-        #         # layers based on the previous target in each time step.
-        #         hidden_states = self._assign_training_step_hidden_states(
-        #             # t, all_hidden_states
-        #             # current_input_index,
-        #             visible_time,
-        #             all_hidden_states,
-        #         )
 
         visible_time_steps = inputs[LayerType.X_ON.value].size(
             1
@@ -592,55 +512,34 @@ class RNNCellModel(nn.Module):
             # Training mode (only one visible step)
             # We add 1 to iterate through the visible time loop correctly (we want to iterate once).
             visible_time_steps = 1 + 1
-        # num_time_steps = self.num_hidden_time_steps
-        # if not self.training:
-        #     num_time_steps = self.num_hidden_time_steps * visible_time_steps
 
-        # is_hidden_step = (t % (self.num_hidden_time_steps + 1)) != 0
-        # for t in range(self.num_hidden_time_steps):
         for visible_time in range(1, visible_time_steps):
-            # # if not is_hidden_step:
-            # if self.training:
-            #     # In case we are in the train mode, we assign new hidden
-            #     # layers based on the previous target in each time step.
-            #     hidden_states = self._assign_training_step_hidden_states(
-            #         # t, all_hidden_states
-            #         current_input_index,
-            #         all_hidden_states,
-            #     )
+            # Prediction of the visible time steps
+            # (in training only one step, in evaluation all time steps)
 
-            # Perform model step prediction.
-            # current_time_outputs = self._perform_model_time_step(
-            #     inputs,
-            #     hidden_states,
-            #     # t,
-            #     current_input_index,
-            # )
+            # Placeholder for RNN outputs in case we would like
+            # to store RNN outputs for model analysis.
+            recurrent_outputs: Dict[str, torch.Tensor] = {}
 
-            # Define input layers for the hidden time steps (LGN layer)
-            current_inputs = inputs
+            # Define input layers for the current visible time prediction.
+            current_inputs = inputs  # Train mode -> only one input state
             if not self.training:
+                # Evaluation mode
+                # -> assign current input state
+                # (we predict all visible time steps in one forward step of the model).
                 current_inputs = {
                     layer: layer_input[:, visible_time, :]
                     for layer, layer_input in inputs.items()
                 }
-
             for _ in range(self.num_hidden_time_steps):
-
+                # Perform all hidden time steps.
                 hidden_states, recurrent_outputs = self._perform_model_time_step(
                     current_inputs,
-                    # hidden_states,
                     hidden_states,
-                    # t,
-                    # current_input_index,
-                    # visible_time,
                 )
 
-                # del hidden_states
-                # torch.cuda.empty_cache()
-
                 if self.training:
-                    # In train return all hidden time steps (for backpropagation through time)
+                    # In train return all hidden time steps (for back-propagation through time)
                     self._append_outputs(all_hidden_outputs, hidden_states)
 
             if not self.training:
@@ -652,39 +551,9 @@ class RNNCellModel(nn.Module):
                 # -> save also the results of the RNNs before neuron model.
                 # Only the visible steps
                 self._append_outputs(all_recurrent_outputs, recurrent_outputs)
-                # hidden_states = current_time_outputs
-
-            # Append time step prediction to list of all predictions.
-            # self._append_outputs(all_time_outputs, current_time_outputs)
-            # self._append_outputs(all_time_outputs, hidden_states)
-
-            # current_input_index += 1
-
-            # if not self.training:
-            #     # If we are in the evaluation mode
-            #     # -> assign new hidden states as the current model outputs.
-            #     hidden_states = current_time_outputs
-
-        # self._append_outputs(all_time_outputs, hidden_states)
-
-        # if self.return_recurrent_state:
-        #     # If the model is in evaluation mode
-        #     # -> save also the results of the RNNs before neuron model.
-        #     self._append_outputs(all_recurrent_outputs, recurrent_outputs)
-
-        # torch.cuda.empty_cache()
-
-        # else:
-        #     hidden_states = self._perform_model_time_step(
-        #         inputs,
-        #         hidden_states,
-        #         # t,
-        #         current_input_index,
-        #     )
 
         # Clear caches
         del inputs, hidden_states
         torch.cuda.empty_cache()
 
-        # return all_time_outputs, all_recurrent_outputs, all_hidden_outputs
         return all_hidden_outputs, all_recurrent_outputs
