@@ -503,3 +503,8 @@ Notes after meetings:
 # 20.11.2024
 - as it seems now it looks that there is backpropagation through time problem
     - it seems the state reset during training to target is the problem
+
+# 26.11.2024
+- as far as I get the information I would say it is essential to perform the optimizer step before each target state reset
+- the optimizer step and backward step should be performed for all layers together
+    - not sure about calculation of the loss (whether separate the losses or not)

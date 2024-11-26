@@ -307,36 +307,6 @@ class ModelExecuter:
 
         return inputs, targets
 
-    # def _compute_loss(
-    #     self,
-    #     predictions: Dict[str, torch.Tensor],
-    #     targets: Dict[str, torch.Tensor],
-    # ) -> torch.Tensor:
-    #     """
-    #     TODO: probably just compute the loss only for one layer itself (makes more sense)
-    #     Computes model loss of all model layer predictions.
-
-    #     :param predictions: list of model predictions for each time step (without the first one).
-    #     :param targets: tensor of model targets of all time steps
-    #     (we want to omit the first one in computation of the loss).
-    #     :return: Loss of model predictions concatenated to one vector.
-    #     """
-
-    #     all_predictions = (
-    #         torch.cat(
-    #             [predictions[layer] for layer in targets.keys()],
-    #             dim=1,
-    #         )
-    #         .float()
-    #         .cpu()
-    #     )
-    #     all_targets = torch.cat([target.float() for target in targets.values()], dim=1)
-
-    #     # Compute the loss for all layers at once
-    #     loss = self.criterion(all_predictions, all_targets)
-
-    #     return loss
-
     def _apply_model_constraints(self):
         """
         Applies model constraints on all model layers (excitatory/inhibitory).
@@ -431,12 +401,9 @@ class ModelExecuter:
         self,
         time: int,
         dict_tensors: Dict[str, torch.Tensor],
-        # self, tensor_slice, dict_tensors: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
         """
-        TODO: maybe make this function more general.
-        Retrieves only selected time step from the dictionary of data for the
-        layer.
+        Retrieves specified time step from the provided tensor.
 
         NOTE: It expects that the tensors in the dictionaries have the corresponding
         values defined in the slicing dimension. It expects that there is a 3D
@@ -453,19 +420,19 @@ class ModelExecuter:
     def _retrieve_current_time_step_batch_data(
         self,
         time: int,
-        input: Dict[str, torch.Tensor],
-        target: Dict[str, torch.Tensor],
+        input_data: Dict[str, torch.Tensor],
+        target_data: Dict[str, torch.Tensor],
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """
         Retrieves current time slice of the provided batch data.
 
         :param time: Current time index.
-        :param input: Input batch data.
-        :param target: Output batch data.
+        :param input_data: Input batch data.
+        :param target_data: Output batch data.
         :return: Returns tuple of sliced input and output data.
         """
-        current_inputs = self._get_time_step_for_all_layers(time, input)
-        current_targets = self._get_time_step_for_all_layers(time, target)
+        current_inputs = self._get_time_step_for_all_layers(time, input_data)
+        current_targets = self._get_time_step_for_all_layers(time, target_data)
 
         return current_inputs, current_targets
 
@@ -503,54 +470,36 @@ class ModelExecuter:
 
         return current_inputs, current_targets, current_hidden_states
 
-    def _predict_visible_time_step(
-        self, inputs: Dict[str, torch.Tensor], hidden_states: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Perform model step for 1 visible time step.
-
-        Performs model steps for hidden time steps until the next visible
-        time step is reached. At the end selects the last time step prediction
-        (next visible time step prediction).
-
-        :param inputs: Inputs of the appropriate time step of the model.
-        :param hidden_states: Hidden states of the appropriate time step.
-        :return: Returns model prediction of the next visible time step
-        (next target/last hidden prediction time step).
-        """
-        # Get model prediction.
-        # Predict all time steps (including the hidden time steps).
-        # Our target prediction is the last time step.
-        all_predictions, _ = self.model(
-            inputs,  # input of time t
-            # Hidden states based on the layer (some of them from t,
-            # some of them form t-1). The time step is assigned based
-            # on the model architecture during the forward function call.
-            hidden_states,
-        )
-        # TODO: check if problem with all_predictions
-
-        return self._get_time_step_for_all_layers(
-            # Take time 0 because each prediction predicts data for exactly 1 time step.
-            # We just want to get rid of the time dimension using this trick.
-            0,
-            {layer: predictions[-1] for layer, predictions in all_predictions.items()},
-        )  # Take the last time step prediction (target prediction).
-
     def _optimizer_step(
-        self, all_predictions: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
+        self,
+        inputs: Dict[str, torch.Tensor],
+        hidden_states: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
     ) -> float:
         """
-        Performs optimizer step for all model layers.
+        Performs time step prediction and optimizer step.
 
-        :param all_predictions: Predictions of the next visible time step.
+        This function should be run to train visible time step transition.
+        First, it predicts all hidden time-steps (the last one is our prediction).
+        Then computes loss for all layers and sums the losses. Then it performs
+        backward step for the loss sum and after that it does optimizer step.
+
+        :param inputs: Current time values from input layers (LGN).
+        :param hidden_states: Current hidden states (typically targets from previous time step).
         :param targets: Targets of the next visible time step.
-        :return: Returns sum of losses of each layer predictions.
+        :return: Returns sum of losses for all layers.
         """
-        # Loss calculation and backward steps.
-        # TODO: Need to check the correctness of this approach and
-        # ideally move this to separate function.
+        # We want to zero optimizer gradient before each training step.
+        self.optimizer.zero_grad()
 
+        all_predictions, _ = self.model(
+            inputs,  # input of time t
+            # Hidden states based on the layer (some of them from t, some of them form t-1).
+            # Time step is assigned based on model architecture during the forward function call.
+            hidden_states,
+        )
+
+        # Take last time step predictions (those are the visible time steps predictions).
         predictions = self._get_time_step_for_all_layers(
             # Take time 0 because each prediction predicts data for exactly 1 time step.
             # We just want to get rid of the time dimension using this trick.
@@ -558,22 +507,22 @@ class ModelExecuter:
             {layer: predictions[-1] for layer, predictions in all_predictions.items()},
         )  # Take the last time step prediction (target prediction).
 
-        self.optimizer.zero_grad()
-
-        loss_sum = 0.0
+        # Loss calculation
+        total_loss = torch.zeros(1)
         for layer in predictions:
-            # Zeroing gradient for each batch of data.
-            # self.optimizer.zero_grad()
-            loss = self.criterion(
+            total_loss += self.criterion(
                 predictions[layer],
                 targets[layer],
             )
-            loss_sum += loss.item()
 
-        loss.backward()
+        # Backward and optimizer steps for the sum of losses.
+        total_loss.backward()
         self.optimizer.step()
 
-        return loss_sum
+        del all_predictions
+        torch.cuda.empty_cache()
+
+        return total_loss.item()
 
     def _train_perform_visible_time_step(
         self,
@@ -601,38 +550,13 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            # # Zeroing gradient for each batch of data.
-            # self.optimizer.zero_grad()
-
-            # predictions = self._predict_visible_time_step(inputs, hidden_states)
-
-            all_predictions, _ = self.model(
-                inputs,  # input of time t
-                # Hidden states based on the layer (some of them from t,
-                # some of them form t-1). The time step is assigned based
-                # on the model architecture during the forward function call.
-                hidden_states,
-            )
-            # TODO: check if problem with all_predictions
-
-            # self._get_time_step_for_all_layers(
-            #     # Take time 0 because each prediction predicts data for exactly 1 time step.
-            #     # We just want to get rid of the time dimension using this trick.
-            #     0,
-            #     {
-            #         layer: predictions[-1]
-            #         for layer, predictions in all_predictions.items()
-            #     },
-            # )  # Take the last time step prediction (target prediction).
-
-            time_loss_sum += self._optimizer_step(all_predictions, targets)
+            time_loss_sum += self._optimizer_step(inputs, hidden_states, targets)
 
             # Save CUDA memory. Delete not needed variables.
             del (
-                hidden_states,
                 inputs,
                 targets,
-                all_predictions,
+                hidden_states,
             )
             torch.cuda.empty_cache()
 
@@ -716,18 +640,30 @@ class ModelExecuter:
 
     def _add_trial_predictions_to_list_of_all_predictions(
         self,
-        predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+        trial_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
         all_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
     ):
-        for prediction_type, layers_predictions in predictions.items():
+        """
+        Sort all the predictions for the trial and split them to corresponding
+        lists of all the predictions or do not save them based on the evaluation status.
+
+        :param trial_predictions: Predictions for the trial (list of predictions for all
+        visible time steps).
+        :param all_predictions: All predictions for all the trials.
+        """
+        for prediction_type, layers_predictions in trial_predictions.items():
+            # Iterate all predictions types (full prediction, RNN predictions...)
             for layer, layers_prediction in layers_predictions.items():
-                current_prediction = torch.zeros(0)  # RNN default
-                # current_prediction = torch.cat(layers_prediction, dim=1)
+                # Iterate all layers predictions.
+                current_prediction = torch.zeros(
+                    0
+                )  # RNN default (do not save predictions).
                 if (
                     prediction_type == PredictionTypes.FULL_PREDICTION.value
                     or self.model.return_recurrent_state
                 ):
-                    # current_prediction = torch.zeros(0)
+                    # In case we are doing full prediction or we specified we want RNN predictions
+                    # -> store them
                     current_prediction = torch.cat(layers_prediction, dim=1)
 
                 all_predictions[prediction_type][layer].append(current_prediction)
@@ -737,9 +673,7 @@ class ModelExecuter:
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-    ) -> Dict[
-        str, Dict[str, List[torch.Tensor]]
-    ]:  # -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
+    ) -> Dict[str, Dict[str, List[torch.Tensor]]]:
         """
         Computes predictions for all trials (used for evaluation usually).
 
@@ -749,7 +683,7 @@ class ModelExecuter:
         Of shape: `(batch_size, num_trials, num_time_steps, num_neurons)`
         :param num_trials: total number of trials in provided data.
         :return: Returns tuple of all predictions of the model (also hidden steps) and
-        predictions before passing information through neuron model.
+        predictions before passing information through neuron model (RNN predictions).
         """
         # Initialize dictionaries with the keys of all output layers names.
         all_predictions: Dict[str, Dict[str, List[torch.Tensor]]] = {
@@ -774,11 +708,13 @@ class ModelExecuter:
                 }
             )
 
+            # Get all visible time steps predictions of the model.
             trial_predictions, trial_rnn_predictions = self.model(
                 trial_inputs,
                 trial_hidden,
             )
 
+            # Accumulate all trials predictions.
             self._add_trial_predictions_to_list_of_all_predictions(
                 {
                     PredictionTypes.FULL_PREDICTION.value: trial_predictions,
@@ -787,8 +723,31 @@ class ModelExecuter:
                 all_predictions,
             )
 
-        # return dict_predictions, rnn_predictions
         return all_predictions
+
+    def _prepare_evaluation_predictions_for_return(
+        self, all_layers_predictions: Dict[str, List[torch.Tensor]]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Takes all the predictions of given type (full predictions, rnn predictions etc.) and
+        does proper modifications to convert them to proper output format. It stacks all the
+        trials predictions to one tensor and permutes them to shape
+        `(batch_size, num_trials, time, num_neurons)`.
+
+        :param all_layers_predictions: All predictions for all trials in form of list.
+        :return: Returns converted predictions to one big tensor of shape
+        `(batch_size, num_trials, time, num_neurons)`.
+        """
+        # Stack all trials predictions into one torch array.
+        dict_stacked_predictions = {
+            key: torch.stack(value_list, dim=0)
+            for key, value_list in all_layers_predictions.items()
+        }
+        # Reshape the prediction to shape:  `(batch_size, num_trials, time, num_neurons)`
+        return {
+            layer: predictions.permute(1, 0, 2, 3)
+            for layer, predictions in dict_stacked_predictions.items()
+        }
 
     def _predict_for_evaluation(
         self,
@@ -808,34 +767,28 @@ class ModelExecuter:
         :param num_trials: number of trials.
         :return: Returns dictionary of model predictions for all trials.
         """
-
         # Get predictions for all trials.
-        # dict_predictions, rnn_predictions = self._get_all_trials_predictions(
         all_predictions = self._get_all_trials_predictions(inputs, targets, num_trials)
         torch.cuda.empty_cache()
 
+        # Initialize dictionary of the predictions.
         return_predictions: Dict[str, Dict[str, torch.Tensor]] = {
             prediction_type: {} for prediction_type in all_predictions
         }
 
         for prediction_type, all_layers_predictions in all_predictions.items():
+            # Iterate all prediction types
             if (
                 prediction_type == PredictionTypes.RNN_PREDICTION.value
                 and not self.model.return_recurrent_state
             ):
+                # In case we do not want to save RNN predictions -> skip them
                 return_predictions[prediction_type] = {}
                 continue
 
-            # Stack all predictions into one torch array.
-            dict_stacked_predictions = {
-                key: torch.stack(value_list, dim=0)
-                for key, value_list in all_layers_predictions.items()
-            }
-            # Reshape the prediction to shape:  `(num_trials, batch_size, time, num_neurons)`
-            return_predictions[prediction_type] = {
-                layer: predictions.permute(1, 0, 2, 3)
-                for layer, predictions in dict_stacked_predictions.items()
-            }
+            return_predictions[prediction_type] = (
+                self._prepare_evaluation_predictions_for_return(all_layers_predictions)
+            )
 
         return return_predictions
 
@@ -949,12 +902,28 @@ class ModelExecuter:
                 )  # We want to skip the first time step + the trials dimension is the second.
                 for layer, target in targets.items()
             },
-            # {
-            #     layer: torch.mean(
-            #         rnn_prediction, dim=0
-            #     )  # Trials dimension is the first because we reshape it during prediction step.
-            #     for layer, rnn_prediction in rnn_predictions.items()
-            # },
+        )
+
+    def _print_current_evaluation_status(
+        self, step_num: int, cc_norm_sum: float, cc_abs_sum: float
+    ):
+        """
+        Prints status of the current evaluation.
+
+        :param step_num: Current evaluation step.
+        :param cc_norm_sum: Current sum of all CC_NORM values.
+        :param cc_abs_sum: Current sum of all CC_ABS values.
+        """
+        print(
+            "".join(
+                [
+                    f"Average normalized cross correlation after step {step_num} is: ",
+                    f"{cc_norm_sum/(step_num):.4f}",
+                    "\n",
+                    "Average Pearson's CC is: ",
+                    f"{cc_abs_sum/(step_num):.4f}",
+                ]
+            )
         )
 
     def evaluation(
@@ -993,7 +962,6 @@ class ModelExecuter:
 
         cc_norm_sum = 0.0
         cc_abs_sum = 0.0
-        # num_examples = 0
 
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
@@ -1003,18 +971,14 @@ class ModelExecuter:
 
                 inputs, targets = self._get_data(inputs, targets, test=True)
 
-                # time_length = inputs[LayerType.X_ON.value].size(1)
-
-                # for t in range(1, time_length):
-                # predictions, rnn_predictions = self._predict_for_evaluation(
+                # Get predictions for all the trials.
                 all_predictions = self._predict_for_evaluation(
                     inputs, targets, inputs[LayerType.X_ON.value].shape[1]
                 )
 
                 if save_predictions:
-                    self._save_full_evaluation(
-                        i, all_predictions, targets
-                    )  # predictions, targets, rnn_predictions)
+                    # We want to save the predictions for further analysis.
+                    self._save_full_evaluation(i, all_predictions, targets)
 
                 cc_norm, cc_abs = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
@@ -1029,22 +993,16 @@ class ModelExecuter:
                 wandb.log({"batch_cc_abs": cc_abs})
 
                 if i % print_each_step == 0:
-                    print(
-                        "".join(
-                            [
-                                f"Average normalized cross correlation after step {i+1} is: ",
-                                f"{cc_norm_sum/(i+1):.4f}",
-                                "\n",
-                                "Average Pearson's CC is: ",
-                                f"{cc_abs_sum/(i+1):.4f}",
-                            ]
-                        )
+                    self._print_current_evaluation_status(
+                        i + 1, cc_norm_sum, cc_abs_sum
                     )
 
         num_examples = subset_for_evaluation + 1
         if subset_for_evaluation == -1:
             num_examples = len(self.test_loader)
 
+        # TODO: better structure for multiple evaluation metrics.
+        # Average evaluation metrics calculation
         avg_cc_norm = cc_norm_sum / num_examples
         avg_cc_abs = cc_abs_sum / num_examples
         print(f"Final average normalized cross correlation is: {avg_cc_norm:.4f}")
