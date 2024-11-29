@@ -89,7 +89,7 @@ class LoggerModel:
             " ".join(
                 [
                     f"Epoch [{epoch_num}/{total_num_epochs}],",
-                    "Average Loss: {avg_epoch_loss:.4f}",
+                    f"Average Loss: {avg_epoch_loss:.4f}",
                 ]
             )
         )

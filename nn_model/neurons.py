@@ -42,13 +42,14 @@ class FeedForwardNeuron(nn.Module):
         :param num_layers: Total number of layers.
         :return: Returns sequential model of the neuron model.
         """
-        layers = []
+        layers = nn.ModuleList()
 
         # Input layer
         layers.append(nn.Linear(1, layer_size))
         # Hidden layers
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(layer_size, layer_size))
+            layers.append(nn.ReLU())  # Non-linear activation after each layer.
 
         # Final output layer: output size is 1
         layers.append(nn.Linear(layer_size, 1))

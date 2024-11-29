@@ -11,6 +11,7 @@ import random
 import pickle
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -18,21 +19,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import nn_model.globals
 from nn_model.type_variants import LayerType
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
-from nn_model.model_executer import ModelExecuter
+from nn_model.model_executer import ModelExecuter, RNNCellModel
 from nn_model.type_variants import EvaluationFields
-
-
-# import pickle
-# import numpy as np
-import matplotlib.pyplot as plt
-
-# import os
-# import seaborn as sns
-# from matplotlib.ticker import MultipleLocator
-
-# import nn_model.globals
-
-# from response_analyzer import ResponseAnalyzer
+from nn_model.dictionary_handler import DictionaryHandler
 
 
 class ResponseAnalyzer:
@@ -71,7 +60,7 @@ class ResponseAnalyzer:
         self.responses_dir = responses_dir
 
         # Initialize batch size (for loader) as default batch size for test dataset.
-        self.batch_size = nn_model.globals.test_batch_size
+        self.batch_size = nn_model.globals.TEST_BATCH_SIZE
 
         # Number of time-step in which there is the overlap of stimuli and blank part
         self.stimulus_blank_step = int(
@@ -85,7 +74,7 @@ class ResponseAnalyzer:
         self.selected_neurons = self.load_selected_neurons(neurons_path)
         self.images_batches = self.randomly_select_batches()
         self.batch_image_indices = self.randomly_select_img_index(
-            range(0, nn_model.globals.test_batch_size), len(self.images_batches)
+            range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
         )
 
         # Total number of responses batches to analysis
@@ -155,7 +144,7 @@ class ResponseAnalyzer:
         :param is_test: Flag whether load test dataset (multitrial dataset).
         :return: Returns tuple of initialized dataset object and DataLoader object.
         """
-        input_layers, output_layers = ModelExecuter._split_input_output_layers(
+        input_layers, output_layers = DictionaryHandler.split_input_output_layers(
             nn_model.globals.ORIGINAL_SIZES
         )
         dataset_dir = self.test_dataset_dir
@@ -423,7 +412,7 @@ class ResponseAnalyzer:
         self.mean_input_layer_responses = self._compute_mean_responses(
             layer_responses_sum,
             len(self.test_loader),
-            nn_model.globals.test_batch_size * trials_multiplier,
+            nn_model.globals.TEST_BATCH_SIZE * trials_multiplier,
             subset=subset,
         )
 
@@ -455,17 +444,7 @@ class ResponseAnalyzer:
         for i, response_filename in enumerate(tqdm(self.responses_filenames)):
             if i == subset:
                 break
-            # all_predictions_and_targets = {
-            #     self.load_pickle_file(self.responses_dir + "/" + response_filename)
-            # }
 
-            # all_predictions_and_targets = {
-            #     key: value
-            #     for key, value in self.load_pickle_file(
-            #         self.responses_dir + "/" + response_filename
-            #     ).items()
-            #     if key in ResponseAnalyzer.mean_responses_fields
-            # }
             all_predictions_and_targets = self._get_data_from_responses_file(
                 response_filename, ResponseAnalyzer.mean_responses_fields
             )
@@ -482,7 +461,7 @@ class ResponseAnalyzer:
                 layer_sum,
                 self.num_responses,
                 # len(all_batch_response_filenames),
-                nn_model.globals.test_batch_size,
+                nn_model.globals.TEST_BATCH_SIZE,
                 subset=subset,
             )
             for identifier, layer_sum in layer_responses_sum.items()
@@ -495,24 +474,14 @@ class ResponseAnalyzer:
         for i, response_filename in enumerate(tqdm(self.responses_filenames)):
             if i == subset:
                 break
-            # all_predictions_and_targets = {
-            #     self.load_pickle_file(self.responses_dir + "/" + response_filename)
-            # }
 
-            # all_predictions_and_targets = {
-            #     key: value
-            #     for key, value in self.load_pickle_file(
-            #         self.responses_dir + "/" + response_filename
-            #     ).items()
-            #     if key in ResponseAnalyzer.mean_responses_fields
-            # }
             rnn_and_normal_predictions = self._get_data_from_responses_file(
                 response_filename, ResponseAnalyzer.rnn_to_neuron_fields
             )
 
             for identifier, batch_data in rnn_and_normal_predictions.items():
                 for layer, layer_values in batch_data.items():
-                    print(layer_values)
+                    # print(layer_values)
                     layer_values_1d = layer_values.ravel()
                     if layer not in self.rnn_to_prediction_responses[identifier]:
                         self.rnn_to_prediction_responses[identifier][layer] = np.zeros(

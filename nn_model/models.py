@@ -241,21 +241,21 @@ class RNNCellModel(nn.Module):
         # Init model.
         self._init_model_architecture()
 
-    @staticmethod
-    def split_input_output_layers(
-        layer_sizes,
-    ) -> Tuple[Dict[str, int], Dict[str, int]]:
-        """
-        Splits layers sizes to input and output ones.
+    # @staticmethod
+    # def split_input_output_layers(
+    #     layer_sizes,
+    # ) -> Tuple[Dict[str, int], Dict[str, int]]:
+    #     """
+    #     Splits layers sizes to input and output ones.
 
-        :return: Returns tuple of dictionaries of input and output layer sizes.
-        """
-        input_layers = {key: layer_sizes[key] for key in RNNCellModel.input_layers}
-        output_layers = {
-            key: value for key, value in layer_sizes.items() if key not in input_layers
-        }
+    #     :return: Returns tuple of dictionaries of input and output layer sizes.
+    #     """
+    #     input_layers = {key: layer_sizes[key] for key in RNNCellModel.input_layers}
+    #     output_layers = {
+    #         key: value for key, value in layer_sizes.items() if key not in input_layers
+    #     }
 
-        return input_layers, output_layers
+    #     return input_layers, output_layers
 
     def switch_to_return_recurrent_state(self):
         """

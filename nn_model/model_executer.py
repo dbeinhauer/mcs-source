@@ -25,6 +25,7 @@ from nn_model.models import (
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
 from nn_model.evaluation_results_saver import EvaluationResultsSaver
 from nn_model.logger import LoggerModel
+from nn_model.dictionary_handler import DictionaryHandler
 
 
 class ModelExecuter:
@@ -73,7 +74,7 @@ class ModelExecuter:
         :param arguments: command line arguments.
         :return: Returns tuple of initialized train and test dataset.
         """
-        input_layers, output_layers = RNNCellModel.split_input_output_layers(
+        input_layers, output_layers = DictionaryHandler.split_input_output_layers(
             self.layer_sizes
         )
 

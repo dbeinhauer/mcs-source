@@ -256,7 +256,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=9,
+        default=5,
         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
     )
     parser.add_argument(
