@@ -1,75 +1,8 @@
-# Now
-- inspect different neuron models
-    - different number of layers/layer sizes
-- code refinement of the new features
-    - evaluation on the subset of experiments and neurons
-- adding additional hidden time steps between each target
-    - the model might learn the dynamics better
-
-- it seems that the backpropagation through time is wrongly defined
-    - I probably need to do optimizer steps each time step predicted
-        - because I predict the whole time series
-    - maybe do optimizer step after each layer?
-
-- remove time_loss (have only batch loss)
+# Questions for meeting
+- loss calculation
+    - is it better to calculate the loss separately for each layer or together concatenated?
 
 
-# Future steps
-- possibly change the RNNs with some LSTM (should be same for all neurons in the layer)
-    - might be better than some small NN instead of simple neuron
-    - need to share the weights (otherwise it would not be sufficient to run it (too large model))
-- for the training with smaller numbers (float16)
-    - it might be good idea to lower the training step
-- try to find better measure
-    - something for correlation of binary values
-- tools for summarizing training results
-- different evaluation metrics
-- different losses
-- try different models for neurons
-- make plotting more convenient
-- think about possibility to create class for storing the
-layers data
-    - there is always a dictionary of tensors (layers)
-    - if we have class of these we can create class of 
-    custom operations with the layers
-    - `_get_data` and `_get_time_step_for_all_layers` are basically the same functions
-    - `selected_predictions` also needs to iterate through dictionaries
-    - might be needed in the `_get_all_trials_predictions` 
-        - the general form of this will definitely help
 
-# In longer time period:
-- install the model to computational cluster
-    - need to create docker image
-
-
-# When is time:
-- add documentation to existing code
-- add documentation for the repository structure
-- add globals for common paths and prefixes for extraction tools
-- documentation for random subset selector
-- create global variables for paths used in the model 
-- probably separate model executer and argparse to separate source
-- think about model_executor architecture
-    - it might be useful to change it in order to make the source readable
-- disable weights and biases for evaluation of best model
-- make it possible to change all model parameters from `run_model.sh` script
-    - some of the parameters might be optional
-    - also change residual to optional
-- improve response analysis 
-    - add option to select neurons for analysis
-    - add option to select images for analysis
-- option for selecting the device (GPU) where we want to run the experiment
-
-
-# Notes for the meeting
-- look at the time back-propagation
-    - how to it works in pytorch
-    - additional step might be adding this between time steps
-        - artificial time steps between the targets
-            - model might learn more the dynamics
-                - it is pretty complicated to learn the dynamics that is so sharp
-- inspect what happens at the end
-    - there should be slight increase at the end
-    - same problem also with trained responses
-        - predictions went downwards and targets upwards (strange)
+# Notes from meeting
 

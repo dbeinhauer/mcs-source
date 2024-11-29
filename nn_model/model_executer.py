@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 This script defines manipulation with the models and is used to execute 
 model training and evaluation.
 """
 
-import os
-import pickle
 from typing import Tuple, Dict, List, Optional
 
 import torch.nn
@@ -18,7 +15,6 @@ import nn_model.globals
 from nn_model.type_variants import (
     LayerType,
     ModelTypes,
-    EvaluationFields,
     PredictionTypes,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
@@ -27,18 +23,14 @@ from nn_model.models import (
     ConstrainedRNNCell,
 )
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+from nn_model.evaluation_results_saver import EvaluationResultsSaver
+from nn_model.logger import LoggerModel
 
 
 class ModelExecuter:
     """
     Class used for execution of training and evaluation steps of the models.
     """
-
-    # Input layer keys (LGN).
-    input_layers = [LayerType.X_ON.value, LayerType.X_OFF.value]
 
     def __init__(self, arguments):
         """
@@ -65,75 +57,12 @@ class ModelExecuter:
         # Placeholder for the best evaluation result value.
         self.best_metric = -float("inf")
 
-        # Path of where the best model parameters are stored.
-        self.best_model_path = self._init_model_path(arguments)
-        if arguments.best_model_dir:
-            # In case we specify the path of the best model -> use it
-            self.best_model_path = arguments.best_model_dir
+        # Object that serves for storing the paths used in model execution
+        # and stores the evaluation results.
+        self.evaluation_results_saver = EvaluationResultsSaver(arguments)
 
-        # Directory where the results of the evaluation should be stored.
-        self.full_evaluation_directory = arguments.full_evaluation_dir
-
-        # Print experiment setup
-        self._print_experiment_info(arguments)
-
-    def _init_model_path(self, arguments) -> str:
-        """
-        Initializes path where to store the best model parameters.
-
-        By default (if not specified other version in `arguments`) the path is in format:
-            ```
-            arguments.model_dir/ +
-                model_lr-{learning_rate} +
-                _{model_type} +
-                _residual-{True/False} +
-                _neuron_layers-{num_neuron_layers} +
-                _neuron-size-{size_neuron_layer} +
-                _num-hidden-time-steps-{num_hidden_time_steps} +
-                .pth
-            ```
-            or in case `arguments.model_filename` is defined:
-            `arguments.model_dir/arguments.model_filename`
-
-
-        :param arguments: command line arguments
-        :return: Returns the path where the best model parameters should be stored.
-        """
-        if not arguments.model_filename:
-            # Model filename not defined -> use format:
-            #       "model_lr_{learning_rate}_{model_type}_residual_{True/False}.pth"
-            arguments.model_filename = "".join(
-                [
-                    f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
-                    f"_step-{nn_model.globals.TIME_STEP}",
-                    f"_lr-{str(arguments.learning_rate)}",
-                    f"_{arguments.model}",
-                    f"_residual-{not arguments.neuron_not_residual}",
-                    f"_neuron-layers-{arguments.neuron_num_layers}",
-                    f"_neuron-size-{arguments.neuron_layer_size}",
-                    f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
-                    ".pth",
-                ]
-            )
-
-        # Path where to store the best model parameter.
-        return arguments.model_dir + arguments.model_filename
-
-    @staticmethod
-    def _split_input_output_layers(
-        layer_sizes,
-    ) -> Tuple[Dict[str, int], Dict[str, int]]:
-        """
-        Splits layers sizes to input and output ones.
-
-        :return: Returns tuple of dictionaries of input and output layer sizes.
-        """
-        input_layers = {key: layer_sizes[key] for key in ModelExecuter.input_layers}
-        output_layers = {
-            key: value for key, value in layer_sizes.items() if key not in input_layers
-        }
-
-        return input_layers, output_layers
+        # Logger of the object.
+        self.logger = LoggerModel()
 
     def _init_datasets(
         self, arguments
@@ -144,7 +73,7 @@ class ModelExecuter:
         :param arguments: command line arguments.
         :return: Returns tuple of initialized train and test dataset.
         """
-        input_layers, output_layers = ModelExecuter._split_input_output_layers(
+        input_layers, output_layers = RNNCellModel.split_input_output_layers(
             self.layer_sizes
         )
 
@@ -187,7 +116,8 @@ class ModelExecuter:
 
         return train_loader, test_loader
 
-    def _get_neuron_model_kwargs(self, arguments) -> Dict:
+    @staticmethod
+    def _get_neuron_model_kwargs(arguments) -> Dict:
         """
         Retrieve kwargs of the neuronal model based on the specified model.
 
@@ -223,7 +153,7 @@ class ModelExecuter:
             self.layer_sizes,
             arguments.num_hidden_time_steps,
             arguments.model,
-            neuron_model_kwargs=self._get_neuron_model_kwargs(arguments),
+            neuron_model_kwargs=ModelExecuter._get_neuron_model_kwargs(arguments),
         )
 
     def _init_criterion(self):
@@ -243,32 +173,8 @@ class ModelExecuter:
         """
         return optim.Adam(self.model.parameters(), lr=learning_rate)
 
-    def _print_experiment_info(self, arguments):
-        """
-        Prints basic information about the experiment.
-
-        :param arguments: command line arguments.
-        """
-        print(
-            "\n".join(
-                [
-                    "NEW EXPERIMENT",
-                    "---------------------------------",
-                    "Running with parameters:",
-                    f"Model variant: {arguments.model}",
-                    f"Neuron number of layers: {arguments.neuron_num_layers}",
-                    f"Neurons layer sizes: {arguments.neuron_layer_size}",
-                    f"Neuron use residual connection: {not arguments.neuron_not_residual}",
-                    f"Number of hidden time steps: {arguments.num_hidden_time_steps}",
-                    f"Batch size: {nn_model.globals.train_batch_size}",
-                    f"Learning rate: {arguments.learning_rate}",
-                    f"Num epochs: {arguments.num_epochs}",
-                ]
-            )
-        )
-
+    @staticmethod
     def _get_data(
-        self,
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         test: bool = False,
@@ -365,18 +271,11 @@ class ModelExecuter:
 
         # Check if there is an improvement -> if so, update the best model.
         if current_val_metric > self.best_metric:
-            print(
-                " ".join(
-                    [
-                        f"Validation metric improved from {self.best_metric:.4f}",
-                        f"to {current_val_metric:.4f}. Saving model...",
-                    ]
-                )
-            )
+            self.logger.print_best_model_update(self.best_metric, current_val_metric)
             self.best_metric = current_val_metric
             torch.save(
                 self.model.state_dict(),
-                self.best_model_path,
+                self.evaluation_results_saver.best_model_path,
             )
 
     @staticmethod
@@ -397,8 +296,8 @@ class ModelExecuter:
             for layer, data in data_dict.items()
         }
 
+    @staticmethod
     def _get_time_step_for_all_layers(
-        self,
         time: int,
         dict_tensors: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
@@ -417,8 +316,8 @@ class ModelExecuter:
         # Assign previous time step from targets.
         return {layer: tensor[:, time, :] for layer, tensor in dict_tensors.items()}
 
+    @staticmethod
     def _retrieve_current_time_step_batch_data(
-        self,
         time: int,
         input_data: Dict[str, torch.Tensor],
         target_data: Dict[str, torch.Tensor],
@@ -431,13 +330,13 @@ class ModelExecuter:
         :param target_data: Output batch data.
         :return: Returns tuple of sliced input and output data.
         """
-        current_inputs = self._get_time_step_for_all_layers(time, input_data)
-        current_targets = self._get_time_step_for_all_layers(time, target_data)
+        current_inputs = ModelExecuter._get_time_step_for_all_layers(time, input_data)
+        current_targets = ModelExecuter._get_time_step_for_all_layers(time, target_data)
 
         return current_inputs, current_targets
 
+    @staticmethod
     def _get_train_current_time_data(
-        self,
         time: int,
         input_batch: Dict[str, torch.Tensor],
         target_batch: Dict[str, torch.Tensor],
@@ -459,13 +358,15 @@ class ModelExecuter:
         :return: Returns slices of the provided data for the next training time step.
         """
         # Initialize hidden states as the previous time step targets.
-        current_hidden_states = self._get_time_step_for_all_layers(
+        current_hidden_states = ModelExecuter._get_time_step_for_all_layers(
             time - 1,
             all_hidden_states,
         )
         # Retrieve data batch data for the current time step.
-        current_inputs, current_targets = self._retrieve_current_time_step_batch_data(
-            time, input_batch, target_batch
+        current_inputs, current_targets = (
+            ModelExecuter._retrieve_current_time_step_batch_data(
+                time, input_batch, target_batch
+            )
         )
 
         return current_inputs, current_targets, current_hidden_states
@@ -546,7 +447,7 @@ class ModelExecuter:
         for visible_time in range(
             1, time_length
         ):  # We skip the first time step because we do not have initial hidden values for them.
-            inputs, targets, hidden_states = self._get_train_current_time_data(
+            inputs, targets, hidden_states = ModelExecuter._get_train_current_time_data(
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
@@ -606,7 +507,9 @@ class ModelExecuter:
                     break
 
                 # Retrieve the batch of data.
-                input_batch, target_batch = self._get_data(input_batch, target_batch)
+                input_batch, target_batch = ModelExecuter._get_data(
+                    input_batch, target_batch
+                )
 
                 avg_time_loss = self._train_perform_visible_time_step(
                     input_batch, target_batch
@@ -615,16 +518,7 @@ class ModelExecuter:
                 epoch_loss_sum += avg_time_loss
 
             avg_epoch_loss = epoch_loss_sum / len(self.train_loader)
-            wandb.log(
-                {
-                    "epoch_loss": avg_epoch_loss,
-                }
-            )
-            print(
-                f"Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {avg_epoch_loss:.4f}"
-            )
-            # Run evaluation after each epoch. In case the results are the best
-            # -> save model parameters.
+            self.logger.print_epoch_loss(epoch + 1, self.num_epochs, avg_epoch_loss)
             self._update_best_model(epoch, continuous_evaluation_kwargs)
 
     def _load_best_model(self):
@@ -633,15 +527,16 @@ class ModelExecuter:
 
         NOTE: This function changes internal state of `self.model` object.
         """
-        self.model.load_state_dict(torch.load(self.best_model_path, weights_only=True))
-        print(
-            f"Running final evaluation on model with best CC_NORM value: {self.best_metric:.4f}"
+        self.model.load_state_dict(
+            torch.load(self.evaluation_results_saver.best_model_path, weights_only=True)
         )
+        self.logger.print_best_model_evaluation(self.best_metric)
 
+    @staticmethod
     def _add_trial_predictions_to_list_of_all_predictions(
-        self,
         trial_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
         all_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+        save_recurrent_state: bool,
     ):
         """
         Sort all the predictions for the trial and split them to corresponding
@@ -650,6 +545,7 @@ class ModelExecuter:
         :param trial_predictions: Predictions for the trial (list of predictions for all
         visible time steps).
         :param all_predictions: All predictions for all the trials.
+        :param save_recurrent_state: Flag whether we want to also save predictions of the RNNs.
         """
         for prediction_type, layers_predictions in trial_predictions.items():
             # Iterate all predictions types (full prediction, RNN predictions...)
@@ -660,7 +556,7 @@ class ModelExecuter:
                 )  # RNN default (do not save predictions).
                 if (
                     prediction_type == PredictionTypes.FULL_PREDICTION.value
-                    or self.model.return_recurrent_state
+                    or save_recurrent_state
                 ):
                     # In case we are doing full prediction or we specified we want RNN predictions
                     # -> store them
@@ -715,18 +611,20 @@ class ModelExecuter:
             )
 
             # Accumulate all trials predictions.
-            self._add_trial_predictions_to_list_of_all_predictions(
+            ModelExecuter._add_trial_predictions_to_list_of_all_predictions(
                 {
                     PredictionTypes.FULL_PREDICTION.value: trial_predictions,
                     PredictionTypes.RNN_PREDICTION.value: trial_rnn_predictions,
                 },
                 all_predictions,
+                self.model.return_recurrent_state,
             )
 
         return all_predictions
 
+    @staticmethod
     def _prepare_evaluation_predictions_for_return(
-        self, all_layers_predictions: Dict[str, List[torch.Tensor]]
+        all_layers_predictions: Dict[str, List[torch.Tensor]]
     ) -> Dict[str, torch.Tensor]:
         """
         Takes all the predictions of given type (full predictions, rnn predictions etc.) and
@@ -787,7 +685,9 @@ class ModelExecuter:
                 continue
 
             return_predictions[prediction_type] = (
-                self._prepare_evaluation_predictions_for_return(all_layers_predictions)
+                ModelExecuter._prepare_evaluation_predictions_for_return(
+                    all_layers_predictions
+                )
             )
 
         return return_predictions
@@ -821,110 +721,6 @@ class ModelExecuter:
         )
 
         return cc_norm, cc_abs
-
-    def _save_predictions_batch(
-        self,
-        batch_index: int,
-        all_predictions: Dict[str, Dict[str, torch.Tensor]],
-        targets: Dict[str, torch.Tensor],
-        filename: str = "",
-    ):
-        """
-        Saves averaged predictions and targets across the trials for the provided batch.
-
-        :param batch_index: Index of the batch (just used for naming).
-        :param predictions: Dictionary of predictions of the batch for all layers.
-        Shape of tensor:(batch_size, time, num_neurons)
-        :param targets: Dictionary of targets of the batch for all layers.
-        Shape of tensor:(batch_size, time, num_neurons)
-        :param filename: optional path of the file, if empty string then use default filename.
-        Default filename:
-            f"{args.full_evaluation_directory}/{args.model_filename}/batch_{batch_index}.pkl"
-        """
-
-        if not filename:
-            # If the filename is not defined -> use the default one
-            # Path: {full_evaluation_directory}/{model_filename}/batch_{batch_index}.pkl
-            subdirectory_name = os.path.splitext(
-                os.path.basename(self.best_model_path)
-            )[0]
-            subdirectory_path = os.path.join(
-                self.full_evaluation_directory, subdirectory_name
-            )
-            os.makedirs(subdirectory_path, exist_ok=True)
-            filename = os.path.join(subdirectory_path, f"batch_{batch_index}.pkl")
-
-        # Save to a pickle file
-        with open(filename, "wb") as f:
-            pickle.dump(
-                {
-                    EvaluationFields.PREDICTIONS.value: all_predictions[
-                        PredictionTypes.FULL_PREDICTION.value
-                    ],
-                    EvaluationFields.TARGETS.value: targets,
-                    EvaluationFields.RNN_PREDICTIONS.value: all_predictions[
-                        PredictionTypes.RNN_PREDICTION.value
-                    ],
-                },
-                f,
-            )
-
-    def _save_full_evaluation(
-        self,
-        batch_index: int,
-        all_predictions: Dict[str, Dict[str, torch.Tensor]],
-        targets: Dict[str, torch.Tensor],
-    ):
-        """
-        Saves all evaluation results together with its targets in appropriate format to
-        pickle file.
-
-        :param batch_index: ID of the batch used to determine filename (batch ID is part of it).
-        :param predictions: Dictionary of predictions of the batch for all layers.
-        Shape of tensor:(batch_size, time, num_neurons)
-        :param targets: Dictionary of targets of the batch for all layers.
-        Shape of tensor:(batch_size, time, num_neurons)
-        """
-        self._save_predictions_batch(
-            batch_index,
-            {
-                prediction_type: {
-                    layer: torch.mean(
-                        prediction, dim=0
-                    )  # Trials dimension is the first because we reshape it during prediction step.
-                    for layer, prediction in predictions.items()
-                }
-                for prediction_type, predictions in all_predictions.items()
-            },
-            {
-                layer: torch.mean(
-                    target, dim=1
-                )  # We want to skip the first time step + the trials dimension is the second.
-                for layer, target in targets.items()
-            },
-        )
-
-    def _print_current_evaluation_status(
-        self, step_num: int, cc_norm_sum: float, cc_abs_sum: float
-    ):
-        """
-        Prints status of the current evaluation.
-
-        :param step_num: Current evaluation step.
-        :param cc_norm_sum: Current sum of all CC_NORM values.
-        :param cc_abs_sum: Current sum of all CC_ABS values.
-        """
-        print(
-            "".join(
-                [
-                    f"Average normalized cross correlation after step {step_num} is: ",
-                    f"{cc_norm_sum/(step_num):.4f}",
-                    "\n",
-                    "Average Pearson's CC is: ",
-                    f"{cc_abs_sum/(step_num):.4f}",
-                ]
-            )
-        )
 
     def evaluation(
         self,
@@ -969,7 +765,7 @@ class ModelExecuter:
                     # Evaluate only subset of test data.
                     break
 
-                inputs, targets = self._get_data(inputs, targets, test=True)
+                inputs, targets = ModelExecuter._get_data(inputs, targets, test=True)
 
                 # Get predictions for all the trials.
                 all_predictions = self._predict_for_evaluation(
@@ -978,7 +774,9 @@ class ModelExecuter:
 
                 if save_predictions:
                     # We want to save the predictions for further analysis.
-                    self._save_full_evaluation(i, all_predictions, targets)
+                    self.evaluation_results_saver.save_full_evaluation(
+                        i, all_predictions, targets
+                    )
 
                 cc_norm, cc_abs = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
@@ -988,12 +786,9 @@ class ModelExecuter:
                 cc_norm_sum += cc_norm
                 cc_abs_sum += cc_abs
 
-                # Where the magic happens
-                wandb.log({"batch_cc_norm": cc_norm})
-                wandb.log({"batch_cc_abs": cc_abs})
-
+                self.logger.wand_batch_evaluation_logs(cc_norm, cc_abs)
                 if i % print_each_step == 0:
-                    self._print_current_evaluation_status(
+                    self.logger.print_current_evaluation_status(
                         i + 1, cc_norm_sum, cc_abs_sum
                     )
 
@@ -1005,25 +800,6 @@ class ModelExecuter:
         # Average evaluation metrics calculation
         avg_cc_norm = cc_norm_sum / num_examples
         avg_cc_abs = cc_abs_sum / num_examples
-        print(f"Final average normalized cross correlation is: {avg_cc_norm:.4f}")
-        print(f"Final average Pearson's CC is: {avg_cc_abs:.4f}")
-        wandb.log({"CC_NORM": avg_cc_norm})
-        wandb.log({"CC_ABS": avg_cc_abs})
+        self.logger.print_final_evaluation_results(avg_cc_norm, avg_cc_abs)
 
         return avg_cc_norm
-
-    def _prepare_selected_data_for_analysis(
-        self, all_data_batches: Dict[str, List[torch.Tensor]]
-    ) -> Dict:
-        """
-        Takes all selected data batches (subset of neurons for analysis) and
-        concatenates them to one `np.array`.
-
-        :param all_data_batches: Dictionary of list of all batches of selected data for analysis.
-        :return: Returns dictionary of numpy arrays of all data selected for further
-        evaluation analysis.
-        """
-        return {
-            layer: torch.cat(all_data_batches[layer], dim=0).cpu().numpy()
-            for layer in all_data_batches
-        }
