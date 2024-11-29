@@ -6,6 +6,8 @@ import logging
 
 import wandb
 
+import nn_model.globals
+
 
 # pylint: disable=W1203
 class LoggerModel:
@@ -19,6 +21,31 @@ class LoggerModel:
         """
         self.logger = logging.getLogger(__name__)
 
+    def print_experiment_info(self, arguments):
+        """
+        Prints basic information about the experiment.
+
+        :param arguments: command line arguments.
+        """
+        print(
+            "\n".join(
+                [
+                    "NEW EXPERIMENT",
+                    "---------------------------------",
+                    "Running with parameters:",
+                    f"Model size: {nn_model.globals.SIZE_MULTIPLIER}",
+                    f"Model variant: {arguments.model}",
+                    f"Neuron number of layers: {arguments.neuron_num_layers}",
+                    f"Neurons layer sizes: {arguments.neuron_layer_size}",
+                    f"Neuron use residual connection: {not arguments.neuron_not_residual}",
+                    f"Number of hidden time steps: {arguments.num_hidden_time_steps}",
+                    f"Batch size: {nn_model.globals.TRAIN_BATCH_SIZE}",
+                    f"Learning rate: {arguments.learning_rate}",
+                    f"Num epochs: {arguments.num_epochs}",
+                ]
+            )
+        )
+
     def print_best_model_update(self, previous_best: float, current_metric: float):
         """
         Prints information while updating the new best model.
@@ -26,7 +53,7 @@ class LoggerModel:
         :param previous_best: Previous best metric value.
         :param current_best: Current best metric value.
         """
-        self.logger.info(
+        print(
             " ".join(
                 [
                     f"Validation metric improved from {previous_best:.4f}",
@@ -34,6 +61,14 @@ class LoggerModel:
                 ]
             )
         )
+
+    def wandb_batch_loss(self, avg_time_loss):
+        """
+        Writes logs to `wandb` of the loss for the current batch.
+
+        :param avg_time_loss: Loss to be logged.
+        """
+        wandb.log({"batch_loss": avg_time_loss})
 
     def print_epoch_loss(
         self, epoch_num: int, total_num_epochs: int, avg_epoch_loss: float
@@ -50,7 +85,7 @@ class LoggerModel:
                 "epoch_loss": avg_epoch_loss,
             }
         )
-        self.logger.info(
+        print(
             " ".join(
                 [
                     f"Epoch [{epoch_num}/{total_num_epochs}],",
@@ -69,7 +104,7 @@ class LoggerModel:
             f"Running final evaluation on model with best CC_NORM value: {best_metric:.4f}"
         )
 
-    def wand_batch_evaluation_logs(self, cc_norm: float, cc_abs: float):
+    def wandb_batch_evaluation_logs(self, cc_norm: float, cc_abs: float):
         """
         Writes logs to `wandb` regarding the batch evaluation metrics.
 
@@ -89,7 +124,7 @@ class LoggerModel:
         :param cc_norm_sum: Current sum of all CC_NORM values.
         :param cc_abs_sum: Current sum of all CC_ABS values.
         """
-        self.logger.info(
+        print(
             "".join(
                 [
                     f"Average normalized cross correlation after step {step_num} is: ",
@@ -108,9 +143,7 @@ class LoggerModel:
         :param avg_cc_norm: Average CC_NORM value.
         :param avg_cc_abs: Average CC_ABS value.
         """
-        self.logger.info(
-            f"Final average normalized cross correlation is: {avg_cc_norm:.4f}"
-        )
-        self.logger.info(f"Final average Pearson's CC is: {avg_cc_abs:.4f}")
+        print(f"Final average normalized cross correlation is: {avg_cc_norm:.4f}")
+        print(f"Final average Pearson's CC is: {avg_cc_abs:.4f}")
         wandb.log({"CC_NORM": avg_cc_norm})
         wandb.log({"CC_ABS": avg_cc_abs})

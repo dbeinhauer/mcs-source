@@ -2,7 +2,7 @@
 This source code contains definition of all models used in our experiments.
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -381,7 +381,7 @@ class RNNCellModel(nn.Module):
         if not self.training:
             # Evaluation step. Use only time step 0 as initialization of hidden states.
             return {
-                layer: hidden.to(nn_model.globals.device0)
+                layer: hidden.to(nn_model.globals.DEVICE)
                 for layer, hidden in targets.items()
             }
         # Training mode. Hidden layers are last steps from targets for each time step.
@@ -402,7 +402,7 @@ class RNNCellModel(nn.Module):
         return torch.cat(
             current_parts + previous_parts,
             dim=1,
-        ).to(nn_model.globals.device0)
+        ).to(nn_model.globals.DEVICE)
 
     def _get_list_by_time_variant(
         self,

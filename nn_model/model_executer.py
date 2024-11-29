@@ -47,7 +47,7 @@ class ModelExecuter:
         self.train_loader, self.test_loader = self._init_data_loaders()
 
         # Model Init
-        self.model = self._init_model(arguments).to(device=nn_model.globals.device0)
+        self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(arguments.learning_rate)
 
@@ -103,13 +103,13 @@ class ModelExecuter:
         """
         train_loader = DataLoader(
             self.train_dataset,
-            batch_size=nn_model.globals.train_batch_size,
+            batch_size=nn_model.globals.TRAIN_BATCH_SIZE,
             shuffle=True,  # Shuffle the training dataset
             collate_fn=different_times_collate_fn,
         )
         test_loader = DataLoader(
             self.test_dataset,
-            batch_size=nn_model.globals.test_batch_size,
+            batch_size=nn_model.globals.TEST_BATCH_SIZE,
             shuffle=False,  # Load the test dataset always in the same order
             collate_fn=different_times_collate_fn,
         )
@@ -201,7 +201,7 @@ class ModelExecuter:
         slice_ = slice(None) if test else 0
 
         inputs = {
-            layer: input_data[:, slice_, :, :].float().to(nn_model.globals.device0)
+            layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
             for layer, input_data in inputs.items()
         }
         targets = {
@@ -292,7 +292,7 @@ class ModelExecuter:
         :return: Returns dictionary of given data moved to CUDA.
         """
         return {
-            layer: data.clone().to(nn_model.globals.device0)
+            layer: data.clone().to(nn_model.globals.DEVICE)
             for layer, data in data_dict.items()
         }
 
@@ -710,9 +710,9 @@ class ModelExecuter:
         all_predictions = torch.cat(
             [prediction for prediction in predictions.values()],
             dim=-1,
-        ).to(nn_model.globals.device0)
+        ).to(nn_model.globals.DEVICE)
         all_targets = torch.cat([target for target in targets.values()], dim=-1).to(
-            nn_model.globals.device0
+            nn_model.globals.DEVICE
         )
 
         # Run the calculate function once on the concatenated tensors.
@@ -786,7 +786,7 @@ class ModelExecuter:
                 cc_norm_sum += cc_norm
                 cc_abs_sum += cc_abs
 
-                self.logger.wand_batch_evaluation_logs(cc_norm, cc_abs)
+                self.logger.wandb_batch_evaluation_logs(cc_norm, cc_abs)
                 if i % print_each_step == 0:
                     self.logger.print_current_evaluation_status(
                         i + 1, cc_norm_sum, cc_abs_sum

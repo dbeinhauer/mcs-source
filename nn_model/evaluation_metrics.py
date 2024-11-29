@@ -25,6 +25,9 @@ class NormalizedCrossCorrelation:
     """
 
     def __init__(self):
+        """
+        Initialized the shared variables needed for loss calculation.
+        """
         self.batch_size: int = 0
         self.num_trials: int = 0
         self.time_duration: int = 0

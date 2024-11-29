@@ -70,3 +70,18 @@ class EvaluationFields(Enum):
     PREDICTIONS = "predictions"
     TARGETS = "targets"
     RNN_PREDICTIONS = "rnn_predictions"
+
+
+class PathDefaultFields(Enum):
+    """
+    All input paths fields used in the model
+    """
+
+    TRAIN_DIR = "train_dir"
+    TEST_DIR = "test_dir"
+    SUBSET_DIR = "subset_dir"
+    MODEL_DIR = "model_dir"
+    EXPERIMENT_SELECTION_PATH = "experiment_selection_path"
+    NEURON_SELECTION_PATH = "neuron_selection_path"
+    SELECTION_RESULTS_DIR = "selection_results_dir"
+    FULL_EVALUATION_DIR = "full_evaluation_dir"

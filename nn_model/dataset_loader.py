@@ -7,12 +7,9 @@ import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-import numpy as np
 from scipy.sparse import load_npz
 import torch
 from torch.utils.data import Dataset
-
-import nn_model.globals
 
 
 class SparseSpikeDataset(Dataset):

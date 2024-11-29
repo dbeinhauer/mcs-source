@@ -4,7 +4,10 @@ are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
-from nn_model.type_variants import LayerType
+from nn_model.type_variants import LayerType, PathDefaultFields
+
+# GPU Devices:
+DEVICE = "cuda"
 
 # Model Parameters:
 
@@ -19,6 +22,10 @@ SIZE_MULTIPLIER = 0.1
 # TIME_STEP = 10
 # TIME_STEP = 15
 TIME_STEP = 20
+
+# Batch sizes:
+TRAIN_BATCH_SIZE = 50
+TEST_BATCH_SIZE = 10
 
 # Will return values as its names
 EXCITATORY_LAYERS = {
@@ -52,12 +59,14 @@ MODEL_SIZES = {
     layer: int(size * SIZE_MULTIPLIER) for layer, size in ORIGINAL_SIZES.items()
 }
 
-# GPU Devices:
-device0 = "cuda:1"
-device1 = "cuda:0"
-device1 = "cuda"
-device0 = device1
-
-# Batch sizes:
-train_batch_size = 50
-test_batch_size = 10
+# All default input paths that are used in model executer.
+DEFAULT_PATHS = {
+    PathDefaultFields.TRAIN_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.TEST_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.SUBSET_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
+    PathDefaultFields.MODEL_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/best_models/",
+    PathDefaultFields.EXPERIMENT_SELECTION_PATH: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
+    PathDefaultFields.NEURON_SELECTION_PATH: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
+    PathDefaultFields.SELECTION_RESULTS_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
+    PathDefaultFields.FULL_EVALUATION_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
+}

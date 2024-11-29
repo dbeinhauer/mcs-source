@@ -11,7 +11,6 @@ import torch.nn as nn
 # Shared complexity module
 class FeedForwardNeuron(nn.Module):
     """
-    TODO:
     Class defining shared complexity of the layer that should represent
     one neuron (more complex neuron than just one operation).
     """
