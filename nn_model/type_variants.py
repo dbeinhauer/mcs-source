@@ -85,3 +85,4 @@ class PathDefaultFields(Enum):
     NEURON_SELECTION_PATH = "neuron_selection_path"
     SELECTION_RESULTS_DIR = "selection_results_dir"
     FULL_EVALUATION_DIR = "full_evaluation_dir"
+    NEURON_MODEL_RESPONSES_DIR = "neuron_model_responses_dir"

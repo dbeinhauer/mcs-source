@@ -241,22 +241,6 @@ class RNNCellModel(nn.Module):
         # Init model.
         self._init_model_architecture()
 
-    # @staticmethod
-    # def split_input_output_layers(
-    #     layer_sizes,
-    # ) -> Tuple[Dict[str, int], Dict[str, int]]:
-    #     """
-    #     Splits layers sizes to input and output ones.
-
-    #     :return: Returns tuple of dictionaries of input and output layer sizes.
-    #     """
-    #     input_layers = {key: layer_sizes[key] for key in RNNCellModel.input_layers}
-    #     output_layers = {
-    #         key: value for key, value in layer_sizes.items() if key not in input_layers
-    #     }
-
-    #     return input_layers, output_layers
-
     def switch_to_return_recurrent_state(self):
         """
         Function that is used to switch the model to return also RNN outputs.
@@ -332,7 +316,7 @@ class RNNCellModel(nn.Module):
             for layer, input_parameters in RNNCellModel.layers_input_parameters.items()
         }
 
-    def _init_layer(self, layer: str):
+    def _init_layer(self, layer: str) -> ConstrainedRNNCell:
         """
         Initializes one layer of the model.
 
@@ -387,6 +371,43 @@ class RNNCellModel(nn.Module):
         # Training mode. Hidden layers are last steps from targets for each time step.
         # Assign the values in each training step (not in this function).
         return {}
+
+    def apply_layer_neuron_complexity(
+        self, layer: str, input_data: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Applies layer neuron DNN model to given input data.
+
+        NOTE: Usually used to inspect how to model complexity module behaves.
+        :param layer: Identifier of the layer to apply the complexity for.
+        :param input_data: Input data tensor to apply complexity on.
+        :return: Returns output of DNN module.
+        """
+        return self.layers[layer].apply_complexity(input_data)
+
+    def apply_neuron_complexity_on_all_layers(
+        self, start: float, end: float, step: float
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """
+        Applies neuron complexity on all layers on given range of input data.
+
+        NOTE: This function is used mainly to inspect the behavior of the DNN neuron model.
+
+        :param start: Start of input interval.
+        :param end: End of input interval.
+        :param step: Step size used to generate input interval.
+        :return: Returns dictionary of input and output for each layer DNN neuron module.
+        """
+        input_data_range = torch.arange(start, end, step).to(nn_model.globals.DEVICE)
+        input_data_range = input_data_range[:, None]
+
+        return {
+            layer: {
+                "input": input_data_range,
+                "output": self.apply_layer_neuron_complexity(layer, input_data_range),
+            }
+            for layer in self.layers
+        }
 
     def _get_layer_input_tensor(
         self, current_parts: List[torch.Tensor], previous_parts: List[torch.Tensor]

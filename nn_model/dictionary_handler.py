@@ -3,7 +3,7 @@ This script defines class that is used for manipulation with data stored in dict
 Typically for the multiple layers results and variables.
 """
 
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Union
 
 import torch
 
@@ -36,7 +36,7 @@ class DictionaryHandler:
 
     @staticmethod
     def slice_given_axes(
-        data: torch.Tensor, slice_axes_dict: Dict[int, int]
+        data: torch.Tensor, slice_axes_dict: Dict[int, Union[int, slice]]
     ) -> torch.Tensor:
         """
         Slices given tensor in the provided axes on the provided positions.
@@ -55,7 +55,9 @@ class DictionaryHandler:
         return DictionaryHandler.slice_tensor(data, slices)
 
     @staticmethod
-    def slice_tensor(data: torch.Tensor, slices: List) -> torch.Tensor:
+    def slice_tensor(
+        data: torch.Tensor, slices: List[Union[int, slice]]
+    ) -> torch.Tensor:
         """
         Slices the tensor based on the list of slices in each dimension.
 
@@ -66,10 +68,10 @@ class DictionaryHandler:
         return data[tuple(slices)]
 
 
-if __name__ == "__main__":
-    data = torch.reshape(torch.arange(4 * 3 * 2 * 5), ((4, 3, 2, 5)))
-    print(data)
-    print(DictionaryHandler.slice_given_axes(data, {1: 1, 2: 0}))
-    print(DictionaryHandler.slice_given_axes(data, {0: 1}))
+# if __name__ == "__main__":
+#     data = torch.reshape(torch.arange(4 * 3 * 2 * 5), ((4, 3, 2, 5)))
+#     print(data.shape)
+#     print(DictionaryHandler.slice_given_axes(data, {1: 1, 2: 0}).shape)
+#     print(DictionaryHandler.slice_given_axes(data, {0: 1}).shape)
 
-    # print(DictionaryHandler.slice_given_axes(data, {1: 1, 2: 0}).shape)
+# print(DictionaryHandler.slice_given_axes(data, {1: 1, 2: 0}).shape)

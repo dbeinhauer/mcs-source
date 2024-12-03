@@ -13,6 +13,8 @@ from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import ModelTypes, PathDefaultFields
 from nn_model.logger import LoggerModel
 
+# from nn_model.evaluation_results_saver import EvaluationResultsSaver
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -35,6 +37,7 @@ def init_wandb(arguments):
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
+        "train_subset_size": arguments.train_subset,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -56,7 +59,9 @@ def init_model_path(arguments) -> str:
     By default (if not specified other version in `arguments`) the path is in format:
         ```
         arguments.model_dir/ +
-            model_lr-{learning_rate} +
+            model_ +
+            [train-subset-{train_subset_size}] +
+            lr-{learning_rate} +
             _{model_type} +
             _residual-{True/False} +
             _neuron_layers-{num_neuron_layers} +
@@ -72,11 +77,15 @@ def init_model_path(arguments) -> str:
     :return: Returns the path where the best model parameters should be stored.
     """
     if not arguments.model_filename:
-        # Model filename not defined -> use format:
-        #       "model_lr_{learning_rate}_{model_type}_residual_{True/False}.pth"
+        # Model filename not defined -> use format from docstring
+        train_subset_string = ""
+        if arguments.train_subset < 1.0:
+            # Subset for training specified.
+            train_subset_string = f"train-subset-{arguments.train_subset}"
         return "".join(
             [
                 f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
+                train_subset_string,
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
@@ -144,7 +153,7 @@ def main(arguments):
             best_model_evaluation_subset=1,
         )
 
-    if not arguments.best_model_evaluation:
+    if not arguments.best_model_evaluation and not arguments.neuron_model_responses:
         # Train the model used the given parameters.
         model_executer.train(
             continuous_evaluation_kwargs={
@@ -158,10 +167,18 @@ def main(arguments):
             subset_for_evaluation=execution_setup["final_evaluation_subset"]
         )
     else:
-        model_executer.evaluation(
-            subset_for_evaluation=execution_setup["best_model_evaluation_subset"],
-            save_predictions=arguments.save_all_predictions,
-        )
+        if arguments.neuron_model_responses:
+            # Save neuron DNN models outputs.
+            model_executer.evaluation_results_saver.save_neuron_model_responses(
+                model_executer.evaluate_neuron_models(),
+                arguments.neuron_model_responses_dir,
+            )
+        if arguments.best_model_evaluation:
+            # Run full evaluation on the best trained model.
+            model_executer.evaluation(
+                subset_for_evaluation=execution_setup["best_model_evaluation_subset"],
+                save_predictions=arguments.save_all_predictions,
+            )
 
     wandb.finish()
 
@@ -233,6 +250,14 @@ if __name__ == "__main__":
         default="",
         help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
     )
+    parser.add_argument(
+        "--neuron_model_responses_dir",
+        type=str,
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.NEURON_MODEL_RESPONSES_DIR
+        ],
+        help="Directory where the results of neuron DNN model on testing range should be stored (filename is best model name).",
+    )
     # Model parameters:
     parser.add_argument(
         "--model",
@@ -244,7 +269,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=0.007,
+        default=0.00001,
         help="Learning rate to use in model training.",
     )
     parser.add_argument(
@@ -277,6 +302,13 @@ if __name__ == "__main__":
         default=5,
         help="Number of hidden time steps in RNN (to use backtracking through time (not just use known targets)).",
     )
+    # Dataset analysis:
+    parser.add_argument(
+        "--train_subset",
+        type=float,
+        default=1.0,
+        help="Number of batches to select as train subset (for model training performance).",
+    )
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
     parser.add_argument(
@@ -289,6 +321,12 @@ if __name__ == "__main__":
         "--save_all_predictions",
         action="store_true",
         help="Whether we want to store all model predictions in final evaluation.",
+    )
+    parser.set_defaults(neuron_model_responses=False)
+    parser.add_argument(
+        "--neuron_model_responses",
+        action="store_true",
+        help="Whether we want to get neuron DNN model responses for given range of input data.",
     )
     # Debugging:
     parser.set_defaults(debug=False)

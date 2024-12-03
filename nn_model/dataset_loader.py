@@ -25,6 +25,7 @@ class SparseSpikeDataset(Dataset):
         is_test: bool = False,
         model_subset_path: str = "",
         experiment_selection_path: str = "",
+        dataset_subset_ratio: float = 1.0,
     ):
         """
         Initializes class attributes, loads model subset indices and all
@@ -43,6 +44,7 @@ class SparseSpikeDataset(Dataset):
         :param experiment_selection_path: path of the file where experiment filenames for
         loading only subset of the dataset are stored. It is pickle file with list of
         selected filenames that should be loaded by the dataset.
+        :param dataset_subset_ratio: Ratio of total number of examples which to choose from the full dataset.
         """
         # Define basic attributes.
         self.spikes_dir = spikes_dir
@@ -59,6 +61,13 @@ class SparseSpikeDataset(Dataset):
 
         # Load all filenames of experiments to use in dataset.
         self.experiments = self._load_all_spikes_filenames()
+
+        if dataset_subset_ratio < 1.0:
+            # Select only subset of training data (for analysis of the results on the smaller dataset).
+            num_experiments_to_select = int(
+                len(self.experiments) * dataset_subset_ratio
+            )
+            self.experiments = self.experiments[:num_experiments_to_select]
 
         # Define selected experiments for final evaluation.
         self.selected_experiments = self._init_experiment_selection(

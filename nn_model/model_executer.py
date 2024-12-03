@@ -3,7 +3,7 @@ This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
-from typing import Tuple, Dict, List, Optional
+from typing import Tuple, Dict, List, Optional, Union
 
 import torch.nn
 import torch.optim as optim
@@ -84,6 +84,7 @@ class ModelExecuter:
             output_layers,
             is_test=False,
             model_subset_path=arguments.subset_dir,
+            dataset_subset_ratio=arguments.train_subset,  # Subset of train dataset in case of model analysis
         )
         test_dataset = SparseSpikeDataset(
             arguments.test_dir,
@@ -199,16 +200,22 @@ class ModelExecuter:
         """
         # Define what part of trials dimension we want to take.
         # Take `0` for train or all trials `slice(None) == :` for test.
-        slice_ = slice(None) if test else 0
+        slice_: Union[int, slice] = slice(None) if test else 0
+
+        # inputs = DictionaryHandler.slice_given_axes()
 
         inputs = {
-            layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
+            # layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
+            layer: DictionaryHandler.slice_given_axes(input_data, {1: slice_})
+            .float()
+            .to(nn_model.globals.DEVICE)
             for layer, input_data in inputs.items()
         }
         targets = {
-            layer: output_data[
-                :, slice_, :, :
-            ].float()  # Do not move it to GPU as it is not always used there (only in training).
+            # layer: output_data[
+            #     :, slice_, :, :
+            # ].float()  # Do not move it to GPU as it is not always used there (only in training).
+            layer: DictionaryHandler.slice_given_axes(output_data, {1: slice_}).float()
             for layer, output_data in targets.items()
         }
 
@@ -804,3 +811,20 @@ class ModelExecuter:
         self.logger.print_final_evaluation_results(avg_cc_norm, avg_cc_abs)
 
         return avg_cc_norm
+
+    def evaluate_neuron_models(
+        self, start: float = -1.0, end: float = 1.0, step: float = 0.001
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """
+        Applies neuron complexity on all layers on given range of input data on the model
+        with the best model performance based on the evaluation metric.
+
+        NOTE: This function is used mainly to inspect the behavior of the DNN neuron model.
+
+        :param start: Start of input interval.
+        :param end: End of input interval.
+        :param step: Step size used to generate input interval.
+        :return: Returns dictionary of input and output for each layer DNN neuron module.
+        """
+        self._load_best_model()
+        return self.model.apply_neuron_complexity_on_all_layers(start, end, step)

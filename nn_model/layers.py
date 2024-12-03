@@ -9,6 +9,8 @@ from typing import Tuple, Optional
 import torch
 import torch.nn as nn
 
+from nn_model.custom_rnn import CustomRNNCell
+
 
 class ConstrainedRNNCell(nn.Module):
     """
@@ -34,8 +36,9 @@ class ConstrainedRNNCell(nn.Module):
         definition.
         """
         super(ConstrainedRNNCell, self).__init__()
+        self.input_size = input_size
         self.hidden_size = hidden_size
-        self.rnn_cell = nn.RNNCell(input_size, hidden_size)
+        self.rnn_cell = CustomRNNCell(input_size, hidden_size)
         self.constraint = weight_constraint
         self.shared_complexity = shared_complexity
 
@@ -48,7 +51,13 @@ class ConstrainedRNNCell(nn.Module):
         """
         self.return_recurrent_state = True
 
-    def _apply_complexity(self, rnn_output: torch.Tensor) -> torch.Tensor:
+    def apply_constraints(self):
+        """
+        Applies the layer constraint on the weights.
+        """
+        self.constraint.apply(self.rnn_cell)
+
+    def apply_complexity(self, rnn_output: torch.Tensor) -> torch.Tensor:
         """
         Applies complexity layer (shared DNN of neuron) on RNN output.
 
@@ -57,22 +66,20 @@ class ConstrainedRNNCell(nn.Module):
         """
         # If shared complexity is defined (model is complex) -> apply complexity.
         if self.shared_complexity:
-            batch_size = rnn_output.size(0)
-            layer_size = rnn_output.size(1)
-
             # Reshape the layer output to [batch_size * hidden_size, 1] for batch processing
-            complexity_result = rnn_output.view(batch_size * layer_size, 1)
+            complexity_result = rnn_output.view(-1, 1)
 
             # Apply the small network to all elements in parallel
             complexity_result = self.shared_complexity(complexity_result)
 
             # Reshape back to [batch_size, hidden_size]
-            complexity_result = complexity_result.view(batch_size, self.hidden_size)
+            complexity_result = complexity_result.view_as(rnn_output)
 
             return complexity_result
 
-        # No shared complexity (is `None` -> apply identity).
-        return rnn_output
+        # No shared complexity (is `None` -> apply default tanh).
+        # TODO: maybe add option to apply different complexity functions.
+        return torch.tanh(rnn_output)
 
     def forward(
         self, input_data: torch.Tensor, hidden: torch.Tensor
@@ -85,17 +92,14 @@ class ConstrainedRNNCell(nn.Module):
         :return: Returns tuple of the output of the forward step and optionally
         output of the RNN layer in case we switch the layer to do so.
         """
+        # RNN linear step.
         hidden = self.rnn_cell(input_data, hidden)
-        complexity_result = self._apply_complexity(hidden)
+
+        # Apply non-linearity (either function or DNN model of neuron).
+        complexity_result = self.apply_complexity(hidden)
 
         if not self.return_recurrent_state:
             # In case we do not want ot return RNN results -> return None
             return complexity_result, None
 
         return complexity_result, hidden
-
-    def apply_constraints(self):
-        """
-        Applies the layer constraint on the weights.
-        """
-        self.constraint.apply(self.rnn_cell)

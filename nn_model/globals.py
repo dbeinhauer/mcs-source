@@ -69,4 +69,5 @@ DEFAULT_PATHS = {
     PathDefaultFields.NEURON_SELECTION_PATH: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
     PathDefaultFields.SELECTION_RESULTS_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
     PathDefaultFields.FULL_EVALUATION_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
+    PathDefaultFields.NEURON_MODEL_RESPONSES_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/",
 }

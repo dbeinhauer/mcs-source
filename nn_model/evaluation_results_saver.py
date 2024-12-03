@@ -18,6 +18,7 @@ class EvaluationResultsSaver:
     """
 
     def __init__(self, arguments):
+        self.model_filename = arguments.model_filename
         self.best_model_path = arguments.model_dir + arguments.model_filename
         if arguments.best_model_dir:
             # In case we specify the path of the best model -> use it
@@ -106,3 +107,26 @@ class EvaluationResultsSaver:
                 for layer, target in targets.items()
             },
         )
+
+    def save_neuron_model_responses(
+        self,
+        neuron_model_responses: Dict[str, Dict[str, torch.Tensor]],
+        output_dir: str,
+        filename: str = "",
+    ):
+        """
+        Saves inputs and outputs of the DNN neuron module for the given interval of input data for each output layer.
+
+        :param neuron_model_responses: Inputs and outputs of DNN neuron module for each layer.
+        :param output_dir: Path to output directory where we want to store the results.
+        :param filename: Filename of the responses to be stored (`self.model_filename` if empty string).
+        """
+        if not filename:
+            # If filename not specified -> use the default model filename
+            filename = self.model_filename
+
+        with open(output_dir + filename, "wb") as f:
+            pickle.dump(
+                neuron_model_responses,
+                f,
+            )
