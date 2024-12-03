@@ -9,127 +9,95 @@ if [ "$#" -ne 4 ]; then
     exit 1
 fi
 
-# Function to display usage
-
-# usage() {
-
-#     echo "Usage: $0 -m mandatory_arg [-o optional_arg] [-t] [-f]"
-
-#     echo "  -m mandatory_arg   Mandatory argument"
-
-#     echo "  -o optional_arg    Optional argument"
-
-#     echo "  -t                 True/False switch (on if present)"
-
-#     echo "  -f                 Another True/False switch (on if present)"
-
-#     exit 1
-
-# }
-
-# # Initialize variables
-
-# MANDATORY_ARG=""
-
-# OPTIONAL_ARG=""
-
-# TRUE_SWITCH=0
-
-# FALSE_SWITCH=0
-
-# # Parse command line options
-
-# while getopts ":m:o:tf" opt; do
-
-#     case ${opt} in
-
-#     m)
-
-#         MANDATORY_ARG=$OPTARG
-
-#         ;;
-
-#     o)
-
-#         OPTIONAL_ARG=$OPTARG
-
-#         ;;
-
-#     t)
-
-#         TRUE_SWITCH=1
-
-#         ;;
-
-#     f)
-
-#         FALSE_SWITCH=1
-
-#         ;;
-
-#     \?)
-
-#         echo "Invalid option: -$OPTARG" 1>&2
-
-#         usage
-
-#         ;;
-
-#     :)
-
-#         echo "Option -$OPTARG requires an argument." 1>&2
-
-#         usage
-
-#         ;;
-
-#     esac
-
-# done
-
-# # Shift processed options away
-
-# shift $((OPTIND - 1))
-
-# # Check for mandatory argument
-
-# if [ -z "$MANDATORY_ARG" ]; then
-
-#     echo "Mandatory argument is missing."
-
-#     usage
-
-# fi
-
-# # Output the parsed arguments for demonstration purposes
-
-# echo "Mandatory Argument: $MANDATORY_ARG"
-
-# if [ -n "$OPTIONAL_ARG" ]; then
-
-#     echo "Optional Argument: $OPTIONAL_ARG"
-
-# fi
-
-# if [ $TRUE_SWITCH -eq 1 ]; then
-
-#     echo "True Switch: ON"
-
-# fi
-
-# if [ $FALSE_SWITCH -eq 1 ]; then
-
-#     echo "False Switch: ON"
-
-# fi
-
+# Directory to store the output log
+OUTPUT_DIR=$1
 # Assign command-line arguments to variables
 MODEL=$2
 LEARNING_RATE=$3
 NUM_EPOCHS=$4
 
-# Directory to store the output log
-OUTPUT_DIR=$1
+# usage() {
+#     echo "Usage: $0 output_dir model_type learning_rate num_epochs [-]"
+#     echo "  --required          Multiple required arguments"
+#     echo "  --optional          Multiple optional arguments"
+#     echo "  --verbose           Verbose output"
+#     echo "  -d, --dry-run       Dry run, won't execute commands"
+#     exit 1
+# }
+
+# # Default values
+# VERBOSE=false
+# DRY_RUN=false
+# REQUIRED_ARGS=()
+# OPTIONAL_ARGS=()
+
+# # Parse command line arguments
+
+# while [ $# -gt 0 ]; do
+#     case "$1" in
+#     --required)
+#         shift
+#         while [[ $# -gt 0 && "$1" != --* ]]; do
+#             REQUIRED_ARGS+=("$1")
+#             shift
+#         done
+#         ;;
+#     --optional)
+#         shift
+#         while [[ $# -gt 0 && "$1" != --* ]]; do
+#             OPTIONAL_ARGS+=("$1")
+#             shift
+#         done
+#         ;;
+#     --verbose)
+#         VERBOSE=true
+#         shift
+#         ;;
+#     -d | --dry-run)
+#         DRY_RUN=true
+#         shift
+#         ;;
+#     -*)
+#         echo "Error: Invalid option '$1'"
+#         usage
+#         ;;
+#     *)
+#         echo "Error: Invalid argument '$1'"
+#         usage
+#         ;;
+#     esac
+# done
+
+# # Check if required arguments are set
+
+# if [ ${#REQUIRED_ARGS[@]} -eq 0 ]; then
+#     echo "Error: At least one required argument is missing."
+#     usage
+# fi
+
+# # Display the parsed arguments
+
+# echo "Required Arguments: ${REQUIRED_ARGS[*]}"
+
+# if [ ${#OPTIONAL_ARGS[@]} -gt 0 ]; then
+#     echo "Optional Arguments: ${OPTIONAL_ARGS[*]}"
+# fi
+
+# echo "Verbose: $VERBOSE"
+# echo "Dry Run: $DRY_RUN"
+
+# # Logic to execute based on the flags and arguments
+
+# if [ "$VERBOSE" = true ]; then
+#     echo "Running in verbose mode..."
+# fi
+
+# if [ "$DRY_RUN" = true ]; then
+#     echo "This is a dry run, commands will not be executed."
+# else
+#     echo "Executing commands..."
+#     # Place your command execution logic here
+# fi
 
 # Command to execute, including the learning rate and number of epochs
 COMMAND="python execute_model.py --model=$MODEL --learning_rate=$LEARNING_RATE --num_epochs=$NUM_EPOCHS"
