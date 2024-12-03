@@ -8,7 +8,12 @@ import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import LayerType, TimeStepVariant, ModelTypes
+from nn_model.type_variants import (
+    LayerType,
+    TimeStepVariant,
+    ModelTypes,
+    NeuronModulePredictionFields,
+)
 from nn_model.weights_constraints import (
     WeightTypes,
     ExcitatoryWeightConstraint,
@@ -403,8 +408,10 @@ class RNNCellModel(nn.Module):
 
         return {
             layer: {
-                "input": input_data_range,
-                "output": self.apply_layer_neuron_complexity(layer, input_data_range),
+                NeuronModulePredictionFields.INPUT.value: input_data_range,
+                NeuronModulePredictionFields.OUTPUT.value: self.apply_layer_neuron_complexity(
+                    layer, input_data_range
+                ),
             }
             for layer in self.layers
         }

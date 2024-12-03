@@ -176,6 +176,26 @@ class ModelExecuter:
         return optim.Adam(self.model.parameters(), lr=learning_rate)
 
     @staticmethod
+    def _slice_and_covert_to_float(
+        data: Dict[str, torch.Tensor], slice_: Union[int, slice]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Slices the provided data in the trials interval and converts them to float.
+
+        NOTE: This function is used while calling `_get_data` method.
+
+        :param data: All layers data.
+        :param slice_: Slice for the trials dimension (to get rid of it in case of train step).
+        :return: Returns sliced data that were converted to float.
+        """
+        return DictionaryHandler.apply_methods_on_dictionary(
+            DictionaryHandler.apply_functions_on_dictionary(
+                data, [(DictionaryHandler.slice_given_axes, ({1: slice_},))]
+            ),
+            [("float",)],
+        )
+
+    @staticmethod
     def _get_data(
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
@@ -202,20 +222,14 @@ class ModelExecuter:
         # Take `0` for train or all trials `slice(None) == :` for test.
         slice_: Union[int, slice] = slice(None) if test else 0
 
-        # inputs = DictionaryHandler.slice_given_axes()
-
         inputs = {
-            # layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
-            layer: DictionaryHandler.slice_given_axes(input_data, {1: slice_})
-            .float()
-            .to(nn_model.globals.DEVICE)
+            layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
             for layer, input_data in inputs.items()
         }
         targets = {
-            # layer: output_data[
-            #     :, slice_, :, :
-            # ].float()  # Do not move it to GPU as it is not always used there (only in training).
-            layer: DictionaryHandler.slice_given_axes(output_data, {1: slice_}).float()
+            layer: output_data[
+                :, slice_, :, :
+            ].float()  # Do not move it to GPU as it is not always used there (only in training).
             for layer, output_data in targets.items()
         }
 

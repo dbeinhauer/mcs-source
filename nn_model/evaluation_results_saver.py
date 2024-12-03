@@ -18,12 +18,19 @@ class EvaluationResultsSaver:
     """
 
     def __init__(self, arguments):
+        """Initializes the saver object.
+
+        :param arguments: Command line arguments.
+        """
+        # Name of the model file.
         self.model_filename = arguments.model_filename
+        # Default path to the best model.
         self.best_model_path = arguments.model_dir + arguments.model_filename
         if arguments.best_model_dir:
             # In case we specify the path of the best model -> use it
             self.best_model_path = arguments.best_model_dir
 
+        # Directory where the full evaluation results should be stored.
         self.full_evaluation_directory = arguments.full_evaluation_dir
 
     def save_predictions_batch(
@@ -115,11 +122,13 @@ class EvaluationResultsSaver:
         filename: str = "",
     ):
         """
-        Saves inputs and outputs of the DNN neuron module for the given interval of input data for each output layer.
+        Saves inputs and outputs of the DNN neuron module for the given interval of input
+        data for each output layer.
 
         :param neuron_model_responses: Inputs and outputs of DNN neuron module for each layer.
         :param output_dir: Path to output directory where we want to store the results.
-        :param filename: Filename of the responses to be stored (`self.model_filename` if empty string).
+        :param filename: Filename of the responses to be stored (`self.model_filename`
+        if empty string).
         """
         if not filename:
             # If filename not specified -> use the default model filename

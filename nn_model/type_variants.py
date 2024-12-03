@@ -62,6 +62,15 @@ class PredictionTypes(Enum):
     RNN_PREDICTION = "rnn_prediction"
 
 
+class NeuronModulePredictionFields(Enum):
+    """
+    All keys of the predictions of the DNN neuron module.
+    """
+
+    INPUT = "input"
+    OUTPUT = "output"
+
+
 class EvaluationFields(Enum):
     """
     All evaluation fields names.
