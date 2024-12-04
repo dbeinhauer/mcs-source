@@ -508,3 +508,12 @@ Notes after meetings:
 - as far as I get the information I would say it is essential to perform the optimizer step before each target state reset
 - the optimizer step and backward step should be performed for all layers together
     - not sure about calculation of the loss (whether separate the losses or not)
+
+# 3.12.2024
+- model DNN module was applied in the wrong way
+    - first it was applied non-linearity -> DNN module
+        - we wanted DNN module instead of non-linearity
+    - this might be the reason of very strange behavior of the DNN module
+    - also might be the reason of the bad model dynamics
+    -> solution was create custom RNNCell module
+- also code refined

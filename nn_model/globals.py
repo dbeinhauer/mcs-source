@@ -4,7 +4,7 @@ are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
-from nn_model.type_variants import LayerType, PathDefaultFields
+from nn_model.type_variants import LayerType, PathDefaultFields, PathPlotDefaults
 
 # GPU Devices:
 DEVICE = "cuda"
@@ -61,13 +61,20 @@ MODEL_SIZES = {
 
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {
-    PathDefaultFields.TRAIN_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.TEST_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.SUBSET_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
-    PathDefaultFields.MODEL_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/best_models/",
-    PathDefaultFields.EXPERIMENT_SELECTION_PATH: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
-    PathDefaultFields.NEURON_SELECTION_PATH: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
-    PathDefaultFields.SELECTION_RESULTS_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
-    PathDefaultFields.FULL_EVALUATION_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
-    PathDefaultFields.NEURON_MODEL_RESPONSES_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/",
+    PathDefaultFields.TRAIN_DIR.value: f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.TEST_DIR.value: f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.SUBSET_DIR.value: f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
+    PathDefaultFields.MODEL_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/best_models/",
+    PathDefaultFields.EXPERIMENT_SELECTION_PATH.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
+    PathDefaultFields.NEURON_SELECTION_PATH.value: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
+    PathDefaultFields.SELECTION_RESULTS_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
+    PathDefaultFields.FULL_EVALUATION_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
+    PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/",
+}
+
+# All default paths of the plots.
+DEFAULT_PLOT_PATHS = {
+    PathPlotDefaults.NEURON_MODULE_SEPARATE.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/dnn_module_dependencies_separate.png",
+    PathPlotDefaults.NEURON_MODULE_TOGETHER.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/dnn_module_dependencies_together.png",
+    PathPlotDefaults.MEAN_LAYER_RESPONSES.value: "",
 }

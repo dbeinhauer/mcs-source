@@ -12,12 +12,17 @@ import pickle
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import seaborn as sns
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import nn_model.globals
-from nn_model.type_variants import LayerType
+from nn_model.type_variants import (
+    LayerType,
+    NeuronModulePredictionFields,
+    PathPlotDefaults,
+)
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.model_executer import ModelExecuter, RNNCellModel
 from nn_model.type_variants import EvaluationFields
@@ -45,6 +50,7 @@ class ResponseAnalyzer:
         train_dataset_dir: str,
         test_dataset_dir: str,
         responses_dir: str,
+        dnn_responses_path: str,
         neurons_path: str,
     ):
         """
@@ -54,33 +60,33 @@ class ResponseAnalyzer:
         :param responses_dir: Directory containing averaged responses of the model and
         its targets per trial.
         """
+        # TODO: make loading of the files optional
 
+        # Set the input directories
         self.train_dataset_dir = train_dataset_dir
         self.test_dataset_dir = test_dataset_dir
         self.responses_dir = responses_dir
+        self.dnn_responses_path = dnn_responses_path
 
         # Initialize batch size (for loader) as default batch size for test dataset.
         self.batch_size = nn_model.globals.TEST_BATCH_SIZE
 
-        # Number of time-step in which there is the overlap of stimuli and blank part
-        self.stimulus_blank_step = int(
-            nn_model.globals.IMAGE_DURATION // nn_model.globals.TIME_STEP
-        )
-
-        # Raw data loaders
+        # Raw data loaders:
         self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
         self.test_dataset, self.test_loader = self._init_dataloader()
 
-        self.selected_neurons = self.load_selected_neurons(neurons_path)
-        self.images_batches = self.randomly_select_batches()
-        self.batch_image_indices = self.randomly_select_img_index(
+        # Selected neurons for the plotting:
+        self.selected_neurons = ResponseAnalyzer.load_selected_neurons(neurons_path)
+        # Selected image batches for plotting:
+        self.images_batches = ResponseAnalyzer.randomly_select_batches()
+        # Selected image indices for each selected batch selected for plotting.
+        self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
             range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
         )
 
-        # Total number of responses batches to analysis
-        self.num_responses = 0
-
-        self._load_responses_filenames()
+        # Load all batch responses filenames and count its number.
+        self.responses_filenames = self._load_responses_filenames()
+        self.num_responses = len(self.responses_filenames)
 
         # Dictionary of layers and its mean neural responses through time
         # (all examples, all neurons). For both targets and predictions.
@@ -94,6 +100,11 @@ class ResponseAnalyzer:
         self.selected_neurons_responses = {}
         # Dictionary of RNN responses and its transformations from DNN neuron for each layer.
         self.rnn_to_prediction_responses = {}
+        # Histogram bins and edges:
+        self.hist_counts = np.zeros(0)
+        self.bin_edges = np.zeros(0)
+
+        self.dnn_responses = self.load_pickle_file(dnn_responses_path)
 
     @staticmethod
     def load_selected_neurons(path: str) -> Dict:
@@ -166,11 +177,13 @@ class ResponseAnalyzer:
 
         return dataset, loader
 
-    def _load_responses_filenames(self):
-        self.responses_filenames = os.listdir(os.path.join(self.responses_dir))
-        self.num_responses = len(self.responses_filenames)
+    def _load_responses_filenames(self) -> List[str]:
+        """
+        Loads all filenames from the responses directory (batches of responses).
+        """
+        return os.listdir(os.path.join(self.responses_dir))
 
-    def create_spikes_histogram(
+    def create_spikes_histogram_values(
         self,
         processed_layer: str = "",
         subset: int = -1,
@@ -198,7 +211,6 @@ class ResponseAnalyzer:
         NOTE: In case neither input nor output included use output.
         :return: Returns tuple of bin counts and bin edges of histogram.
         """
-
         # Initialize the histogram variables.
         bin_edges = np.arange(0, num_bins)
         hist_counts = np.zeros(len(bin_edges) - 1, dtype=np.float32)
@@ -231,6 +243,9 @@ class ResponseAnalyzer:
                 batch_counts, _ = np.histogram(summed_data, bins=bin_edges)
 
                 hist_counts += batch_counts
+
+        self.hist_counts = hist_counts
+        self.bin_edges = bin_edges
 
         return hist_counts, bin_edges
 
@@ -425,10 +440,6 @@ class ResponseAnalyzer:
             if key in keys_to_select
         }
 
-    # def _load_responses_filenames(self):
-    #     self.responses_filenames = os.listdir(os.path.join(self.responses_dir))
-    #     self.num_responses = len(self.responses_filenames)
-
     def get_mean_from_evaluated_data(self, subset: int = -1):
         """
         Iterates through all mean responses (both predictions and targets).
@@ -438,8 +449,6 @@ class ResponseAnalyzer:
         layer_responses_sum: Dict[str, Dict] = {
             identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
         }
-        # all_batch_response_filenames = os.listdir(os.path.join(self.responses_dir))
-        # self.num_responses = len(all_batch_response_filenames)
 
         for i, response_filename in enumerate(tqdm(self.responses_filenames)):
             if i == subset:
@@ -500,10 +509,6 @@ class ResponseAnalyzer:
 
         return self.rnn_to_prediction_responses
 
-    def plot_rnn_to_prediction_responses(self, responses_data):
-        rnn_responses = responses_data[EvaluationFields.RNN_PREDICTIONS.value]
-        predictions = responses_data[EvaluationFields.PREDICTIONS.value]
-
     def compute_mean_neuron_response_per_all_images(self, neuron_id: int, layer: str):
         """
         Computes mean spatio-temporal response of a selected neurons through all images.
@@ -512,153 +517,6 @@ class ResponseAnalyzer:
         :param layer: name of the layer where the selected neuron lies.
         """
         pass
-
-    def plot_neuron_responses_on_multiple_images(
-        self, neuron_id: int, layer: str, selected_images_ids: List[int]
-    ):
-        """
-        Plots mean neuron responses/targets per selected images.
-
-        :param neuron_id: ID of the neuron to plot the responses for.
-        :param layer: name of the layer where the selected neuron lies.
-        :param selected_images_ids: list of image ids that we are interested to plot.
-        """
-        pass
-
-    def _init_mean_response_in_time_plot_object(self, num_layers: int) -> List:
-        """
-        Initializes plot object where we would plot the results of each layer.
-
-        :param num_layers: Number of layers that we want to plot.
-        :return: Returns initializes subplots list of `axs` objects.
-        """
-
-        # Create subplots for each layer.
-        _, axs = plt.subplots(num_layers, 1, figsize=(10, 5 * num_layers))
-
-        # If there's only one layer, we ensure axs is a list for easier handling
-        if num_layers == 1:
-            axs = [axs]
-
-        return axs
-
-    def _set_mean_response_in_time_plot_variables(
-        self,
-        axs,
-        idx: int,
-        layer: str,
-        y_range: Optional[Tuple[float, float]],
-        stimulus_blank_border: Optional[float],
-    ):
-        """
-        Sets all necessary parameters of the plot of mean response in time.
-
-        :param axs: Axis object where we want to plot the results.
-        :param idx: Index of the subplot where we want to plot the results.
-        :param layer: Name of the layer that we want to plot.
-        :param y_range: Range in y-axis to plot. If `None` then use the default.
-        :param stimuli_blank_border: Time step of stimulus/blank border.
-        If `None` then use default time step computed from the stimulus duration
-        and time step length defined in `nn_model.globals`.
-        """
-
-        if not stimulus_blank_border:
-            # Stimuli/blank border time step not provided
-            # -> use default time step computed from the stimulus duration
-            # and time step length defined in `nn_model.globals`.
-            stimulus_blank_border = self.stimulus_blank_step
-
-        # Set line defining stimulus/blank border
-        axs[idx].axvline(
-            x=stimulus_blank_border,
-            color="green",
-            linestyle="--",
-            label="Stimulus/Blank border",
-        )
-
-        # Adding titles and labels
-        axs[idx].set_title(f"Layer {layer} - Mean neural response through time")
-        axs[idx].set_xlabel("Time")
-        axs[idx].set_ylabel("Mean response")
-        if y_range:
-            # y range defined
-            axs[idx].set_ylim(*y_range)  # y axis limit
-        axs[idx].legend()
-
-    def _plot_execution(self, save_fig_path: str):
-        """
-        Either show the plot or save it to given path.
-
-        :param save_fig_path: Path where to store the figure. If empty string
-        then do not save the figure (only show it).
-        """
-        plt.tight_layout()
-        if save_fig_path:
-            # Path specified (not empty) -> save the figure
-            plt.savefig(save_fig_path)
-        else:
-            # Path not specified -> only show the plot
-            plt.show()
-
-    def plot_mean_layer_data(
-        self,
-        data: Dict,
-        include_predictions: bool,
-        identifier: str = "",
-        y_range: Optional[Tuple[float, float]] = None,
-        save_fig_path: str = "",
-        stimuli_blank_border: Optional[float] = None,
-    ):
-        """
-        Plots mean layer responses either only mean targets or also together with mean predictions.
-
-        :param data: Data to be plotted. Either dictionary of `predictions` and `targets`
-        or just layers of targets.
-        :param include_predictions: Flag whether we want to include predictions in the plot creation.
-        The plot should include both mean prediction and mean target in time.
-        :param identifier: Identifier of the specific computed means to plot.
-        Possible options are: `['prediction_mean', input_mean']`. If everything else then plot the `data`.
-        :param y_range: Range in y-axis to plot. If `None` then use the default.
-        :param save_fig_path: Path where we want to store the created figure.
-        If empty string then do not save the figure and just show it.
-        :param stimuli_blank_border: Time step where is the border between stimulus
-        and blank stage.
-        """
-
-        if identifier == "prediction_mean":
-            data = self.mean_layer_responses
-        elif identifier == "input_mean":
-            data = self.mean_input_layer_responses
-
-        predictions = {}
-        targets = data
-        if include_predictions:
-            predictions = data["predictions"]
-            targets = data["targets"]
-
-        axs = self._init_mean_response_in_time_plot_object(len(targets))
-
-        # Iterate over each layer
-        for idx, layer in enumerate(targets.keys()):
-            # pred_tensor = predictions[layer].detach().numpy()
-            target_tensor = targets[layer].detach().numpy()
-
-            if include_predictions:
-                pred_tensor = predictions[layer].detach().numpy()
-                axs[idx].plot(
-                    # Insert first target value (starting point of the predictions)
-                    np.insert(pred_tensor, 0, target_tensor[0], axis=0),
-                    label="Predictions",
-                    color="blue",
-                )
-
-            axs[idx].plot(target_tensor, label="Targets", color="red")
-
-            self._set_mean_response_in_time_plot_variables(
-                axs, idx, layer, y_range, stimuli_blank_border
-            )
-
-        self._plot_execution(save_fig_path)
 
 
 if __name__ == "__main__":

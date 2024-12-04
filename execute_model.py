@@ -15,7 +15,7 @@ from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
@@ -191,25 +191,25 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value],
         help="Directory where train dataset is stored.",
     )
     parser.add_argument(
         "--test_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value],
         help="Directory where tests dataset is stored.",
     )
     parser.add_argument(
         "--subset_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value],
         help="Directory where model subset indices are stored.",
     )
     parser.add_argument(
         "--model_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.MODEL_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.MODEL_DIR.value],
         help="Directory where to store the best model parameters.",
     )
     parser.add_argument(
@@ -222,26 +222,32 @@ if __name__ == "__main__":
         "--experiment_selection_path",
         type=str,
         default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.EXPERIMENT_SELECTION_PATH
+            PathDefaultFields.EXPERIMENT_SELECTION_PATH.value
         ],
         help="Path to selected experiments used for model analysis during evaluation.",
     )
     parser.add_argument(
         "--neuron_selection_path",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.NEURON_SELECTION_PATH],
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.NEURON_SELECTION_PATH.value
+        ],
         help="Path to selected neuron IDs used for model analysis during evaluation.",
     )
     parser.add_argument(
         "--selection_results_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SELECTION_RESULTS_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.SELECTION_RESULTS_DIR.value
+        ],
         help="Path to selected neuron IDs used for model analysis during evaluation.",
     )
     parser.add_argument(
         "--full_evaluation_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.FULL_EVALUATION_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.FULL_EVALUATION_DIR.value
+        ],
         help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
     )
     parser.add_argument(
@@ -254,7 +260,7 @@ if __name__ == "__main__":
         "--neuron_model_responses_dir",
         type=str,
         default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.NEURON_MODEL_RESPONSES_DIR
+            PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value
         ],
         help="Directory where the results of neuron DNN model on testing range should be stored (filename is best model name).",
     )
@@ -281,7 +287,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=5,
+        default=7,
         help="Number of hidden layers we want to use in feed-forward model of a neuron.",
     )
     parser.add_argument(

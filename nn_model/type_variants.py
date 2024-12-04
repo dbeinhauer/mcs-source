@@ -95,3 +95,13 @@ class PathDefaultFields(Enum):
     SELECTION_RESULTS_DIR = "selection_results_dir"
     FULL_EVALUATION_DIR = "full_evaluation_dir"
     NEURON_MODEL_RESPONSES_DIR = "neuron_model_responses_dir"
+
+
+class PathPlotDefaults(Enum):
+    """
+    All default paths fields where to store the plots.
+    """
+
+    NEURON_MODULE_SEPARATE = "neuron_module_separate"
+    NEURON_MODULE_TOGETHER = "neuron_module_together"
+    MEAN_LAYER_RESPONSES = "mean_layer_responses"

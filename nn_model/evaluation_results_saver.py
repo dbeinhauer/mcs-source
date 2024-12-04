@@ -50,7 +50,7 @@ class EvaluationResultsSaver:
         Shape of tensor:(batch_size, time, num_neurons)
         :param filename: optional path of the file, if empty string then use default filename.
         Default filename:
-            f"{args.full_evaluation_directory}/{args.model_filename}/batch_{batch_index}.pkl"
+            `{args.full_evaluation_directory}/{model_filename}/batch_{batch_index}.pkl`
         """
 
         if not filename:
