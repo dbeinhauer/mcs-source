@@ -517,3 +517,11 @@ Notes after meetings:
     - also might be the reason of the bad model dynamics
     -> solution was create custom RNNCell module
 - also code refined
+
+# 5.12.2024
+- possible future steps after model captures the dynamics same as the spiking model:
+    - checking that the connections are similar (the spiking model is bio-inspired)
+    - not-showing some neurons -> predicting them from others
+        - natural transition to real-data (in the future)
+    - constraining the neurons with some connectivity rules
+        - neurons that are further has less probability to be connected
