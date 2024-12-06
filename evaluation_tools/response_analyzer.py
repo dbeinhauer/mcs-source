@@ -90,21 +90,34 @@ class ResponseAnalyzer:
 
         # Dictionary of layers and its mean neural responses through time
         # (all examples, all neurons). For both targets and predictions.
-        self.mean_layer_responses = {}
+        self.mean_layer_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Dictionary of layers and its mean neural responses through time
         # (all examples, all neurons). Only for targets (loading from Dataloader).
-        self.mean_input_layer_responses = {}
+        self.mean_input_layer_responses: Dict[str, torch.Tensor] = {}
         # Dictionary of `neuron ids` and its mean responses through time
-        self.mean_neurons_responses = {}
+        self.mean_neurons_responses: Dict[str, Dict[int, torch.Tensor]] = {}
         # Dictionary of `neuron ids` and its dictionary of responses on selected images (key is `image_id`)
-        self.selected_neurons_responses = {}
+        self.selected_neurons_responses: Dict[
+            str, Dict[int, Dict[int, torch.Tensor]]
+        ] = {}
         # Dictionary of RNN responses and its transformations from DNN neuron for each layer.
-        self.rnn_to_prediction_responses = {}
+        self.rnn_to_prediction_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Histogram bins and edges:
-        self.hist_counts = np.zeros(0)
-        self.bin_edges = np.zeros(0)
+        self.hist_counts = np.zeros(0, dtype=np.float32)
+        self.bin_edges = np.zeros(0, dtype=np.int32)
 
         self.dnn_responses = self.load_pickle_file(dnn_responses_path)
+
+    @staticmethod
+    def load_pickle_file(filename: str):
+        """
+        Loads pickle file.
+
+        :param filename: Name of the pickle file.
+        :return: Returns content of the pickle file.
+        """
+        with open(filename, "rb") as f:
+            return pickle.load(f)
 
     @staticmethod
     def load_selected_neurons(path: str) -> Dict:
@@ -114,9 +127,7 @@ class ResponseAnalyzer:
         :param path: Path of the pickle file where the neuron IDs are stored.
         :return: Returns dictionary of loaded neurons IDs for each layer.
         """
-        selected_neurons = {}
-        with open(path, "rb") as f:
-            selected_neurons = pickle.load(f)
+        selected_neurons = ResponseAnalyzer.load_pickle_file(path)
 
         return {
             layer: data
@@ -249,16 +260,6 @@ class ResponseAnalyzer:
 
         return hist_counts, bin_edges
 
-    def load_pickle_file(self, filename: str):
-        """
-        Loads pickle file.
-
-        :param filename: Name of the pickle file.
-        :return: Returns content of the pickle file.
-        """
-        with open(filename, "rb") as f:
-            return pickle.load(f)
-
     @staticmethod
     def _pad_vector_to_size(vector: torch.Tensor, size: int) -> torch.Tensor:
         """
@@ -358,7 +359,7 @@ class ResponseAnalyzer:
         total_number_examples: int,
         batch_multiplier: int,
         subset: int = -1,
-    ) -> Dict:
+    ) -> Dict[str, torch.Tensor]:
         """
         Computes mean response of each provided layer in time.
 
@@ -519,23 +520,23 @@ class ResponseAnalyzer:
         pass
 
 
-if __name__ == "__main__":
-    train_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
-    test_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
+# if __name__ == "__main__":
+#     # train_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
+#     # test_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
 
-    all_responses_dir = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10"
-    neuron_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_10_subset_10.pkl"
-    images_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl"
-    response_analyzer = ResponseAnalyzer(
-        train_spikes_dir,
-        test_spikes_dir,
-        all_responses_dir,
-        neuron_ids_path,
-        # images_ids_path,
-    )
+#     # all_responses_dir = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10"
+#     # neuron_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_10_subset_10.pkl"
+#     # images_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl"
+#     # response_analyzer = ResponseAnalyzer(
+#     #     train_spikes_dir,
+#     #     test_spikes_dir,
+#     #     all_responses_dir,
+#     #     neuron_ids_path,
+#     #     # images_ids_path,
+#     # )
 
-    # response_analyzer.get_mean_from_evaluated_data()
-    # response_analyzer.get_original_data_mean_over_time(subset=2)
-    response_analyzer.get_rnn_responses_to_neuron_responses(subset=1)
-    # response_analyzer.plot_mean_layer_data(response_analyzer.mean_layer_responses, True)
-    # response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")
+#     # response_analyzer.get_mean_from_evaluated_data()
+#     # response_analyzer.get_original_data_mean_over_time(subset=2)
+#     response_analyzer.get_rnn_responses_to_neuron_responses(subset=1)
+#     # response_analyzer.plot_mean_layer_data(response_analyzer.mean_layer_responses, True)
+#     # response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")
