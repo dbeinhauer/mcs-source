@@ -8,6 +8,30 @@ import torch
 import torch.nn as nn
 
 
+class CustomReLU(nn.Module):
+    """
+    Custom ReLU class as the classical one has problems with computational graph.
+    """
+
+    def __init__(self, min_val=0.0):
+        """
+        Initializes ReLU module.
+
+        :param min_val: ReLU clamp value (minimum).
+        """
+        super().__init__()
+        self.min_val = min_val
+
+    def forward(self, x):
+        """
+        Does simple ReLU computation. All negative values are equal to 0.
+
+        :param x: Input value.
+        :return: Input value after ReLU application.
+        """
+        return torch.clamp(x, min=self.min_val)
+
+
 # Shared complexity module
 class FeedForwardNeuron(nn.Module):
     """
@@ -49,6 +73,9 @@ class FeedForwardNeuron(nn.Module):
         # Hidden layers
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(layer_size, layer_size))
+            # TODO:
+            # layers.append(nn.BatchNorm1d(layer_size))
+            layers.append(nn.LayerNorm(layer_size))
             layers.append(nn.ReLU())  # Non-linear activation after each layer.
 
         # Final output layer: output size is 1
@@ -69,5 +96,7 @@ class FeedForwardNeuron(nn.Module):
         if self.residual:
             # We want to use residual connection.
             out += hidden
+
+        out = torch.nn.functional.relu(out)
 
         return out

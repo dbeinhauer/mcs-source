@@ -22,6 +22,8 @@ from nn_model.type_variants import (
     LayerType,
     NeuronModulePredictionFields,
     PathPlotDefaults,
+    PathDefaultFields,
+    EvaluationMeanVariants,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.model_executer import ModelExecuter, RNNCellModel
@@ -95,7 +97,7 @@ class ResponseAnalyzer:
         # (all examples, all neurons). Only for targets (loading from Dataloader).
         self.mean_input_layer_responses: Dict[str, torch.Tensor] = {}
         # Dictionary of `neuron ids` and its mean responses through time
-        self.mean_neurons_responses: Dict[str, Dict[int, torch.Tensor]] = {}
+        self.mean_neurons_responses: Dict[str, torch.Tensor] = {}
         # Dictionary of `neuron ids` and its dictionary of responses on selected images (key is `image_id`)
         self.selected_neurons_responses: Dict[
             str, Dict[int, Dict[int, torch.Tensor]]
@@ -330,10 +332,13 @@ class ResponseAnalyzer:
             ResponseAnalyzer._sum_over_neurons(data)
         )
 
-    @staticmethod
+    # @staticmethod
     def _update_time_sum(
+        self,
         all_layer_data_batch: Dict[str, torch.Tensor],
         sums_dictionary: Dict[str, torch.Tensor],
+        variant: str,
+        selected_sum: bool = False,
     ):
         """
         Takes data batch, iterates through all layers and updates each layer
@@ -342,22 +347,37 @@ class ResponseAnalyzer:
         :param all_layer_data_batch: One batch of data to add to sum of spikes in all data in time.
         :param sums_dictionary: Current sum of spikes in all layers in time.
         """
+        summing_function = ResponseAnalyzer._time_sum_over_layer
+        if variant == EvaluationMeanVariants.NEURON_MEAN.value:
+            summing_function = ResponseAnalyzer._sum_over_images
+        elif variant == EvaluationMeanVariants.IMAGE_MEAN.value:
+            summing_function = ResponseAnalyzer._sum_over_neurons
+
         for layer, layer_data in all_layer_data_batch.items():
             # Sum first across neurons dimension -> sum across batch dimension (images)
             # -> I get 1D tensor of sum of time responses
             if layer not in sums_dictionary:
                 sums_dictionary[layer] = torch.zeros(0)
 
+            if selected_sum:
+                if variant == EvaluationMeanVariants.NEURON_MEAN.value:
+                    layer_data = layer_data[:, :, self.selected_neurons[layer]]
+                elif variant == EvaluationMeanVariants.IMAGE_MEAN.value:
+                    # layer_data = layer_data[self.selected_images, :, :]
+                    pass
+
             sums_dictionary[layer] = ResponseAnalyzer._sum_vectors(
                 sums_dictionary[layer],
-                ResponseAnalyzer._time_sum_over_layer(layer_data),
+                summing_function(layer_data),
             )
 
     @staticmethod
     def _compute_mean_responses(
-        responses_sum: Dict,
+        responses_sum: Dict[str, torch.Tensor],
         total_number_examples: int,
         batch_multiplier: int,
+        # neuron_multiplier: int,
+        mean_over_neurons: bool = True,
         subset: int = -1,
     ) -> Dict[str, torch.Tensor]:
         """
@@ -378,7 +398,12 @@ class ResponseAnalyzer:
         if subset != -1:
             counter = subset * batch_multiplier
         return {
-            layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
+            # layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
+            layer: layer_data
+            / (
+                counter
+                * (nn_model.globals.MODEL_SIZES[layer] if mean_over_neurons else 1)
+            )
             for layer, layer_data in responses_sum.items()
         }
 
@@ -417,12 +442,13 @@ class ResponseAnalyzer:
                 if include_input:
                     batch_to_process = {**inputs, **targets}
 
-            ResponseAnalyzer._update_time_sum(
+            self._update_time_sum(
                 {
                     layer: torch.sum(data.float(), dim=1)
                     for layer, data in batch_to_process.items()
                 },
                 layer_responses_sum,
+                variant=EvaluationMeanVariants.LAYER_MEAN.value,
             )
 
         self.mean_input_layer_responses = self._compute_mean_responses(
@@ -431,6 +457,8 @@ class ResponseAnalyzer:
             nn_model.globals.TEST_BATCH_SIZE * trials_multiplier,
             subset=subset,
         )
+
+        return self.mean_input_layer_responses
 
     def _get_data_from_responses_file(self, filename, keys_to_select):
         return {
@@ -446,8 +474,12 @@ class ResponseAnalyzer:
         Iterates through all mean responses (both predictions and targets).
         While iterating performs selected task.
 
+        :param
         """
-        layer_responses_sum: Dict[str, Dict] = {
+        layer_responses_sum: Dict[str, Dict[str, torch.Tensor]] = {
+            identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
+        }
+        neuron_responses_sum: Dict[str, Dict[str, torch.Tensor]] = {
             identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
         }
 
@@ -464,7 +496,16 @@ class ResponseAnalyzer:
                 # if identifier not in layer_responses_sum:
                 #     layer_responses_sum[identifier] = {}
 
-                ResponseAnalyzer._update_time_sum(data, layer_responses_sum[identifier])
+                self._update_time_sum(
+                    data,
+                    layer_responses_sum[identifier],
+                    variant=EvaluationMeanVariants.LAYER_MEAN.value,
+                )
+                # self._update_time_sum(
+                #     data,
+                #     neuron_responses_sum[identifier],
+                #     variant=EvaluationMeanVariants.NEURON_MEAN.value,
+                # )
 
         self.mean_layer_responses = {
             identifier: self._compute_mean_responses(
@@ -476,6 +517,18 @@ class ResponseAnalyzer:
             )
             for identifier, layer_sum in layer_responses_sum.items()
         }
+        # self.mean_neurons_responses = {
+        #     identifier: self._compute_mean_responses(
+        #         neuron_sum,
+        #         self.num_responses,
+        #         nn_model.globals.TEST_BATCH_SIZE,
+        #         mean_over_neurons=False,
+        #         subset=subset,
+        #     )
+        #     for identifier, neuron_sum in neuron_responses_sum.items()
+        # }
+
+        return self.mean_layer_responses, self.mean_neurons_responses
 
     def get_rnn_responses_to_neuron_responses(self, subset: int = -1):
         self.rnn_to_prediction_responses = {
@@ -520,23 +573,17 @@ class ResponseAnalyzer:
         pass
 
 
-# if __name__ == "__main__":
-#     # train_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
-#     # test_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
+if __name__ == "__main__":
 
-#     # all_responses_dir = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10"
-#     # neuron_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_10_subset_10.pkl"
-#     # images_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl"
-#     # response_analyzer = ResponseAnalyzer(
-#     #     train_spikes_dir,
-#     #     test_spikes_dir,
-#     #     all_responses_dir,
-#     #     neuron_ids_path,
-#     #     # images_ids_path,
-#     # )
+    train_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value]
+    test_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value]
+    model_name = "model-10_step-20_lr-1e-05_complex_residual-True_neuron-layers-5_neuron-size-10_num-hidden-time-steps-1"
+    responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/{model_name}/"
+    dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pkl"
+    neurons_path = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl"
 
-#     # response_analyzer.get_mean_from_evaluated_data()
-#     # response_analyzer.get_original_data_mean_over_time(subset=2)
-#     response_analyzer.get_rnn_responses_to_neuron_responses(subset=1)
-#     # response_analyzer.plot_mean_layer_data(response_analyzer.mean_layer_responses, True)
-#     # response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")
+    response_analyzer = ResponseAnalyzer(
+        train_dir, test_dir, responses_dir, dnn_responses_dir, neurons_path
+    )
+
+    response_analyzer.get_mean_from_evaluated_data(subset=5)

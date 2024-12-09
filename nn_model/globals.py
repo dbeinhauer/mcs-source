@@ -13,11 +13,12 @@ DEVICE = "cuda"
 
 # Model Diminishing factor
 # SIZE_MULTIPLIER = 0.53
-# SIZE_MULTIPLIER = 0.1
+SIZE_MULTIPLIER = 0.1
 # SIZE_MULTIPLIER = 0.25
-SIZE_MULTIPLIER = 0.5
+# SIZE_MULTIPLIER = 0.5
 
 # Model time step size
+# TIME_STEP = 1
 # TIME_STEP = 5
 # TIME_STEP = 10
 # TIME_STEP = 15
@@ -71,6 +72,16 @@ DEFAULT_PATHS = {
     PathDefaultFields.FULL_EVALUATION_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
     PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/",
 }
+
+# Change default dataset paths in case the time step is 1 (not compressed).
+if TIME_STEP == 1:
+    DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value] = (
+        "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/trimmed_spikes"
+    )
+    DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value] = (
+        "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/trimmed_spikes"
+    )
+
 
 # All default paths of the plots.
 DEFAULT_PLOT_PATHS = {

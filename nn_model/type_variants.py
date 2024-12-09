@@ -105,3 +105,13 @@ class PathPlotDefaults(Enum):
     NEURON_MODULE_SEPARATE = "neuron_module_separate"
     NEURON_MODULE_TOGETHER = "neuron_module_together"
     MEAN_LAYER_RESPONSES = "mean_layer_responses"
+
+
+class EvaluationMeanVariants(Enum):
+    """
+    All variants of evaluation mean.
+    """
+
+    LAYER_MEAN = "layer_mean"
+    NEURON_MEAN = "neuron_mean"
+    IMAGE_MEAN = "image_mean"
