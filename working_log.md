@@ -525,3 +525,15 @@ Notes after meetings:
         - natural transition to real-data (in the future)
     - constraining the neurons with some connectivity rules
         - neurons that are further has less probability to be connected
+
+# 13.12.2024
+- implemented model variant where we split the inhibitory and excitatory inputs and pass two values to DNN
+    - inputs to DNN are then sum of excitatory and inhibitory layer (separate 2 values)
+- there was a problem caused by weight clipping mainly probably
+    - we had a bug in code so the original model did not clip weights
+    - after application of weight clipping we were encountering NaNs mainly in predictions of evaluation
+    - after some inspection of gradients it looks that exploding gradients are the main cause of this problem
+        - we applied gradient clipping (to prevent it)
+    - we also applied bounded ReLU (max value 20) for last neuron activation to prevent large spike predictions
+        - does not make sense to predict larger values (it is not realistic to have such many spikes in 20 ms).
+        - due our model resolution (1 ms) we set the max value to 20

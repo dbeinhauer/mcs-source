@@ -87,5 +87,5 @@ if TIME_STEP == 1:
 DEFAULT_PLOT_PATHS = {
     PathPlotDefaults.NEURON_MODULE_SEPARATE.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/dnn_module_dependencies_separate.png",
     PathPlotDefaults.NEURON_MODULE_TOGETHER.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/dnn_module_dependencies_together.png",
-    PathPlotDefaults.MEAN_LAYER_RESPONSES.value: "",
+    PathPlotDefaults.MEAN_LAYER_RESPONSES.value: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/mean_layer_responses_size_{int(SIZE_MULTIPLIER*100)}.png",
 }

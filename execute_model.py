@@ -15,7 +15,7 @@ from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
@@ -37,7 +37,7 @@ def init_wandb(arguments):
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
-        "train_subset_size": arguments.train_subset,
+        "train_subset_s ize": arguments.train_subset,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
