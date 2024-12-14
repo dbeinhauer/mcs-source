@@ -5,7 +5,7 @@ are typically used for determination of excitatory/inhibitory layer.
 
 import torch
 
-from nn_model.type_variants import WeightTypes
+from nn_model.type_variants import WeightTypes, LayerConstraintFields
 
 
 class WeightConstraint:
@@ -50,37 +50,55 @@ class WeightConstraint:
         :param kwargs: kwargs of the `torch.clamp` function specifying the
         operation on the weights.
         """
-        if hasattr(module, "weight_hh"):
-            module.weight_hh.data = torch.clamp(module.weight_hh.data, **kwargs)
+        if hasattr(module, "weights_hh"):
+            module.weights_hh.weight.data = torch.clamp(
+                module.weights_hh.weight.data, **kwargs
+            )
 
     def input_constraint(self, module):
-        """
-        Applies constraint on the `weight_ih` (input) parameters of the provided
-        layer. Applying excitatory/inhibitory constraint on the given
-        part of the input of the layer.
+        if hasattr(module, "weights_ih_exc"):
+            # module.weight_hh.data = torch.clamp(module.weight_hh.data, **kwargs)
+            module.weights_ih_exc.weight.data = torch.clamp(
+                module.weights_ih_exc.weight.data,
+                **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
+            )
+        if hasattr(module, "weights_ih_inh"):
+            # module.weight_hh.data = torch.clamp(module.weight_hh.data, **kwargs)
+            module.weights_ih_inh.weight.data = torch.clamp(
+                module.weights_ih_inh.weight.data,
+                **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
+            )
 
-        Applies the constrain in ascending order to the parts of the weights
-        based on the properties of the input of the layer specified in the
-        attribute `self.input_parameters`.
+    # def input_constraint(self, module):
+    #     """
+    #     Applies constraint on the `weight_ih` (input) parameters of the provided
+    #     layer. Applying excitatory/inhibitory constraint on the given
+    #     part of the input of the layer.
 
-        :param module: module (layer) to which we want to apply the constraint to.
-        """
-        if hasattr(module, "weight_ih"):
-            end_index = 0
-            for item in self.input_parameters:
-                # Iterate each input layer part (input neuron layers).
-                part_size = item["part_size"]
-                part_kwargs = WeightConstraint.layer_kwargs[item["part_type"]]
+    #     Applies the constrain in ascending order to the parts of the weights
+    #     based on the properties of the input of the layer specified in the
+    #     attribute `self.input_parameters`.
 
-                # Define the section where the constraint should be applied.
-                start_index = end_index
-                end_index += part_size
+    #     :param module: module (layer) to which we want to apply the constraint to.
+    #     """
+    #     if hasattr(module, "weights_ih"):
+    #         end_index = 0
+    #         for item in self.input_parameters:
+    #             # Iterate each input layer part (input neuron layers).
+    #             part_size = item[LayerConstraintFields.SIZE.value]
+    #             part_kwargs = WeightConstraint.layer_kwargs[
+    #                 item[LayerConstraintFields.TYPE.value]
+    #             ]
 
-                # Apply constraint to the selected section of input weights.
-                module.weight_ih.data[start_index:end_index] = torch.clamp(
-                    module.weight_ih.data[start_index:end_index],
-                    **part_kwargs,
-                )
+    #             # Define the section where the constraint should be applied.
+    #             start_index = end_index
+    #             end_index += part_size
+
+    #             # Apply constraint to the selected section of input weights.
+    #             module.weights_ih.weight.data[start_index:end_index] = torch.clamp(
+    #                 module.weights_ih.weight.data[start_index:end_index],
+    #                 **part_kwargs,
+    #             )
 
 
 class ExcitatoryWeightConstraint(WeightConstraint):

@@ -53,6 +53,15 @@ class MetricTypes(Enum):
     CC_NORM = "cc_norm"
 
 
+class LayerConstraintFields(Enum):
+    """
+    All fields of the layer constraints (to determine excitatory/inhibitory layers).
+    """
+
+    SIZE = "size"
+    TYPE = "type"
+
+
 class PredictionTypes(Enum):
     """
     All variants of predictions that are provided by the model.

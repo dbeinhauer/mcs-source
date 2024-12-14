@@ -13,6 +13,7 @@ from nn_model.type_variants import (
     TimeStepVariant,
     ModelTypes,
     NeuronModulePredictionFields,
+    LayerConstraintFields,
 )
 from nn_model.weights_constraints import (
     WeightTypes,
@@ -54,8 +55,10 @@ class LayerConfig:
         self.neuron_model = neuron_model
 
         # Determine weight constraints for the layer (excitatory/inhibitory).
-        input_constraints = self._determine_input_constraints()
-        self.constraint = self._determine_constraint(layer_type, input_constraints)
+        self.input_constraints = (
+            self._determine_input_constraints()
+        )  # Constraints setup (for determining inh/excitatory in the architecture).
+        self.constraint = self._determine_constraint(layer_type, self.input_constraints)
 
     def _determine_input_constraints(self) -> List[Dict]:
         """
@@ -73,8 +76,10 @@ class LayerConfig:
         """
         return [
             {
-                "part_size": nn_model.globals.MODEL_SIZES[layer[0]],
-                "part_type": self._get_constraint_type(layer[0]),
+                LayerConstraintFields.SIZE.value: nn_model.globals.MODEL_SIZES[
+                    layer[0]
+                ],
+                LayerConstraintFields.TYPE.value: self._get_constraint_type(layer[0]),
             }
             for layer in self.input_layers_parameters
         ]
@@ -335,7 +340,9 @@ class RNNCellModel(nn.Module):
                 for layer_name, _ in RNNCellModel.layers_input_parameters[layer]
             ),
             self.layers_configs[layer].size,
+            layer,
             self.layers_configs[layer].constraint,
+            self.layers_configs[layer].input_constraints,
             self.layers_configs[layer].neuron_model,
         )
 

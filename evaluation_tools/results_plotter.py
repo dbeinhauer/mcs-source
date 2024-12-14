@@ -15,6 +15,7 @@ from nn_model.type_variants import (
     PathPlotDefaults,
     EvaluationFields,
 )
+from response_analyzer import ResponseAnalyzer
 
 
 class ResultsPlotter:
@@ -26,7 +27,9 @@ class ResultsPlotter:
         pass
 
     @staticmethod
-    def save_figure_logic(fig_path: str, save_fig: bool, plot_key: str):
+    def save_figure_logic(
+        fig_path: str, save_fig: bool, plot_key: str, layer: str = ""
+    ):
         """
         Does common logic regarding saving or showing the plot.
 
@@ -39,6 +42,11 @@ class ResultsPlotter:
             if not fig_path:
                 # We have not specified the path -> use the default one.
                 fig_path = nn_model.globals.DEFAULT_PLOT_PATHS[plot_key]
+                if layer:
+                    splitted_fig_path = fig_path.split(".")
+                    fig_path = (
+                        splitted_fig_path[0] + f"_{layer}." + splitted_fig_path[1]
+                    )
 
             plt.savefig(fig_path)
         else:
@@ -217,7 +225,7 @@ class ResultsPlotter:
         )
 
         # Adding titles and labels
-        axs[idx].set_title(f"Layer {layer} - Mean neural response through time")
+        # axs[idx].set_title(f"Layer {layer} - Mean neural response through time")
         axs[idx].set_xlabel("Time")
         axs[idx].set_ylabel("Mean response")
         if y_range:
@@ -242,6 +250,27 @@ class ResultsPlotter:
             axs = [axs]
 
         return axs
+
+    @staticmethod
+    def _create_mean_responses_plot(
+        target_tensor, pred_tensor, axis, labels, colors, include_predictions=True
+    ):
+        target_tensor = target_tensor.detach().numpy()
+
+        if include_predictions:
+            pred_tensor = pred_tensor.detach().numpy()
+            axis.plot(
+                # Insert first target value (starting point of the predictions)
+                np.insert(pred_tensor, 0, target_tensor[0], axis=0),
+                label=labels[EvaluationFields.PREDICTIONS.value],
+                color=colors[EvaluationFields.PREDICTIONS.value],
+            )
+
+        axis.plot(
+            target_tensor,
+            label=labels[EvaluationFields.TARGETS.value],
+            color=colors[EvaluationFields.TARGETS.value],
+        )
 
     @staticmethod
     def plot_mean_layer_data(
@@ -285,19 +314,23 @@ class ResultsPlotter:
 
         # Iterate over each layer
         for idx, layer in enumerate(targets.keys()):
-            target_tensor = targets[layer].detach().numpy()
 
-            if include_predictions:
-                pred_tensor = predictions[layer].detach().numpy()
-                axs[idx].plot(
-                    # Insert first target value (starting point of the predictions)
-                    np.insert(pred_tensor, 0, target_tensor[0], axis=0),
-                    label="Predictions",
-                    color="blue",
-                )
+            ResultsPlotter._create_mean_responses_plot(
+                targets[layer],
+                predictions[layer],
+                axis=axs[idx],
+                labels={
+                    EvaluationFields.TARGETS.value: "Targets",
+                    EvaluationFields.PREDICTIONS.value: "Predictions",
+                },
+                colors={
+                    EvaluationFields.TARGETS.value: "red",
+                    EvaluationFields.PREDICTIONS.value: "blue",
+                },
+                include_predictions=include_predictions,
+            )
 
-            axs[idx].plot(target_tensor, label="Targets", color="red")
-
+            axs[idx].set_title(f"Layer {layer} - Mean neural response through time")
             ResultsPlotter._set_mean_response_in_time_plot_variables(
                 axs, idx, layer, y_range, stimuli_blank_border
             )
@@ -305,3 +338,73 @@ class ResultsPlotter:
         ResultsPlotter.save_figure_logic(
             fig_path, save_fig, PathPlotDefaults.MEAN_LAYER_RESPONSES.value
         )
+
+    @staticmethod
+    def plot_mean_neuron_responses(
+        data: Dict,
+        mean_data: Dict,
+        y_range: Optional[Tuple[float, float]] = None,
+        save_fig: bool = False,
+        fig_path: str = "",
+        stimuli_blank_border: Optional[float] = None,
+    ):
+
+        predictions = data[EvaluationFields.PREDICTIONS.value]
+        targets = data[EvaluationFields.TARGETS.value]
+        mean_predictions = mean_data[EvaluationFields.PREDICTIONS.value]
+        mean_targets = mean_data[EvaluationFields.TARGETS.value]
+        neuron_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_25_subset_10.pkl"
+
+        selected_neurons = ResponseAnalyzer.load_pickle_file(neuron_ids_path)
+
+        for layer in targets:
+            # print(selected_neurons)
+            num_neurons = selected_neurons[layer].shape[0]  # predictions[layer].size(1)
+            _, axs = plt.subplots(num_neurons, 1, figsize=(10, 5 * num_neurons))
+
+            for i in range(num_neurons):
+                neuron_id = selected_neurons[layer][i]
+
+                ResultsPlotter._create_mean_responses_plot(
+                    targets[layer][:, neuron_id],
+                    predictions[layer][:, neuron_id],
+                    axis=axs[i],
+                    labels={
+                        EvaluationFields.TARGETS.value: "Targets",
+                        EvaluationFields.PREDICTIONS.value: "Predictions",
+                    },
+                    colors={
+                        EvaluationFields.TARGETS.value: "red",
+                        EvaluationFields.PREDICTIONS.value: "blue",
+                    },
+                    include_predictions=True,
+                )
+
+                pred_tensor = mean_predictions[layer].detach().numpy()
+                axs[i].plot(
+                    # Insert first target value (starting point of the predictions)
+                    np.insert(pred_tensor, 0, mean_targets[layer][0], axis=0),
+                    label="Mean Predictions",
+                    color="black",
+                    # linestyle="loosely dashed",
+                    linestyle="dotted",
+                    # linewidth=1.5,
+                )
+
+                axs[i].set_title(
+                    f"Neuron {neuron_id} in layer {layer} - Mean response through time"
+                )
+
+                ResultsPlotter._set_mean_response_in_time_plot_variables(
+                    axs, i, layer, y_range, stimuli_blank_border
+                )
+
+            # splitted_fig_path = fig_path.split(".")
+            # layer_path = splitted_fig_path[0] + f"_{layer}." + splitted_fig_path[1]
+
+            ResultsPlotter.save_figure_logic(
+                fig_path,
+                save_fig,
+                PathPlotDefaults.MEAN_LAYER_RESPONSES.value,
+                layer=layer,
+            )

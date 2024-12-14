@@ -282,6 +282,48 @@ class ResponseAnalyzer:
         )
 
     @staticmethod
+    def pad_tensors(tensor1, tensor2):
+
+        size1 = tensor1.size()
+        size2 = tensor2.size()
+
+        # Find the maximum size for each dimension
+        max_size = [max(s1, s2) for s1, s2 in zip(size1, size2)]
+
+        # Calculate the padding needed for each tensor
+        padding1 = [max_dim - s for s, max_dim in zip(size1, max_size)]
+        padding2 = [max_dim - s for s, max_dim in zip(size2, max_size)]
+
+        # # Create padding tuples (reverse order for F.pad)
+        # padding1 = sum([[0, p] for p in padding1], [])
+        # padding2 = sum([[0, p] for p in padding2], [])
+
+        # Create padding tuples (reverse order for F.pad, last dimension first)
+        padding1 = [
+            item for sublist in reversed([[0, p] for p in padding1]) for item in sublist
+        ]
+        padding2 = [
+            item for sublist in reversed([[0, p] for p in padding2]) for item in sublist
+        ]
+
+        # Pad both tensors
+        padded_tensor1 = torch.nn.functional.pad(
+            tensor1,
+            padding1,
+            "constant",
+            0,
+        )
+        padded_tensor2 = torch.nn.functional.pad(
+            tensor2,
+            padding2,
+            "constant",
+            0,
+        )
+
+        # Sum the tensors
+        return padded_tensor1 + padded_tensor2
+
+    @staticmethod
     def _sum_vectors(vector1: torch.Tensor, vector2: torch.Tensor) -> torch.Tensor:
         """
         Takes two 1D vectors checks their sizes. If sizes are not matching then pads the smaller
@@ -291,12 +333,14 @@ class ResponseAnalyzer:
         :param vector2: Second vector to be summed.
         :return: Returns summed vectors.
         """
-        if vector1.shape[0] < vector2.shape[0]:
-            vector1 = ResponseAnalyzer._pad_vector_to_size(vector1, vector2.shape[0])
-        else:
-            vector2 = ResponseAnalyzer._pad_vector_to_size(vector2, vector1.shape[0])
+        # if vector1.shape[0] < vector2.shape[0]:
+        #     vector1 = ResponseAnalyzer._pad_vector_to_size(vector1, vector2.shape[0])
+        # else:
+        #     vector2 = ResponseAnalyzer._pad_vector_to_size(vector2, vector1.shape[0])
 
-        return vector1 + vector2
+        # return vector1 + vector2
+
+        return ResponseAnalyzer.pad_tensors(vector1, vector2)
 
     @staticmethod
     def _sum_over_neurons(data: torch.Tensor, dim: int = 2) -> torch.Tensor:
@@ -358,10 +402,13 @@ class ResponseAnalyzer:
             # -> I get 1D tensor of sum of time responses
             if layer not in sums_dictionary:
                 sums_dictionary[layer] = torch.zeros(0)
+                if variant == EvaluationMeanVariants.NEURON_MEAN.value:
+                    sums_dictionary[layer] = torch.zeros((1, layer_data.size(2)))
 
             if selected_sum:
                 if variant == EvaluationMeanVariants.NEURON_MEAN.value:
-                    layer_data = layer_data[:, :, self.selected_neurons[layer]]
+                    # layer_data = layer_data[:, :, self.selected_neurons[layer]]
+                    layer_data = layer_data
                 elif variant == EvaluationMeanVariants.IMAGE_MEAN.value:
                     # layer_data = layer_data[self.selected_images, :, :]
                     pass
@@ -501,11 +548,11 @@ class ResponseAnalyzer:
                     layer_responses_sum[identifier],
                     variant=EvaluationMeanVariants.LAYER_MEAN.value,
                 )
-                # self._update_time_sum(
-                #     data,
-                #     neuron_responses_sum[identifier],
-                #     variant=EvaluationMeanVariants.NEURON_MEAN.value,
-                # )
+                self._update_time_sum(
+                    data,
+                    neuron_responses_sum[identifier],
+                    variant=EvaluationMeanVariants.NEURON_MEAN.value,
+                )
 
         self.mean_layer_responses = {
             identifier: self._compute_mean_responses(
@@ -517,16 +564,16 @@ class ResponseAnalyzer:
             )
             for identifier, layer_sum in layer_responses_sum.items()
         }
-        # self.mean_neurons_responses = {
-        #     identifier: self._compute_mean_responses(
-        #         neuron_sum,
-        #         self.num_responses,
-        #         nn_model.globals.TEST_BATCH_SIZE,
-        #         mean_over_neurons=False,
-        #         subset=subset,
-        #     )
-        #     for identifier, neuron_sum in neuron_responses_sum.items()
-        # }
+        self.mean_neurons_responses = {
+            identifier: self._compute_mean_responses(
+                neuron_sum,
+                self.num_responses,
+                nn_model.globals.TEST_BATCH_SIZE,
+                mean_over_neurons=False,
+                subset=subset,
+            )
+            for identifier, neuron_sum in neuron_responses_sum.items()
+        }
 
         return self.mean_layer_responses, self.mean_neurons_responses
 
@@ -577,9 +624,9 @@ if __name__ == "__main__":
 
     train_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value]
     test_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value]
-    model_name = "model-10_step-20_lr-1e-05_complex_residual-True_neuron-layers-5_neuron-size-10_num-hidden-time-steps-1"
+    model_name = "model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10_num-hidden-time-steps-1"
     responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/{model_name}/"
-    dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pkl"
+    dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pth"
     neurons_path = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl"
 
     response_analyzer = ResponseAnalyzer(
@@ -587,3 +634,4 @@ if __name__ == "__main__":
     )
 
     response_analyzer.get_mean_from_evaluated_data(subset=5)
+    print(response_analyzer.mean_neurons_responses)

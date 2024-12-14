@@ -440,6 +440,11 @@ class ModelExecuter:
 
         # Backward and optimizer steps for the sum of losses.
         total_loss.backward()
+
+        # Gradient clipping to prevent exploding gradients.
+        # It might make more sense using some parameter to select max value.
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+
         self.optimizer.step()
 
         del all_predictions
