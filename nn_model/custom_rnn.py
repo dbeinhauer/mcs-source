@@ -55,18 +55,18 @@ class CustomRNNCell(nn.Module):
 
         # Define module weights and biases.
         # TODO: Adding exc/inh weights.
-        # self.weights_ih = nn.Linear(input_size, hidden_size)
-        self.weights_ih_exc = nn.Linear(
-            self.excitatory_size, hidden_size
-        )  # Input excitatory
-        self.weights_ih_inh = nn.Linear(
-            self.inhibitory_size, hidden_size
-        )  # Input inhibitory
+        self.weights_ih = nn.Linear(input_size, hidden_size)
+        # self.weights_ih_exc = nn.Linear(
+        #     self.excitatory_size, hidden_size
+        # )  # Input excitatory
+        # self.weights_ih_inh = nn.Linear(
+        #     self.inhibitory_size, hidden_size
+        # )  # Input inhibitory
         self.weights_hh = nn.Linear(hidden_size, hidden_size)
 
-        # self.b_ih = nn.Parameter(torch.Tensor(hidden_size))
-        self.b_ih_exc = nn.Parameter(torch.Tensor(hidden_size))  # Input excitatory
-        self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
+        self.b_ih = nn.Parameter(torch.Tensor(hidden_size))
+        # self.b_ih_exc = nn.Parameter(torch.Tensor(hidden_size))  # Input excitatory
+        # self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
         self.b_hh = nn.Parameter(torch.Tensor(hidden_size))
 
         self._init_weights()
@@ -108,13 +108,13 @@ class CustomRNNCell(nn.Module):
         Initializes module weights and biases. Weights are initialized using
         uniform distribution. Biases are initialized with zeros.
         """
-        # nn.init.kaiming_uniform_(self.weights_ih.weight, nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_ih_exc.weight, nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_ih_inh.weight, nonlinearity="linear")
+        nn.init.kaiming_uniform_(self.weights_ih.weight, nonlinearity="linear")
+        # nn.init.kaiming_uniform_(self.weights_ih_exc.weight, nonlinearity="linear")
+        # nn.init.kaiming_uniform_(self.weights_ih_inh.weight, nonlinearity="linear")
         nn.init.kaiming_uniform_(self.weights_hh.weight, nonlinearity="linear")
-        # nn.init.zeros_(self.b_ih)
-        nn.init.zeros_(self.b_ih_exc)
-        nn.init.zeros_(self.b_ih_inh)
+        nn.init.zeros_(self.b_ih)
+        # nn.init.zeros_(self.b_ih_exc)
+        # nn.init.zeros_(self.b_ih_inh)
         nn.init.zeros_(self.b_hh)
 
     def forward(
@@ -129,26 +129,26 @@ class CustomRNNCell(nn.Module):
         :return: Returns linearity step of the RNNCell module.
         NOTE: It expects that the non-linearity would be used outside of the module.
         """
-        # Take excitatory and inhibitory parts
-        input_excitatory = input_data[:, self.excitatory_indices]
-        input_inhibitory = input_data[:, self.inhibitory_indices]
+        # # Take excitatory and inhibitory parts
+        # input_excitatory = input_data[:, self.excitatory_indices]
+        # input_inhibitory = input_data[:, self.inhibitory_indices]
 
-        # Apply linear step to inhibitory and excitatory part
-        in_exc_linear = self.weights_ih_exc(input_excitatory) + self.b_ih_exc
-        in_inh_linear = self.weights_ih_inh(input_inhibitory) + self.b_ih_inh
+        # # Apply linear step to inhibitory and excitatory part
+        # in_exc_linear = self.weights_ih_exc(input_excitatory) + self.b_ih_exc
+        # in_inh_linear = self.weights_ih_inh(input_inhibitory) + self.b_ih_inh
 
-        # Apply linear step to self recurrent connection and
-        # decide whether it is excitatory or inhibitory.
-        hidden_linear = self.weights_hh(hidden) + self.b_hh
-        if self.layer_name in nn_model.globals.EXCITATORY_LAYERS:
-            # In case excitatory layer -> add to excitatory part the self recurrent part
-            in_exc_linear += hidden_linear
-        elif self.layer_name in nn_model.globals.INHIBITORY_LAYERS:
-            # Inhibitory layer -> add self recurrent part to inhibitory
-            in_inh_linear += hidden_linear
-
-        return in_exc_linear, in_inh_linear
-
-        # in_linear = self.weights_ih(input_data) + self.b_ih
+        # # Apply linear step to self recurrent connection and
+        # # decide whether it is excitatory or inhibitory.
         # hidden_linear = self.weights_hh(hidden) + self.b_hh
-        # return in_linear + hidden_linear
+        # if self.layer_name in nn_model.globals.EXCITATORY_LAYERS:
+        #     # In case excitatory layer -> add to excitatory part the self recurrent part
+        #     in_exc_linear += hidden_linear
+        # elif self.layer_name in nn_model.globals.INHIBITORY_LAYERS:
+        #     # Inhibitory layer -> add self recurrent part to inhibitory
+        #     in_inh_linear += hidden_linear
+
+        # return in_exc_linear, in_inh_linear
+
+        in_linear = self.weights_ih(input_data) + self.b_ih
+        hidden_linear = self.weights_hh(hidden) + self.b_hh
+        return in_linear + hidden_linear

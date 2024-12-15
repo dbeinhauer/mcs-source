@@ -69,8 +69,8 @@ class FeedForwardNeuron(nn.Module):
         layers = nn.ModuleList()
 
         # Input layer
-        # layers.append(nn.Linear(1, layer_size))
-        layers.append(nn.Linear(2, layer_size))
+        layers.append(nn.Linear(1, layer_size))
+        # layers.append(nn.Linear(2, layer_size))
         # Hidden layers
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(layer_size, layer_size))
@@ -96,10 +96,10 @@ class FeedForwardNeuron(nn.Module):
         out = self.network(hidden)
         if self.residual:
             # We want to use residual connection.
-            # out += hidden
-            out += hidden.sum(
-                dim=1, keepdim=True
-            )  # Sum over second dimension (sum excitatory and inhibitory outputs)
+            out += hidden
+            # out += hidden.sum(
+            #     dim=1, keepdim=True
+            # )  # Sum over second dimension (sum excitatory and inhibitory outputs)
 
         # out = torch.nn.functional.relu(out)
         out = torch.nn.functional.hardtanh(out, min_val=0.0, max_val=20.0)
