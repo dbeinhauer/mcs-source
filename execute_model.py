@@ -37,7 +37,7 @@ def init_wandb(arguments):
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
-        "train_subset_s ize": arguments.train_subset,
+        "train_subset_size": arguments.train_subset,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -93,6 +93,7 @@ def init_model_path(arguments) -> str:
                 f"_neuron-layers-{arguments.neuron_num_layers}",
                 f"_neuron-size-{arguments.neuron_layer_size}",
                 f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
+                f"_gradient-clip-{arguments.gradient_clip}",
                 ".pth",
             ]
         )
@@ -264,19 +265,26 @@ if __name__ == "__main__":
         ],
         help="Directory where the results of neuron DNN model on testing range should be stored (filename is best model name).",
     )
-    # Model parameters:
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="complex",
-        choices=[model_type.value for model_type in ModelTypes],
-        help="Model variant that we want to use.",
-    )
+    # Training parameters
     parser.add_argument(
         "--learning_rate",
         type=float,
         default=0.00001,
         help="Learning rate to use in model training.",
+    )
+    parser.add_argument(
+        "--gradient_clip",
+        type=float,
+        default=10.0,
+        help="Gradient clipping max norm.",
+    )
+    # Model parameters:
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=ModelTypes.COMPLEX_JOINT.value,
+        choices=[model_type.value for model_type in ModelTypes],
+        help="Model variant that we want to use.",
     )
     parser.add_argument(
         "--num_epochs",

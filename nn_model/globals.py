@@ -13,8 +13,8 @@ DEVICE = "cuda"
 
 # Model Diminishing factor
 # SIZE_MULTIPLIER = 0.53
-# SIZE_MULTIPLIER = 0.1
-SIZE_MULTIPLIER = 0.25
+SIZE_MULTIPLIER = 0.1
+# SIZE_MULTIPLIER = 0.25
 # SIZE_MULTIPLIER = 0.5
 
 # Model time step size

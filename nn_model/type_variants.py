@@ -42,7 +42,8 @@ class ModelTypes(Enum):
     """
 
     SIMPLE = "simple"
-    COMPLEX = "complex"
+    COMPLEX_JOINT = "complex_joint"
+    COMPLEX_SEPARATE = "complex_separate"
 
 
 class MetricTypes(Enum):

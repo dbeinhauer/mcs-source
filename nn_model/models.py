@@ -295,10 +295,13 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and
         appropriate neuron model (shared complexity).
         """
-        if self.neuron_type == ModelTypes.COMPLEX.value:
+        if self.neuron_type in [
+            ModelTypes.COMPLEX_JOINT.value,
+            ModelTypes.COMPLEX_SEPARATE.value,
+        ]:
             # Complex complexity.
             return self._init_complex_neuron_model(
-                self.neuron_model_kwargs[ModelTypes.COMPLEX.value]
+                self.neuron_model_kwargs[self.neuron_type]
             )
 
         # Simple neuron (no additional complexity).

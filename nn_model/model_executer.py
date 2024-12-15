@@ -51,6 +51,7 @@ class ModelExecuter:
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(arguments.learning_rate)
+        self.gradient_clip = arguments.gradient_clip  # Gradient clipping upper bound
 
         # Evaluation metric
         self.evaluation_metrics = NormalizedCrossCorrelation()
@@ -129,16 +130,30 @@ class ModelExecuter:
         if arguments.model == ModelTypes.SIMPLE.value:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
             return {}
-        if arguments.model == ModelTypes.COMPLEX.value:
+        if arguments.model in [
+            ModelTypes.COMPLEX_JOINT.value,
+            ModelTypes.COMPLEX_SEPARATE.value,
+        ]:
             # Model with neuron that consist of small multilayer Feed-Forward NN
             # of th same layer sizes in each layer.
             return {
-                ModelTypes.COMPLEX.value: {
+                arguments.model: {
+                    "model_type": arguments.model,
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
                     "residual": not arguments.neuron_not_residual,
                 }
             }
+        # if arguments.model == ModelTypes.COMPLEX_SEPARATE.value:
+        #     # Model with neuron that consist of small multilayer Feed-Forward NN
+        #     # of th same layer sizes in each layer.
+        #     return {
+        #         ModelTypes.COMPLEX_SEPARATE.value: {
+        #             "num_layers": arguments.neuron_num_layers,
+        #             "layer_size": arguments.neuron_layer_size,
+        #             "residual": not arguments.neuron_not_residual,
+        #         }
+        #     }
 
         # Wrongly defined complexity type -> treat as simple neuron.
         print("Wrong complexity, using simple complexity layer.")
@@ -443,7 +458,7 @@ class ModelExecuter:
 
         # Gradient clipping to prevent exploding gradients.
         # It might make more sense using some parameter to select max value.
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
 
         self.optimizer.step()
 

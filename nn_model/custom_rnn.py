@@ -4,13 +4,13 @@ It is especially needed due the need to play with custom neuron models instead
 of just simple non-linearity function.
 """
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import LayerConstraintFields, WeightTypes
+from nn_model.type_variants import LayerConstraintFields, WeightTypes, ModelTypes
 
 
 class CustomRNNCell(nn.Module):
@@ -29,6 +29,7 @@ class CustomRNNCell(nn.Module):
         hidden_size: int,
         layer_name: str,
         input_constraints: List[Dict],
+        model_type: str,
     ):
         """
         Initializes the custom RNNCell module.
@@ -38,6 +39,7 @@ class CustomRNNCell(nn.Module):
         :param layer_name: Name of the layer which this module represents
         (to determine whether it is excitatory or inhibitory).
         :param input_constraints:
+        :param model_type: Variant of the complex neuron (value from `ModelTypes`).
         """
         super(CustomRNNCell, self).__init__()
         self.input_size = input_size
@@ -45,6 +47,13 @@ class CustomRNNCell(nn.Module):
 
         self.layer_name = layer_name
         self.input_constraints = input_constraints
+
+        # Assert model type is what we expected.
+        assert model_type in [
+            ModelTypes.COMPLEX_JOINT.value,
+            ModelTypes.COMPLEX_SEPARATE.value,
+        ]
+        self.model_type = model_type
 
         # Select excitatory and inhibitory indices and determine their sizes.
         self.excitatory_indices, self.inhibitory_indices = (
@@ -109,9 +118,9 @@ class CustomRNNCell(nn.Module):
         uniform distribution. Biases are initialized with zeros.
         """
         # nn.init.kaiming_uniform_(self.weights_ih.weight, nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_ih_exc.weight, nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_ih_inh.weight, nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_hh.weight, nonlinearity="linear")
+        nn.init.kaiming_uniform_(self.weights_ih_exc.weight)  # , nonlinearity="linear")
+        nn.init.kaiming_uniform_(self.weights_ih_inh.weight)  # , nonlinearity="linear")
+        nn.init.kaiming_uniform_(self.weights_hh.weight)  # , nonlinearity="linear")
         # nn.init.zeros_(self.b_ih)
         nn.init.zeros_(self.b_ih_exc)
         nn.init.zeros_(self.b_ih_inh)
@@ -119,14 +128,15 @@ class CustomRNNCell(nn.Module):
 
     def forward(
         self, input_data: torch.Tensor, hidden: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, ...]:
         """
         Forward step the cell. One time step.
 
         :param input_data: Input data (all inputs without itself).
         :param hidden: Output data of the previous step (previous predictions of itself
         modified by non-linearity function).
-        :return: Returns linearity step of the RNNCell module.
+        :return: Returns linearity step of the RNNCell module (either sum of inhibitory and
+        excitatory (`complex_joint` model) or tuple of both outputs (`complex_separate` model).
         NOTE: It expects that the non-linearity would be used outside of the module.
         """
         # Take excitatory and inhibitory parts
@@ -146,6 +156,10 @@ class CustomRNNCell(nn.Module):
         elif self.layer_name in nn_model.globals.INHIBITORY_LAYERS:
             # Inhibitory layer -> add self recurrent part to inhibitory
             in_inh_linear += hidden_linear
+
+        if self.model_type == ModelTypes.COMPLEX_JOINT.value:
+            # In case we do not want to
+            return in_exc_linear + in_inh_linear
 
         return in_exc_linear, in_inh_linear
 
