@@ -443,7 +443,7 @@ class ModelExecuter:
 
         # Gradient clipping to prevent exploding gradients.
         # It might make more sense using some parameter to select max value.
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
 
         self.optimizer.step()
 

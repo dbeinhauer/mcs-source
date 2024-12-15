@@ -108,7 +108,7 @@ class ResponseAnalyzer:
         self.hist_counts = np.zeros(0, dtype=np.float32)
         self.bin_edges = np.zeros(0, dtype=np.int32)
 
-        self.dnn_responses = self.load_pickle_file(dnn_responses_path)
+        # self.dnn_responses = self.load_pickle_file(dnn_responses_path)
 
     @staticmethod
     def load_pickle_file(filename: str):
