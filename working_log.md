@@ -537,3 +537,15 @@ Notes after meetings:
     - we also applied bounded ReLU (max value 20) for last neuron activation to prevent large spike predictions
         - does not make sense to predict larger values (it is not realistic to have such many spikes in 20 ms).
         - due our model resolution (1 ms) we set the max value to 20
+
+# 17.12.2024
+- currently we are encountering issues with the training the model caused by the weight constraints
+    - clipping to absolute value might help (instead of clipping to 0)
+    - better initialization of the inhibitory/excitatory weights
+        - as there are approximately 4 times less inhibitory neurons the weights should be 4 times higher
+        - it might be also good to use adaptive learning rate for each layer
+            - inhibitory should have 4 time lower (because they are in average 4 times higher)
+        - also we know that the weights are generally distributed using Gauss distribution
+            - try to apply this too
+    - generally dealing with gradients might improve the training
+    - maybe study gradient exploding problem and its improvements on weights in general case and try to apply this to constraint example (find the analogies)
