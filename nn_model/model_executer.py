@@ -16,6 +16,7 @@ from nn_model.type_variants import (
     LayerType,
     ModelTypes,
     PredictionTypes,
+    OptimizerTypes,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -50,7 +51,10 @@ class ModelExecuter:
         # Model Init
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
         self.criterion = self._init_criterion()
-        self.optimizer = self._init_optimizer(arguments.learning_rate)
+        self.optimizer = self._init_optimizer(
+            arguments.optimizer_type, arguments.learning_rate
+        )
+
         self.gradient_clip = arguments.gradient_clip  # Gradient clipping upper bound
 
         # Evaluation metric
@@ -131,10 +135,10 @@ class ModelExecuter:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
             return {}
         if arguments.model in [
-            ModelTypes.COMPLEX_JOINT.value,
-            ModelTypes.COMPLEX_SEPARATE.value,
+            ModelTypes.DNN_JOINT.value,
+            ModelTypes.DNN_SEPARATE.value,
         ]:
-            # Model with neuron that consist of small multilayer Feed-Forward NN
+            # Model with neuron that consist of small NN.
             # of th same layer sizes in each layer.
             return {
                 arguments.model: {
@@ -144,16 +148,18 @@ class ModelExecuter:
                     "residual": not arguments.neuron_not_residual,
                 }
             }
-        # if arguments.model == ModelTypes.COMPLEX_SEPARATE.value:
-        #     # Model with neuron that consist of small multilayer Feed-Forward NN
-        #     # of th same layer sizes in each layer.
-        #     return {
-        #         ModelTypes.COMPLEX_SEPARATE.value: {
-        #             "num_layers": arguments.neuron_num_layers,
-        #             "layer_size": arguments.neuron_layer_size,
-        #             "residual": not arguments.neuron_not_residual,
-        #         }
-        #     }
+        if arguments.model in [
+            ModelTypes.RNN_JOINT.value,
+            ModelTypes.RNN_SEPARATE.value,
+        ]:
+            return {
+                arguments.model: {
+                    "model_type": arguments.model,
+                    "num_layers": arguments.neuron_num_layers,
+                    "layer_size": arguments.neuron_layer_size,
+                    "residual": not arguments.neuron_not_residual,
+                }
+            }
 
         # Wrongly defined complexity type -> treat as simple neuron.
         print("Wrong complexity, using simple complexity layer.")
@@ -170,6 +176,7 @@ class ModelExecuter:
             self.layer_sizes,
             arguments.num_hidden_time_steps,
             arguments.model,
+            arguments.weight_initialization,
             neuron_model_kwargs=ModelExecuter._get_neuron_model_kwargs(arguments),
         )
 
@@ -181,14 +188,52 @@ class ModelExecuter:
         """
         return torch.nn.MSELoss()
 
-    def _init_optimizer(self, learning_rate: float):
+    def _init_exc_inh_specific_learning_rate(self, learning_rate):
+
+        # Identify layers to apply a 4x lower learning rate
+        selected_params = [
+            self.model.layers.V1_Exc_L23.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L23.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L23.rnn_cell.weights_hh.weight,
+            self.model.layers.V1_Exc_L4.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L4.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L4.rnn_cell.weights_hh.weight,
+        ]  # List of selected layer objects
+
+        selected_param_ids = {id(p) for p in selected_params}
+
+        # Create parameter groups
+        param_groups = [
+            # Parameters with lower learning rate
+            {"params": selected_params, "lr": learning_rate / 4},
+            # All other parameters
+            {
+                "params": [
+                    p
+                    for p in self.model.parameters()
+                    if id(p) not in selected_param_ids
+                ],
+                "lr": learning_rate,
+            },
+        ]
+
+        return param_groups
+
+    def _init_optimizer(self, optimizer_type: str, learning_rate: float):
         """
         Initializes model optimizer.
 
         :param learning_rate: learning rate of the optimizer.
         :return: Returns used model optimizer (Adam).
         """
-        return optim.Adam(self.model.parameters(), lr=learning_rate)
+        # By default same learning rate for all layers.
+        param_groups = self.model.parameters()
+
+        if optimizer_type == OptimizerTypes.EXC_INH_SPECIFIC.value:
+            # Apply exc/inh specific learning rate.
+            param_groups = self._init_exc_inh_specific_learning_rate(learning_rate)
+
+        return optim.Adam(param_groups, lr=learning_rate)
 
     @staticmethod
     def _slice_and_covert_to_float(

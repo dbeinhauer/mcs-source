@@ -4,7 +4,12 @@ are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
-from nn_model.type_variants import LayerType, PathDefaultFields, PathPlotDefaults
+from nn_model.type_variants import (
+    LayerType,
+    PathDefaultFields,
+    PathPlotDefaults,
+    ModelTypes,
+)
 
 # GPU Devices:
 DEVICE = "cuda"
@@ -59,6 +64,18 @@ NORMAL_NUM_TIME_STEPS = (BLANK_DURATION + IMAGE_DURATION) // TIME_STEP
 MODEL_SIZES = {
     layer: int(size * SIZE_MULTIPLIER) for layer, size in ORIGINAL_SIZES.items()
 }
+
+DNN_MODELS = [
+    ModelTypes.DNN_JOINT.value,
+    ModelTypes.DNN_SEPARATE.value,
+]
+
+RNN_MODELS = [
+    ModelTypes.RNN_JOINT.value,
+    ModelTypes.RNN_SEPARATE.value,
+]
+
+COMPLEX_MODELS = DNN_MODELS + RNN_MODELS
 
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {

@@ -41,19 +41,30 @@ class WeightConstraint:
         # List of dictionaries of each input layer of this layer information.
         self.input_parameters = input_parameters
 
-    def hidden_constraint(self, module, kwargs):
+    def hidden_constraint(self, module, layer_type, kwargs):
         """
         Applies constraints on the `weight_hh` (hidden) parameters
         of the provided layer. Applying excitatory/inhibitory constraint.
 
         :param module: module (layer) to which we want to apply the constraint to.
+        :param layer_type: Identifier whether the layer is inhibitory or excitatory.
         :param kwargs: kwargs of the `torch.clamp` function specifying the
         operation on the weights.
         """
+        assert layer_type in [
+            WeightTypes.EXCITATORY.value,
+            WeightTypes.INHIBITORY.value,
+        ]
         if hasattr(module, "weights_hh"):
             module.weights_hh.weight.data = torch.clamp(
                 module.weights_hh.weight.data, **kwargs
             )
+            # constraint_multiplier = (
+            #     1 if layer_type == WeightTypes.EXCITATORY.value else -1
+            # )
+            # module.weights_hh.weight.data = constraint_multiplier * torch.abs(
+            #     module.weights_hh.weight.data
+            # )
 
     def input_constraint(self, module):
         if hasattr(module, "weights_ih_exc"):
@@ -62,12 +73,18 @@ class WeightConstraint:
                 module.weights_ih_exc.weight.data,
                 **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
             )
+            # module.weights_ih_exc.weight.data = torch.abs(
+            #     module.weights_ih_exc.weight.data
+            # )
         if hasattr(module, "weights_ih_inh"):
             # module.weight_hh.data = torch.clamp(module.weight_hh.data, **kwargs)
             module.weights_ih_inh.weight.data = torch.clamp(
                 module.weights_ih_inh.weight.data,
                 **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
             )
+            # module.weights_ih_inh.weight.data = -torch.abs(
+            #     module.weights_ih_inh.weight.data
+            # )
 
     # def input_constraint(self, module):
     #     """
@@ -121,7 +138,9 @@ class ExcitatoryWeightConstraint(WeightConstraint):
         """
         # Apply excitatory condition to all hidden neurons.
         self.hidden_constraint(
-            module, WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value]
+            module,
+            WeightTypes.EXCITATORY.value,
+            WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
         )
         self.input_constraint(module)
 
@@ -146,6 +165,8 @@ class InhibitoryWeightConstraint(WeightConstraint):
         """
         # Apply inhibitory condition to all hidden neurons.
         self.hidden_constraint(
-            module, WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value]
+            module,
+            WeightTypes.INHIBITORY.value,
+            WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
         )
         self.input_constraint(module)

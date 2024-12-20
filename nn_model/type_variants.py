@@ -42,8 +42,12 @@ class ModelTypes(Enum):
     """
 
     SIMPLE = "simple"
-    COMPLEX_JOINT = "complex_joint"
-    COMPLEX_SEPARATE = "complex_separate"
+    DNN_JOINT = "dnn_joint"
+    DNN_SEPARATE = "dnn_separate"
+    RNN_JOINT = "rnn_joint"
+    RNN_SEPARATE = "rnn_separate"
+    
+    
 
 
 class MetricTypes(Enum):
@@ -52,6 +56,24 @@ class MetricTypes(Enum):
     """
 
     CC_NORM = "cc_norm"
+
+
+class OptimizerTypes(Enum):
+    """
+    All possible optimizer types.
+    """
+
+    DEFAULT = "default"
+    EXC_INH_SPECIFIC = "exc_inh_specific"
+
+
+class WeightsInitializationTypes(Enum):
+    """
+    All possible weights initialization variants.
+    """
+
+    DEFAULT = "default"
+    NORMAL = "normal"
 
 
 class LayerConstraintFields(Enum):

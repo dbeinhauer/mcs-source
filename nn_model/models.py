@@ -23,7 +23,7 @@ from nn_model.weights_constraints import (
 from nn_model.layers import (
     ConstrainedRNNCell,
 )
-from nn_model.neurons import FeedForwardNeuron
+from nn_model.neurons import FeedForwardNeuron, LSTMNeuron
 
 
 class LayerConfig:
@@ -215,6 +215,7 @@ class RNNCellModel(nn.Module):
         layer_sizes: Dict[str, int],
         num_hidden_time_steps: int,
         neuron_type: str,
+        weight_initialization: str,
         neuron_model_kwargs: Dict,
     ):
         """
@@ -225,6 +226,7 @@ class RNNCellModel(nn.Module):
         (where we do not know the targets).
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
+        :param weight_initialization: type of weight initialization that we want to use.
         :param neuron_model_kwargs: kwargs of the used neuronal models (if any).
         """
         super(RNNCellModel, self).__init__()
@@ -232,6 +234,8 @@ class RNNCellModel(nn.Module):
         # Number of hidden time steps (between individual targets) that we want to use
         # during training and evaluation (in order to learn the dynamics better).
         self.num_hidden_time_steps = num_hidden_time_steps
+
+        self.weight_initialization = weight_initialization
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -281,8 +285,14 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and appropriate shared
         complex complexity object.
         """
+        neuron_model = None
+        if self.neuron_type in nn_model.globals.DNN_MODELS:
+            neuron_model = FeedForwardNeuron
+        elif self.neuron_type in nn_model.globals.RNN_MODELS:
+            neuron_model = LSTMNeuron
+
         return {
-            layer: FeedForwardNeuron(**neuron_model_kwargs)
+            layer: neuron_model(**neuron_model_kwargs)
             for layer in RNNCellModel.layers_input_parameters
         }
 
@@ -295,10 +305,7 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and
         appropriate neuron model (shared complexity).
         """
-        if self.neuron_type in [
-            ModelTypes.COMPLEX_JOINT.value,
-            ModelTypes.COMPLEX_SEPARATE.value,
-        ]:
+        if self.neuron_type in nn_model.globals.COMPLEX_MODELS:
             # Complex complexity.
             return self._init_complex_neuron_model(
                 self.neuron_model_kwargs[self.neuron_type]
@@ -346,6 +353,7 @@ class RNNCellModel(nn.Module):
             layer,
             self.layers_configs[layer].constraint,
             self.layers_configs[layer].input_constraints,
+            self.weight_initialization,
             self.layers_configs[layer].neuron_model,
         )
 

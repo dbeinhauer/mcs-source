@@ -25,7 +25,8 @@ class ConstrainedRNNCell(nn.Module):
         hidden_size: int,
         layer_name: str,
         weight_constraint,
-        input_constraints: List[Dict],  # TODO: add docstring
+        input_constraints: List[Dict],
+        weight_initialization_type: str,
         shared_complexity=None,
     ):
         """
@@ -37,6 +38,7 @@ class ConstrainedRNNCell(nn.Module):
         :param weight_constraint: constraints of the layer.
         :param input_constraints: List of properties of each input layer
         (its size and type (inhibitory/excitatory)).
+        :param weight_initialization_type: Which type of weight initialization we want to use.
         :param shared_complexity: placeholder for shared complexity
         model used in more complex models. Here only for proper header
         definition.
@@ -60,7 +62,12 @@ class ConstrainedRNNCell(nn.Module):
             else shared_complexity.model_type
         )
         self.rnn_cell = CustomRNNCell(
-            input_size, hidden_size, layer_name, input_constraints, self.model_type
+            input_size,
+            hidden_size,
+            layer_name,
+            input_constraints,
+            self.model_type,
+            weight_initialization_type,
         )
         self.constraint = weight_constraint
         self.shared_complexity = shared_complexity
@@ -112,8 +119,12 @@ class ConstrainedRNNCell(nn.Module):
             complexity_result = self.shared_complexity(complexity_result)
             # complexity_result = self.shared_complexity(complexity_result)
 
+            viewing_shape = rnn_output
+            if self.model_type == ModelTypes.DNN_SEPARATE.value:
+                viewing_shape = rnn_output[0]
+
             # Reshape back to [batch_size, hidden_size]
-            complexity_result = complexity_result.view_as(rnn_output)
+            complexity_result = complexity_result.view_as(viewing_shape)
             # complexity_result = complexity_result.view_as(rnn_output)
 
             return complexity_result
@@ -149,7 +160,7 @@ class ConstrainedRNNCell(nn.Module):
             # In case we do not want ot return RNN results -> return None
             return complexity_result, None
 
-        if self.model_type == ModelTypes.COMPLEX_SEPARATE.value:
+        if self.model_type == ModelTypes.DNN_SEPARATE.value:
             # Ensuring returning 1D vector of input complexity.
             return complexity_result, rnn_out[0] + rnn_out[1]
 

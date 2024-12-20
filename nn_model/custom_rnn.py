@@ -10,7 +10,12 @@ import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import LayerConstraintFields, WeightTypes, ModelTypes
+from nn_model.type_variants import (
+    LayerConstraintFields,
+    WeightTypes,
+    ModelTypes,
+    WeightsInitializationTypes,
+)
 
 
 class CustomRNNCell(nn.Module):
@@ -30,6 +35,7 @@ class CustomRNNCell(nn.Module):
         layer_name: str,
         input_constraints: List[Dict],
         model_type: str,
+        weight_initialization_type: str,
     ):
         """
         Initializes the custom RNNCell module.
@@ -40,31 +46,35 @@ class CustomRNNCell(nn.Module):
         (to determine whether it is excitatory or inhibitory).
         :param input_constraints:
         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
+        :param weight_initialization_type: Which type of weight initialization we want to use.
         """
         super(CustomRNNCell, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
 
+        # Layer type
         self.layer_name = layer_name
+
         self.input_constraints = input_constraints
 
         # Assert model type is what we expected.
-        assert model_type in [
-            ModelTypes.COMPLEX_JOINT.value,
-            ModelTypes.COMPLEX_SEPARATE.value,
-        ]
+        # assert model_type in [
+        #     ModelTypes.COMPLEX_JOINT.value,
+        #     ModelTypes.COMPLEX_SEPARATE.value,
+        # ]
+        assert model_type in nn_model.globals.COMPLEX_MODELS
         self.model_type = model_type
 
         # Select excitatory and inhibitory indices and determine their sizes.
         self.excitatory_indices, self.inhibitory_indices = (
             self._get_excitatory_inhibitory_layer_indices()
         )
+
+        # Layer sizes
+        self.input_size = input_size
+        self.hidden_size = hidden_size
         self.excitatory_size = len(self.excitatory_indices)
         self.inhibitory_size = len(self.inhibitory_indices)
 
         # Define module weights and biases.
-        # TODO: Adding exc/inh weights.
-        # self.weights_ih = nn.Linear(input_size, hidden_size)
         self.weights_ih_exc = nn.Linear(
             self.excitatory_size, hidden_size
         )  # Input excitatory
@@ -78,7 +88,7 @@ class CustomRNNCell(nn.Module):
         self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
         self.b_hh = nn.Parameter(torch.Tensor(hidden_size))
 
-        self._init_weights()
+        self._init_weights(weight_initialization_type)
 
     def _get_excitatory_inhibitory_layer_indices(self) -> Tuple[List[int], List[int]]:
         """
@@ -112,16 +122,93 @@ class CustomRNNCell(nn.Module):
 
         return excitatory_indices, inhibitory_indices
 
-    def _init_weights(self):
+    def _init_pytorch_default_weights(self):
+        """
+        Initializes module weights using `nn.init.kaiming_uniform_` function.
+        """
+        nn.init.kaiming_uniform_(self.weights_ih_exc.weight)
+        nn.init.kaiming_uniform_(self.weights_ih_inh.weight)
+        nn.init.kaiming_uniform_(self.weights_hh.weight)
+
+    def _init_normal_weights(self, mean: float = 0.02, std: float = 0.01):
+        """
+        # TODO: more general usage
+        Initializes module weights using normal distribution that has larger mean in inhibitory part.
+
+        :param mean: excitatory part mean.
+        :param std: excitatory part std.
+        """
+        # Multiplier of the recurrent connection weights (based on inh/exc)
+        recurrent_layer_multiplier = (
+            1 if self.layer_name in nn_model.globals.EXCITATORY_LAYERS else -1
+        )
+        # Multiplier of the means (based on inh/exc). - inh has larger mean
+        mean_multiplier = (
+            1 if self.layer_name in nn_model.globals.EXCITATORY_LAYERS else 4
+        )
+        # Multiplier of the std (based on inh/exc). - inh has larger std
+        std_multiplier = (
+            mean_multiplier
+            if self.layer_name in nn_model.globals.EXCITATORY_LAYERS
+            else 2
+        )
+
+        nn.init.normal_(
+            self.weights_ih_exc.weight,
+            mean=mean * 1 * 1,
+            std=std,
+        )
+        nn.init.normal_(
+            self.weights_ih_inh.weight,
+            mean=mean * -1 * 4,
+            std=std * 2,
+        )
+        torch.nn.init.normal_(
+            self.weights_hh.weight,
+            mean=mean * recurrent_layer_multiplier * mean_multiplier,
+            std=std * std_multiplier,
+        )
+
+    def _flip_weights_signs(self, constraint_multiplier: int):
+        """
+        Flips weights based on the layer it belongs to either non-positive (inhibitory)
+        or non-negative (excitatory) values.
+
+        :param constraint_multiplier: Multiplier used on self-recurrent weights
+        (either `-1` if inhibitory or `1` if excitatory).
+        """
+        self.weights_ih_exc.weight.data = torch.abs(self.weights_ih_exc.weight.data)
+        self.weights_ih_inh.weight.data = -torch.abs(self.weights_ih_inh.weight.data)
+        self.weights_hh.weight.data = constraint_multiplier * torch.abs(
+            self.weights_hh.weight.data
+        )
+
+    def _init_weights(self, weight_initialization_type):
         """
         Initializes module weights and biases. Weights are initialized using
         uniform distribution. Biases are initialized with zeros.
+
+        :param weight_initialization_type: Which type of weight initialization we want to use.
         """
-        # nn.init.kaiming_uniform_(self.weights_ih.weight, nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_ih_exc.weight)  # , nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_ih_inh.weight)  # , nonlinearity="linear")
-        nn.init.kaiming_uniform_(self.weights_hh.weight)  # , nonlinearity="linear")
-        # nn.init.zeros_(self.b_ih)
+        # How should we
+        self_recurrent_multiplier = (
+            1 if self.layer_name in nn_model.globals.EXCITATORY_LAYERS else -1
+        )
+
+        # Init weights:
+        if weight_initialization_type == WeightsInitializationTypes.DEFAULT.value:
+            # Use default pytorch weight initialization.
+            self._init_pytorch_default_weights()
+        elif weight_initialization_type == WeightsInitializationTypes.NORMAL.value:
+            # Use Normal distribution initialization (with shifted larger mean in inhibitory).
+            self._init_normal_weights()
+        else:
+            raise Exception("Wrong weights initialization type.")
+
+        # Flip weights to its correct sign (exc/inh).
+        self._flip_weights_signs(self_recurrent_multiplier)
+
+        # Init biases.
         nn.init.zeros_(self.b_ih_exc)
         nn.init.zeros_(self.b_ih_inh)
         nn.init.zeros_(self.b_hh)
@@ -157,12 +244,8 @@ class CustomRNNCell(nn.Module):
             # Inhibitory layer -> add self recurrent part to inhibitory
             in_inh_linear += hidden_linear
 
-        if self.model_type == ModelTypes.COMPLEX_JOINT.value:
+        if self.model_type == ModelTypes.DNN_JOINT.value:
             # In case we do not want to
             return in_exc_linear + in_inh_linear
 
         return in_exc_linear, in_inh_linear
-
-        # in_linear = self.weights_ih(input_data) + self.b_ih
-        # hidden_linear = self.weights_hh(hidden) + self.b_hh
-        # return in_linear + hidden_linear

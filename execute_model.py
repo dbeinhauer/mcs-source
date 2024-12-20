@@ -10,12 +10,17 @@ import wandb
 
 import nn_model.globals
 from nn_model.model_executer import ModelExecuter
-from nn_model.type_variants import ModelTypes, PathDefaultFields
+from nn_model.type_variants import (
+    ModelTypes,
+    PathDefaultFields,
+    OptimizerTypes,
+    WeightsInitializationTypes,
+)
 from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
@@ -38,6 +43,9 @@ def init_wandb(arguments):
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
         "train_subset_size": arguments.train_subset,
+        "gradient_clip": arguments.gradient_clip,
+        "optimizer_type": arguments.optimizer_type,
+        "weight_initialization": arguments.weight_initialization,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -94,6 +102,8 @@ def init_model_path(arguments) -> str:
                 f"_neuron-size-{arguments.neuron_layer_size}",
                 f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
                 f"_gradient-clip-{arguments.gradient_clip}",
+                f"optimizer-type-{arguments.optimizer_type}",
+                f"weight-initialization-{arguments.weight_initialization}",
                 ".pth",
             ]
         )
@@ -272,17 +282,30 @@ if __name__ == "__main__":
         default=0.00001,
         help="Learning rate to use in model training.",
     )
+    # Training parameters
+    parser.add_argument(
+        "--optimizer_type",
+        type=str,
+        default=OptimizerTypes.DEFAULT.value,
+        help="Optimizer type (either default or learning rate specific).",
+    )
     parser.add_argument(
         "--gradient_clip",
         type=float,
-        default=10.0,
+        default=10000.0,
         help="Gradient clipping max norm.",
+    )
+    parser.add_argument(
+        "--weight_initialization",
+        type=str,
+        default=WeightsInitializationTypes.DEFAULT.value,
+        help="Which type of weights initialization we want to use.",
     )
     # Model parameters:
     parser.add_argument(
         "--model",
         type=str,
-        default=ModelTypes.COMPLEX_JOINT.value,
+        default=ModelTypes.DNN_JOINT.value,
         choices=[model_type.value for model_type in ModelTypes],
         help="Model variant that we want to use.",
     )
