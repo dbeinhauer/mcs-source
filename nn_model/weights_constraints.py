@@ -50,8 +50,8 @@ class WeightConstraint:
         :param kwargs: kwargs of the `torch.clamp` function specifying the
         operation on the weights.
         """
-        if hasattr(module, "weight_hh"):
-            module.weight_hh.data = torch.clamp(module.weight_hh.data, **kwargs)
+        if hasattr(module, "W_hh"):
+            module.W_hh.weight.data = torch.clamp(module.W_hh.weight.data, **kwargs)
 
     def input_constraint(self, module):
         """
@@ -65,7 +65,7 @@ class WeightConstraint:
 
         :param module: module (layer) to which we want to apply the constraint to.
         """
-        if hasattr(module, "weight_ih"):
+        if hasattr(module, "W_ih"):
             end_index = 0
             for item in self.input_parameters:
                 # Iterate each input layer part (input neuron layers).
@@ -77,8 +77,8 @@ class WeightConstraint:
                 end_index += part_size
 
                 # Apply constraint to the selected section of input weights.
-                module.weight_ih.data[start_index:end_index] = torch.clamp(
-                    module.weight_ih.data[start_index:end_index],
+                module.W_ih.weight.data[start_index:end_index] = torch.clamp(
+                    module.W_ih.weight.data[start_index:end_index],
                     **part_kwargs,
                 )
 

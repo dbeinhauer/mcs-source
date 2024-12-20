@@ -299,7 +299,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_hidden_time_steps",
         type=int,
-        default=5,
+        default=1,
         help="Number of hidden time steps in RNN (to use backtracking through time (not just use known targets)).",
     )
     # Dataset analysis:

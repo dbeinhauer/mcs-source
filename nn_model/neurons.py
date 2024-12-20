@@ -70,4 +70,6 @@ class FeedForwardNeuron(nn.Module):
             # We want to use residual connection.
             out += hidden
 
+        out = torch.nn.functional.hardtanh(out, min_val=0.0, max_val=200000.0)
+
         return out
