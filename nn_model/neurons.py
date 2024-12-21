@@ -8,6 +8,16 @@ import torch
 import torch.nn as nn
 
 
+class CustomActivation(torch.nn.Module):
+    def forward(self, x):
+        # Apply sigmoid to get values between 0 and 1
+        sigmoid_output = torch.sigmoid(x)
+        # Apply scaled tanh for values greater than 1
+        tanh_output = 5 * torch.tanh(x / 5)  # Scale tanh to range [0, 5]
+        # Combine the two outputs
+        return torch.where(x <= 1, sigmoid_output, tanh_output)
+
+
 # Shared complexity module
 class FeedForwardNeuron(nn.Module):
     """
@@ -33,6 +43,8 @@ class FeedForwardNeuron(nn.Module):
         self.residual: bool = residual
 
         self.network = self._init_model_architecture(layer_size, num_layers)
+
+        self.custom_activation = CustomActivation()
 
     def _init_model_architecture(self, layer_size: int, num_layers: int):
         """
@@ -70,6 +82,9 @@ class FeedForwardNeuron(nn.Module):
             # We want to use residual connection.
             out += hidden
 
-        out = torch.nn.functional.hardtanh(out, min_val=0.0, max_val=200000.0)
+        # out = torch.nn.functional.hardtanh(out, min_val=0.0, max_val=5.0)
+
+        # out = CustomActivation()
+        out = self.custom_activation(out)
 
         return out
