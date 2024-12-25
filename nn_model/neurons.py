@@ -8,6 +8,16 @@ import torch
 import torch.nn as nn
 
 
+class CustomActivation(torch.nn.Module):
+    def forward(self, x):
+        # Apply sigmoid to get values between 0 and 1
+        sigmoid_output = torch.sigmoid(x)
+        # Apply scaled tanh for values greater than 1
+        tanh_output = 5 * torch.tanh(x / 5)  # Scale tanh to range [0, 5]
+        # Combine the two outputs
+        return torch.where(x <= 1, sigmoid_output, tanh_output)
+
+
 class CustomReLU(nn.Module):
     """
     Custom ReLU class as the classical one has problems with computational graph.
@@ -58,6 +68,9 @@ class FeedForwardNeuron(nn.Module):
 
         self.network = self._init_model_architecture(layer_size, num_layers)
 
+        # self.custom_activation = CustomActivation()
+        self.custom_activation = torch.nn.Hardtanh(min_val=0.0, max_val=2000.0)
+
     def _init_model_architecture(self, layer_size: int, num_layers: int):
         """
         Initializes architecture of the DNN neuron model.
@@ -102,6 +115,8 @@ class FeedForwardNeuron(nn.Module):
             # )  # Sum over second dimension (sum excitatory and inhibitory outputs)
 
         # out = torch.nn.functional.relu(out)
-        out = torch.nn.functional.hardtanh(out, min_val=0.0, max_val=20.0)
+        # out = torch.nn.functional.hardtanh(out, min_val=0.0, max_val=2000.0)
+
+        out = self.custom_activation(out)
 
         return out
