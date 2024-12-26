@@ -61,6 +61,7 @@ class FeedForwardNeuron(nn.Module):
         # Hidden layers
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(layer_size, layer_size))
+            # layers.append(nn.LayerNorm(layer_size))
             layers.append(nn.ReLU())  # Non-linear activation after each layer.
 
         # Final output layer: output size is 1
