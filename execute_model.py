@@ -305,7 +305,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default=ModelTypes.DNN_JOINT.value,
+        default=ModelTypes.RNN_SEPARATE.value,
         choices=[model_type.value for model_type in ModelTypes],
         help="Model variant that we want to use.",
     )

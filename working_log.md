@@ -549,3 +549,19 @@ Notes after meetings:
             - try to apply this too
     - generally dealing with gradients might improve the training
     - maybe study gradient exploding problem and its improvements on weights in general case and try to apply this to constraint example (find the analogies)
+
+# 30.12.2024
+- changed activation non-linearity to combination of sigmoid and tanh
+    - sigmoid - applied for output values of DNN module smaller than 1
+    - `5 * torch.tanh(x / 5)` - for values greater than 1
+    - this should make the non-linearity smoother in comparison to hardtanh (bounder ReLU)
+    - the predictions are now bounded to interval (0, 5)
+        - should not be a problem (in training dataset there are only few data with 4 spikes in 20ms window)
+        - it is very improbable to have more spikes
+- using grading clipping seems to be problematic
+    - we are not using it now (only with very large boundary)
+- using different weight initialization or adaptive learning rate for inh/exc layers does not seem to work
+- using hidden time steps does not seem to be working
+- using separate DNN module produces slightly better results than variant without it
+    - currently, we are reaching 0.9 cc_norm (joint variant only 0.85)
+- long-term problems with the model still persist

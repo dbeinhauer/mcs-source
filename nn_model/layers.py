@@ -87,15 +87,18 @@ class ConstrainedRNNCell(nn.Module):
         """
         self.constraint.apply(self.rnn_cell)
 
-    def apply_complexity(self, rnn_output: Tuple[torch.Tensor, ...]) -> torch.Tensor:
-        # def apply_complexity(
-        #     self, excitatory_input: torch.Tensor, inhibitory_input: torch.Tensor
-        # ) -> torch.Tensor:
+    def apply_complexity(
+        self,
+        rnn_output: Tuple[torch.Tensor, ...],
+        complexity_hidden: Tuple[torch.Tensor, ...],
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
         Applies complexity layer (shared DNN of neuron) on RNN output.
 
         :param rnn_output: Output of RNN layer to apply complexity on.
+        :param complexity_hidden: # TODO: add description
         :return: Returns output after shared complexity is applied.
+        #TODO: update
         """
 
         combined_input = rnn_output
@@ -116,32 +119,41 @@ class ConstrainedRNNCell(nn.Module):
             )
 
             # Apply the small network to all elements in parallel
-            complexity_result = self.shared_complexity(complexity_result)
+            complexity_result, complexity_hidden = self.shared_complexity(
+                complexity_result, complexity_hidden
+            )
             # complexity_result = self.shared_complexity(complexity_result)
 
             viewing_shape = rnn_output
-            if self.model_type == ModelTypes.DNN_SEPARATE.value:
+            if self.model_type in [
+                ModelTypes.DNN_SEPARATE.value,
+                ModelTypes.RNN_SEPARATE.value,
+            ]:
                 viewing_shape = rnn_output[0]
 
             # Reshape back to [batch_size, hidden_size]
             complexity_result = complexity_result.view_as(viewing_shape)
             # complexity_result = complexity_result.view_as(rnn_output)
 
-            return complexity_result
+            return complexity_result, complexity_hidden
 
         # No shared complexity (is `None` -> apply default tanh).
         # TODO: maybe add option to apply different complexity functions.
-        return torch.tanh(combined_input)
+        return torch.tanh(combined_input), torch.zeros(0)
         # return torch.tanh(excitatory_input + inhibitory_input)
 
     def forward(
-        self, input_data: torch.Tensor, hidden: torch.Tensor
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        self,
+        input_data: torch.Tensor,
+        hidden: torch.Tensor,
+        complexity_hidden: Tuple[torch.Tensor, ...],
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Tuple[torch.Tensor]]:
         """
         Forward step the cell. One time step.
 
         :param input_data: input data.
         :param hidden: output data of the previous step (or zeros if first step).
+        :param complexity_hidden: #TODO: add description
         :return: Returns tuple of the output of the forward step and optionally
         output of the RNN layer in case we switch the layer to do so.
         """
@@ -153,16 +165,18 @@ class ConstrainedRNNCell(nn.Module):
         #     rnn_out = tuple(rnn_out)
 
         # Apply non-linearity (either function or DNN model of neuron).
-        complexity_result = self.apply_complexity(rnn_out)
+        complexity_result, complexity_hidden = self.apply_complexity(
+            rnn_out, complexity_hidden
+        )
         # complexity_result = self.apply_complexity(hidden_exc, hidden_inh)
 
         if not self.return_recurrent_state:
             # In case we do not want ot return RNN results -> return None
-            return complexity_result, None
+            return complexity_result, None, complexity_hidden
 
         if self.model_type == ModelTypes.DNN_SEPARATE.value:
             # Ensuring returning 1D vector of input complexity.
-            return complexity_result, rnn_out[0] + rnn_out[1]
+            return complexity_result, rnn_out[0] + rnn_out[1], complexity_hidden
 
-        return complexity_result, rnn_out
+        return complexity_result, rnn_out, complexity_hidden
         # return complexity_result, hidden_exc + hidden_inh/

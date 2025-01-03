@@ -4,13 +4,24 @@ that can be used in the model. Neuron here is represented by
 some small model.
 """
 
-from abc import ABC, abstractmethod
+from typing import Optional, Tuple
+from abc import ABC
 
 import torch
 import torch.nn as nn
 
 import nn_model.globals
 from nn_model.type_variants import ModelTypes
+
+
+class CustomActivation(torch.nn.Module):
+    def forward(self, x):
+        # Apply sigmoid to get values between 0 and 1
+        sigmoid_output = torch.sigmoid(x)
+        # Apply scaled tanh for values greater than 1
+        tanh_output = 5 * torch.tanh(x / 5)  # Scale tanh to range [0, 5]
+        # Combine the two outputs
+        return torch.where(x <= 1, sigmoid_output, tanh_output)
 
 
 class SharedNeuronBase(nn.Module, ABC):
@@ -36,6 +47,8 @@ class SharedNeuronBase(nn.Module, ABC):
         # Flag whether we want to use the residual connection.
         self.residual = residual
 
+        self.custom_activation = CustomActivation()
+
     def _select_input_size(self) -> int:
         """
         Based on the model type set the model input size.
@@ -58,34 +71,6 @@ class SharedNeuronBase(nn.Module, ABC):
         raise WrongModelException(
             "Wrong model type was selected for shared complexity."
         )
-
-    # def forward_residual(self, hidden: torch.Tensor, out: torch.Tensor) -> torch.Tensor:
-    #     """
-    #     Applies residual connection if enabled.
-
-    #     :param hidden: Original input tensor.
-    #     :param out: Output from the model.
-    #     :return: Residual output tensor.
-    #     """
-    #     if self.residual:
-    #         out += hidden.sum(dim=1, keepdim=True)
-
-    #     return out
-
-    def forward_non_linearity(self, input_data: torch.Tensor):
-        """
-        Applies final non-linearity (bounder ReLU) function in the forward step.
-
-        :param input_data: Tensor to apply the non linearity on.
-        :return: Returns the input tensor after the non-linearity is applied.
-        """
-        return torch.nn.functional.hardtanh(input_data, min_val=0.0, max_val=20.0)
-
-    # @abstractmethod
-    # def forward(self) -> torch.Tensor:
-    #     """
-    #     Abstract forward method of the module.
-    #     """
 
 
 # Shared complexity module
@@ -139,9 +124,12 @@ class FeedForwardNeuron(SharedNeuronBase):
         layers.append(nn.Linear(self.input_size, layer_size))
         # Hidden layers
         for _ in range(num_layers - 1):
-            layers.append(nn.Linear(layer_size, layer_size))
             layers.append(nn.LayerNorm(layer_size))
+            layers.append(nn.Linear(layer_size, layer_size))
+            # layers.append(nn.LayerNorm(layer_size))
             layers.append(nn.ReLU())  # Non-linear activation after each layer.
+            # layers.append(nn.GELU())
+            # layers.append(nn.Dropout(0.2))
 
         # Final output layer: output size is 1
         layers.append(nn.Linear(layer_size, 1))
@@ -149,12 +137,15 @@ class FeedForwardNeuron(SharedNeuronBase):
         # Use nn.Sequential to combine all layers into a single network
         return nn.Sequential(*layers)
 
-    def forward(self, hidden: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, hidden: torch.Tensor, complexity_hidden: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Performs forward step of the DNN model of neuron.
 
         :param hidden: Input of the model.
-        :return: Returns output of the DNN model.
+        :return: Returns tuple of output of the DNN mode and empty tensor of hidden states
+        (to have same output as RNN variants).
         """
         # Pass the input through the network.
         out = self.network(hidden)
@@ -164,7 +155,82 @@ class FeedForwardNeuron(SharedNeuronBase):
             out += hidden.sum(dim=1, keepdim=True)
 
         # Apply module final non-linearity function.
-        return self.forward_non_linearity(out)
+        # return self.forward_non_linearity(out)
+
+        out = self.custom_activation(out)
+
+        return out, torch.zeros(0)
+
+
+# class RNNNeuron(SharedNeuronBase):
+#     """
+#     Class defining shared complexity of the layer that should represent
+#     one neuron (more complex neuron than just one operation). This
+#     type of neuron consists of an RNN.
+#     """
+
+#     def __init__(
+#         self,
+#         model_type: str,
+#         hidden_size: int = 10,
+#         num_layers: int = 1,
+#         residual: bool = True,
+#     ):
+#         """
+#         Initializes RNN model of the neuron.
+
+#         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
+#         :param hidden_size: Size of the hidden state in the RNN.
+#         :param num_layers: Number of RNN layers.
+#         :param residual: Flag whether there is a residual connection used in the model.
+#         """
+#         super(RNNNeuron, self).__init__(model_type, residual)
+#         self.hidden_size = hidden_size
+#         self.num_layers = num_layers
+
+#         # RNN for processing
+#         self.rnn = nn.RNN(
+#             input_size=self.input_size,
+#             hidden_size=hidden_size,
+#             num_layers=num_layers,
+#             batch_first=True,
+#         )
+
+#         # Scalar output layer
+#         self.output_layer = nn.Linear(hidden_size, 1)
+
+#     def forward(
+#         self, inputs: torch.Tensor, hidden: Optional[torch.Tensor] = None
+#     ) -> torch.Tensor:
+#         """
+#         Performs forward step of the RNN model of neuron.
+
+#         :param inputs: Input tensor of shape (batch_size, seq_len, input_size).
+#         :param hidden: Optional hidden state for the RNN.
+#         :return: Returns output of the RNN model.
+#         """
+#         # Add a sequence dimension to the input
+#         inputs = inputs.unsqueeze(1)  # Shape: (batch_size, 1, input_size)
+
+#         # RNN processing
+#         rnn_output, hidden = self.rnn(
+#             inputs, hidden
+#         )  # Shape: (batch_size, seq_len, hidden_size)
+
+#         # Extract last output and map to scalar
+#         rnn_output = rnn_output[:, -1, :]  # Shape: (batch_size, hidden_size)
+#         output = self.output_layer(rnn_output)  # Shape: (batch_size, 1)
+
+#         # Apply residual connection if enabled
+#         if self.residual:
+#             output = output + inputs[:, -1, :].sum(
+#                 dim=1, keepdim=True
+#             )  # Use original input as residual
+
+#         # Apply module final non-linearity function
+#         output = self.custom_activation(output)
+
+#         return output, hidden
 
 
 class LSTMNeuron(SharedNeuronBase):
@@ -175,56 +241,80 @@ class LSTMNeuron(SharedNeuronBase):
     def __init__(
         self,
         model_type: str,
-        hidden_size: int = 10,
+        # input_size: int,
         num_layers: int = 1,
+        layer_size: int = 10,
         residual: bool = True,
     ):
         """
         Initialize the neuron module.
 
+        :param model_type: Variant of the complex neuron (value from `ModelTypes`).
         :param input_size: Size of the input feature (scalar).
-        :param hidden_size: Size of the hidden state in the LSTM.
+        :param layer_size: Size of the hidden state in the LSTM.
         :param num_layers: Number of LSTM layers for richer memory.
         :param residual: Whether to use a residual connection.
         """
         super(LSTMNeuron, self).__init__(model_type, residual)
-        self.hidden_size = hidden_size
+        self.layer_size = layer_size
         self.num_layers = num_layers
-        # self.residual = residual
 
-        # LSTM for memory processing
-        self.lstm = nn.LSTM(
-            input_size=self.input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
+        # LSTM cells for memory processing
+        self.lstm_cells = nn.ModuleList(
+            [
+                nn.LSTMCell(self.input_size if i == 0 else layer_size, layer_size)
+                for i in range(num_layers)
+            ]
         )
 
         # Scalar output layer
-        self.output_layer = nn.Linear(hidden_size, 1)
+        self.output_layer = nn.Linear(layer_size, 1)
 
-    def forward(self, inputs: torch.Tensor, hidden: tuple) -> torch.Tensor:
+        # Custom activation function
+        self.custom_activation = CustomActivation()
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    ) -> torch.Tensor:
         """
         Forward pass of the memory neuron.
 
-        :param inputs: Tensor of shape (batch_size, 1), one scalar per input.
-        :param hidden: Optional hidden state (h_0, c_0) for the LSTM.
+        :param inputs: Tensor of shape (batch_size, input_size).
+        :param hidden: Optional hidden state (h_0, c_0) for the LSTM cells.
         :return: Processed output scalar and updated hidden state.
         """
-        # Reshape input to mimic a sequence of length 1
-        inputs = inputs.unsqueeze(1)  # Shape: (batch_size, seq_len=1, input_size)
+        batch_size = inputs.size(0)
 
-        # LSTM processing
-        lstm_output, hidden = self.lstm(
-            inputs, hidden
-        )  # Shape: (batch_size, 1, hidden_size)
+        if hidden is None:
+            hidden = [
+                (
+                    torch.zeros(batch_size, self.layer_size).to(inputs.device),
+                    torch.zeros(batch_size, self.layer_size).to(inputs.device),
+                )
+                for _ in range(self.num_layers)
+            ]
 
-        # Extract last output and map to scalar
-        lstm_output = lstm_output[:, -1, :]  # Shape: (batch_size, hidden_size)
-        output = self.output_layer(lstm_output)  # Shape: (batch_size, 1)
+        current_input = inputs
+        h, c = hidden[0]
+        for i, lstm_cell in enumerate(self.lstm_cells):
+            h, c = lstm_cell(current_input, (h, c))
+            current_input = (
+                h  # The output of the current cell is the input to the next cell
+            )
+
+        # Apply the output layer to the last hidden state
+        output = self.output_layer(h)
 
         # Apply residual connection if enabled
-        if self.residual:
-            output = output + inputs.squeeze(1)  # Use original input as residual
+        # if self.residual:
+        #     output = output + inputs  # Use original input as residual
 
-        return output, hidden
+        if self.residual:
+            output += inputs.sum(dim=1, keepdim=True)
+
+        # Apply module final non-linearity function
+        output = self.custom_activation(output)
+
+        return output, (h, c)

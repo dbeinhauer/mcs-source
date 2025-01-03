@@ -46,8 +46,6 @@ class ModelTypes(Enum):
     DNN_SEPARATE = "dnn_separate"
     RNN_JOINT = "rnn_joint"
     RNN_SEPARATE = "rnn_separate"
-    
-    
 
 
 class MetricTypes(Enum):

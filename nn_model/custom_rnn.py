@@ -244,7 +244,7 @@ class CustomRNNCell(nn.Module):
             # Inhibitory layer -> add self recurrent part to inhibitory
             in_inh_linear += hidden_linear
 
-        if self.model_type == ModelTypes.DNN_JOINT.value:
+        if self.model_type in [ModelTypes.DNN_JOINT.value, ModelTypes.RNN_JOINT.value]:
             # In case we do not want to
             return in_exc_linear + in_inh_linear
 

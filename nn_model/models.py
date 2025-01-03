@@ -2,7 +2,7 @@
 This source code contains definition of all models used in our experiments.
 """
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 import torch
 import torch.nn as nn
@@ -23,7 +23,7 @@ from nn_model.weights_constraints import (
 from nn_model.layers import (
     ConstrainedRNNCell,
 )
-from nn_model.neurons import FeedForwardNeuron, LSTMNeuron
+from nn_model.neurons import FeedForwardNeuron, LSTMNeuron, SharedNeuronBase
 
 
 class LayerConfig:
@@ -285,7 +285,7 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and appropriate shared
         complex complexity object.
         """
-        neuron_model = None
+        neuron_model: Optional[SharedNeuronBase] = None
         if self.neuron_type in nn_model.globals.DNN_MODELS:
             neuron_model = FeedForwardNeuron
         elif self.neuron_type in nn_model.globals.RNN_MODELS:
@@ -487,8 +487,13 @@ class RNNCellModel(nn.Module):
         self,
         current_time_outputs: Dict[str, torch.Tensor],
         hidden_layers: Dict[str, torch.Tensor],
+        complexity_hidden: Dict[str, torch.Tensor],
         # time: int,
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    ) -> Tuple[
+        Dict[str, torch.Tensor],
+        Dict[str, Optional[torch.Tensor]],
+        Dict[str, Tuple[torch.Tensor, ...]],
+    ]:
         """
         Performs model time step. It progresses the model architecture and
         computes next time step results of each layer of the model.
@@ -502,12 +507,23 @@ class RNNCellModel(nn.Module):
         """
         # We already have LGN inputs (assign them to current time layer outputs).
         recurrent_outputs = {}
+        complexity_hidden = {
+            layer: None for layer in RNNCellModel.layers_input_parameters
+        }
+        # complexity_hidden: Dict[str, Tuple[torch.Tensor, ...]] = {}
+
         for layer in RNNCellModel.layers_input_parameters:
             # Iterate through all output layers of the model.
             # Perform model time step for the currently processed layer.
             # NOTE: It is necessary that these layers are sorted by the
             # processing order in the model.
-            current_time_outputs[layer], recurrent_outputs[layer] = self.layers[layer](
+            # if complexity_hidden is None:
+
+            (
+                current_time_outputs[layer],
+                recurrent_outputs[layer],
+                complexity_hidden[layer],
+            ) = self.layers[layer](
                 self._get_layer_input_tensor(
                     self._get_list_by_time_variant(
                         layer,
@@ -521,9 +537,10 @@ class RNNCellModel(nn.Module):
                     ),  # inputs of the layer from time (t-1) (previous time step)
                 ),
                 hidden_layers[layer],  # Recurrent connection to itself from time (t-1)
+                complexity_hidden[layer],
             )
 
-        return current_time_outputs, recurrent_outputs
+        return current_time_outputs, recurrent_outputs, complexity_hidden
 
     def _append_outputs(
         self,
@@ -542,7 +559,10 @@ class RNNCellModel(nn.Module):
                 all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
 
     def forward(
-        self, inputs: Dict[str, torch.Tensor], hidden_states: Dict[str, torch.Tensor]
+        self,
+        inputs: Dict[str, torch.Tensor],
+        hidden_states: Dict[str, torch.Tensor],
+        # complexity_hidden: Dict[str, Tuple[torch.Tensor, ...]],
     ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
         """
         Performs forward step of the model iterating through all time steps of the provided
@@ -578,6 +598,23 @@ class RNNCellModel(nn.Module):
             # We add 1 to iterate through the visible time loop correctly (we want to iterate once).
             visible_time_steps = 1 + 1
 
+        complexity_hidden = None
+        # torch.zeros(0)
+        # if self.neuron_type in [
+        #     ModelTypes.RNN_JOINT.value,
+        #     ModelTypes.RNN_SEPARATE.value,
+        # ]:
+        #     # input_size = 1 if self.neuron_type == ModelTypes.RNN_JOINT.value else 2
+        #     complexity_hidden = {
+        #         layer: (
+        #             torch.zeros().to(nn_model.globals.DEVICE),
+        #             torch.zeros(inputs.size(0), self.model.layers[layer]).to(
+        #                 nn_model.globals.DEVICE
+        #             ),
+        #         )
+        #         for layer in self.model.layers
+        #     }
+
         for visible_time in range(1, visible_time_steps):
             # Prediction of the visible time steps
             # (in training only one step, in evaluation all time steps)
@@ -596,11 +633,17 @@ class RNNCellModel(nn.Module):
                     layer: layer_input[:, visible_time, :]
                     for layer, layer_input in inputs.items()
                 }
+                # complexity_hidden = {
+                #     layer: layer_input[:, visible_time, :]
+                #     for layer, layer_input in inputs.items()
+                # }
+
             for _ in range(self.num_hidden_time_steps):
                 # Perform all hidden time steps.
-                hidden_states, recurrent_outputs = self._perform_model_time_step(
-                    current_inputs,
-                    hidden_states,
+                hidden_states, recurrent_outputs, complexity_hidden = (
+                    self._perform_model_time_step(
+                        current_inputs, hidden_states, complexity_hidden
+                    )
                 )
 
                 if self.training:
