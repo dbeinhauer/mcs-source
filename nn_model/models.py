@@ -491,7 +491,7 @@ class RNNCellModel(nn.Module):
         # time: int,
     ) -> Tuple[
         Dict[str, torch.Tensor],
-        Dict[str, Optional[torch.Tensor]],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
         Dict[str, Tuple[torch.Tensor, ...]],
     ]:
         """
@@ -550,7 +550,7 @@ class RNNCellModel(nn.Module):
         """
         Appends outputs of each output layer to list of outputs of all time steps.
 
-        :param all_outputs: outputs of layers of all time steps.
+        :param all_outputs: outputs of layersFalse of all time steps.
         :param time_step_outputs: outputs of current time step.
         """
         for layer, layer_outputs in time_step_outputs.items():
@@ -657,8 +657,15 @@ class RNNCellModel(nn.Module):
             if self.return_recurrent_state:
                 # If the model is in evaluation mode
                 # -> save also the results of the RNNs before neuron model.
-                # Only the visible steps
-                self._append_outputs(all_recurrent_outputs, recurrent_outputs)
+                # Only the visible
+
+                if self.neuron_type in [
+                    ModelTypes.RNN_JOINT.value,
+                    ModelTypes.DNN_JOINT.value,
+                ]:
+                    self._append_outputs(all_recurrent_outputs, recurrent_outputs)
+
+                # self._append_outputs(all_recurrent_outputs, recurrent_outputs)
 
         # Clear caches
         del inputs, hidden_states

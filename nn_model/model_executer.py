@@ -647,6 +647,14 @@ class ModelExecuter:
                 ):
                     # In case we are doing full prediction or we specified we want RNN predictions
                     # -> store them
+                    if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+                        # if self.model.neuron_model.model_type in [
+                        #     ModelTypes.RNN_SEPARATE.value,
+                        #     ModelTypes.DNN_SEPARATE.value,
+                        # ]:
+                        #     continue
+                        continue
+
                     current_prediction = torch.cat(layers_prediction, dim=1)
 
                 all_predictions[prediction_type][layer].append(current_prediction)
@@ -770,6 +778,9 @@ class ModelExecuter:
                 # In case we do not want to save RNN predictions -> skip them
                 return_predictions[prediction_type] = {}
                 continue
+
+            if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+                continue  # TODO: skip RNN predictions for now
 
             return_predictions[prediction_type] = (
                 ModelExecuter._prepare_evaluation_predictions_for_return(

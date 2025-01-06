@@ -147,7 +147,7 @@ class ConstrainedRNNCell(nn.Module):
         input_data: torch.Tensor,
         hidden: torch.Tensor,
         complexity_hidden: Tuple[torch.Tensor, ...],
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Tuple[torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, ...]], Tuple[torch.Tensor]]:
         """
         Forward step the cell. One time step.
 

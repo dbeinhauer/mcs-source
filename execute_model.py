@@ -20,7 +20,7 @@ from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
-        default=10,
+        default=20,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
     parser.set_defaults(neuron_not_residual=False)
