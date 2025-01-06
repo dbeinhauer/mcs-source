@@ -7,7 +7,7 @@ from typing import Tuple, Dict, List, Union, Any, Optional
 
 import torch
 
-from nn_model.models import RNNCellModel
+from nn_model.models import PrimaryVisualCortexModel
 
 
 class DictionaryHandler:
@@ -23,7 +23,7 @@ class DictionaryHandler:
         call_tuple: Tuple[Any, Optional[Tuple], Optional[Dict]]
     ) -> Tuple:
         """
-        Assings call args and kwargs in case they are not defined in the provided call tuple.
+        Assigns call args and kwargs in case they are not defined in the provided call tuple.
 
         :param call_tuple: Tuple of call object, its args and kwargs.
         :return: Tuple of called object, its args, and kwargs.
@@ -126,7 +126,9 @@ class DictionaryHandler:
 
         :return: Returns tuple of dictionaries of input and output layer sizes.
         """
-        input_layers = {key: layer_sizes[key] for key in RNNCellModel.input_layers}
+        input_layers = {
+            key: layer_sizes[key] for key in PrimaryVisualCortexModel.input_layers
+        }
         output_layers = {
             key: value for key, value in layer_sizes.items() if key not in input_layers
         }

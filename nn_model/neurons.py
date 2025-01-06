@@ -11,11 +11,26 @@ import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import ModelTypes
 
 
-class CustomActivation(torch.nn.Module):
+class CustomNeuronActivation(torch.nn.Module):
+    """
+    Custom neuron activation function designed the way that should better capture the
+    expected output values of the neurons.
+
+    We expect that neurons return values in interval (0, 5) because when we inspect our
+    training data there is no such time interval that contains more than 4 spikes in the
+    20 ms time window (largest window that we use). We then safely assume that our values
+    should be smaller than 5 (in case it is not true it is permissible exception).
+
+    Alongside with this, the majority of data lays in the interval (0, 1). So, we use
+    sigmoid function for all predictions smaller than 1 (for those we would get value
+    from 0 to 1 always). When this threshold is reached we apply scaled tanh to spread the
+    rest of the input values to interval (0, 5).
+    """
+
     def forward(self, x):
+        # TODO: improve the function definition (especially better tanh case)
         # Apply sigmoid to get values between 0 and 1
         sigmoid_output = torch.sigmoid(x)
         # Apply scaled tanh for values greater than 1
@@ -29,13 +44,13 @@ class SharedNeuronBase(nn.Module, ABC):
     Base class of the shared neuron module.
     """
 
-    joint_input_models = [ModelTypes.DNN_JOINT.value, ModelTypes.RNN_JOINT.value]
-    separate_input_models = [
-        ModelTypes.DNN_SEPARATE.value,
-        ModelTypes.RNN_SEPARATE.value,
-    ]
-
     def __init__(self, model_type: str, residual: bool = True):
+        """
+        Initializes neuron model base parameters (shared across all neuron models).
+
+        :param model_type: Type of the neuron model.
+        :param residual: Flag whether we want to use residual connection in the neuron model.
+        """
         super(SharedNeuronBase, self).__init__()
         # Check that the model type is valid
         assert model_type in nn_model.globals.COMPLEX_MODELS, "Invalid model type"
@@ -47,7 +62,8 @@ class SharedNeuronBase(nn.Module, ABC):
         # Flag whether we want to use the residual connection.
         self.residual = residual
 
-        self.custom_activation = CustomActivation()
+        # Neuron activation function layer. TODO: maybe not needed
+        self.custom_activation = CustomNeuronActivation()
 
     def _select_input_size(self) -> int:
         """
@@ -56,11 +72,12 @@ class SharedNeuronBase(nn.Module, ABC):
         :return: Returns size of the input layer (typically 1 for joint
         inputs and 2 for separate excitatory/inhibitory layers).
         """
-        if self.model_type in SharedNeuronBase.joint_input_models:
+        if self.model_type in nn_model.globals.JOINT_MODELS:
             # Joint model -> input is sum of excitatory and inhibitory layers.
             return 1
-        if self.model_type in SharedNeuronBase.separate_input_models:
-            # Separate model -> input are two values one for excitatory one for inhibitory layer.
+        elif self.model_type in nn_model.globals.SEPARATE_MODELS:
+            # Separate model -> input values are two values one for excitatory
+            # one for inhibitory layer.
             return 2
 
         class WrongModelException(Exception):
@@ -73,9 +90,7 @@ class SharedNeuronBase(nn.Module, ABC):
         )
 
 
-# Shared complexity module
-# class FeedForwardNeuron(nn.Module):
-class FeedForwardNeuron(SharedNeuronBase):
+class DNNNeuron(SharedNeuronBase):
     """
     Class defining shared complexity of the layer that should represent
     one neuron (more complex neuron than just one operation). This
@@ -97,17 +112,7 @@ class FeedForwardNeuron(SharedNeuronBase):
         :param layer_size: Size of the layer of the model.
         :param residual: Flag whether there is a residual connection used in the model.
         """
-        super(FeedForwardNeuron, self).__init__(model_type, residual)
-
-        # Check that the model type is the one we would expect.
-        # assert model_type in nn_model.globals.DNN_MODELS
-        # self.model_type: str = model_type
-
-        # self.input_size = (
-        #     1 if model_type == ModelTypes.DNN_JOINT.value else 2
-        # )  # Either joint (one input) or separate exc/inh layers (two inputs).
-
-        # self.residual: bool = residual
+        super(DNNNeuron, self).__init__(model_type, residual)
 
         self.network = self._init_model_architecture(layer_size, num_layers)
 
@@ -126,10 +131,8 @@ class FeedForwardNeuron(SharedNeuronBase):
         for _ in range(num_layers - 1):
             layers.append(nn.LayerNorm(layer_size))
             layers.append(nn.Linear(layer_size, layer_size))
-            # layers.append(nn.LayerNorm(layer_size))
             layers.append(nn.ReLU())  # Non-linear activation after each layer.
-            # layers.append(nn.GELU())
-            # layers.append(nn.Dropout(0.2))
+            # layers.append(nn.Dropout(0.2)) # TODO: decide whether we want to include dropout
 
         # Final output layer: output size is 1
         layers.append(nn.Linear(layer_size, 1))
@@ -144,93 +147,23 @@ class FeedForwardNeuron(SharedNeuronBase):
         Performs forward step of the DNN model of neuron.
 
         :param hidden: Input of the model.
-        :return: Returns tuple of output of the DNN mode and empty tensor of hidden states
-        (to have same output as RNN variants).
+        :param complexity_hidden: Not used argument of complexity hidden states
+        (used to have same forward header as RNN variants).
+        :return: Returns tuple of output of the DNN mode and empty
+        tensor of hidden states (to have same output as RNN variants).
         """
         # Pass the input through the network.
         out = self.network(hidden)
-        # Apply potential residual connection.
-        # out = self.forward_residual(hidden, out)
+
         if self.residual:
+            # Apply residual connection.
             out += hidden.sum(dim=1, keepdim=True)
 
         # Apply module final non-linearity function.
-        # return self.forward_non_linearity(out)
-
         out = self.custom_activation(out)
 
+        # Return
         return out, torch.zeros(0)
-
-
-# class RNNNeuron(SharedNeuronBase):
-#     """
-#     Class defining shared complexity of the layer that should represent
-#     one neuron (more complex neuron than just one operation). This
-#     type of neuron consists of an RNN.
-#     """
-
-#     def __init__(
-#         self,
-#         model_type: str,
-#         hidden_size: int = 10,
-#         num_layers: int = 1,
-#         residual: bool = True,
-#     ):
-#         """
-#         Initializes RNN model of the neuron.
-
-#         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
-#         :param hidden_size: Size of the hidden state in the RNN.
-#         :param num_layers: Number of RNN layers.
-#         :param residual: Flag whether there is a residual connection used in the model.
-#         """
-#         super(RNNNeuron, self).__init__(model_type, residual)
-#         self.hidden_size = hidden_size
-#         self.num_layers = num_layers
-
-#         # RNN for processing
-#         self.rnn = nn.RNN(
-#             input_size=self.input_size,
-#             hidden_size=hidden_size,
-#             num_layers=num_layers,
-#             batch_first=True,
-#         )
-
-#         # Scalar output layer
-#         self.output_layer = nn.Linear(hidden_size, 1)
-
-#     def forward(
-#         self, inputs: torch.Tensor, hidden: Optional[torch.Tensor] = None
-#     ) -> torch.Tensor:
-#         """
-#         Performs forward step of the RNN model of neuron.
-
-#         :param inputs: Input tensor of shape (batch_size, seq_len, input_size).
-#         :param hidden: Optional hidden state for the RNN.
-#         :return: Returns output of the RNN model.
-#         """
-#         # Add a sequence dimension to the input
-#         inputs = inputs.unsqueeze(1)  # Shape: (batch_size, 1, input_size)
-
-#         # RNN processing
-#         rnn_output, hidden = self.rnn(
-#             inputs, hidden
-#         )  # Shape: (batch_size, seq_len, hidden_size)
-
-#         # Extract last output and map to scalar
-#         rnn_output = rnn_output[:, -1, :]  # Shape: (batch_size, hidden_size)
-#         output = self.output_layer(rnn_output)  # Shape: (batch_size, 1)
-
-#         # Apply residual connection if enabled
-#         if self.residual:
-#             output = output + inputs[:, -1, :].sum(
-#                 dim=1, keepdim=True
-#             )  # Use original input as residual
-
-#         # Apply module final non-linearity function
-#         output = self.custom_activation(output)
-
-#         return output, hidden
 
 
 class LSTMNeuron(SharedNeuronBase):
@@ -238,10 +171,11 @@ class LSTMNeuron(SharedNeuronBase):
     Memory-enabled neuron module using an LSTM cell for processing scalar inputs.
     """
 
+    # TODO: Look deeply at the LSTM module definition (num_layers)
+
     def __init__(
         self,
         model_type: str,
-        # input_size: int,
         num_layers: int = 1,
         layer_size: int = 10,
         residual: bool = True,
@@ -250,14 +184,13 @@ class LSTMNeuron(SharedNeuronBase):
         Initialize the neuron module.
 
         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
-        :param input_size: Size of the input feature (scalar).
+        :param num_layers: Number of LSTM layers for richer memory (neuron hidden time steps).
         :param layer_size: Size of the hidden state in the LSTM.
-        :param num_layers: Number of LSTM layers for richer memory.
         :param residual: Whether to use a residual connection.
         """
         super(LSTMNeuron, self).__init__(model_type, residual)
         self.layer_size = layer_size
-        self.num_layers = num_layers
+        self.num_layers = num_layers  # Number of hidden time steps
 
         # LSTM cells for memory processing
         self.lstm_cells = nn.ModuleList(
@@ -271,13 +204,14 @@ class LSTMNeuron(SharedNeuronBase):
         self.output_layer = nn.Linear(layer_size, 1)
 
         # Custom activation function
-        self.custom_activation = CustomActivation()
+        self.custom_activation = CustomNeuronActivation()
 
     def forward(
         self,
         inputs: torch.Tensor,
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
     ) -> torch.Tensor:
+        # TODO: WHole definition is strange somehow (we have layers but we work with only the one of them as time step layer).
         """
         Forward pass of the memory neuron.
 
@@ -307,11 +241,8 @@ class LSTMNeuron(SharedNeuronBase):
         # Apply the output layer to the last hidden state
         output = self.output_layer(h)
 
-        # Apply residual connection if enabled
-        # if self.residual:
-        #     output = output + inputs  # Use original input as residual
-
         if self.residual:
+            # Apply residual connection if enabled
             output += inputs.sum(dim=1, keepdim=True)
 
         # Apply module final non-linearity function

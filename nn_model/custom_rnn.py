@@ -38,13 +38,14 @@ class CustomRNNCell(nn.Module):
         weight_initialization_type: str,
     ):
         """
-        Initializes the custom RNNCell module.
+        Initializes the custom RNN module.
 
         :param input_size: Size of the input.
         :param hidden_size: Size of the layer itself.
         :param layer_name: Name of the layer which this module represents
         (to determine whether it is excitatory or inhibitory).
-        :param input_constraints:
+        :param input_constraints: List of properties of each input layer
+        (its size and type (inhibitory/excitatory)).
         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
         :param weight_initialization_type: Which type of weight initialization we want to use.
         """
@@ -53,13 +54,9 @@ class CustomRNNCell(nn.Module):
         # Layer type
         self.layer_name = layer_name
 
+        # List of properties of input.
         self.input_constraints = input_constraints
 
-        # Assert model type is what we expected.
-        # assert model_type in [
-        #     ModelTypes.COMPLEX_JOINT.value,
-        #     ModelTypes.COMPLEX_SEPARATE.value,
-        # ]
         assert model_type in nn_model.globals.COMPLEX_MODELS
         self.model_type = model_type
 
@@ -81,12 +78,12 @@ class CustomRNNCell(nn.Module):
         self.weights_ih_inh = nn.Linear(
             self.inhibitory_size, hidden_size
         )  # Input inhibitory
-        self.weights_hh = nn.Linear(hidden_size, hidden_size)
+        self.weights_hh = nn.Linear(hidden_size, hidden_size)  # Self-connection
 
-        # self.b_ih = nn.Parameter(torch.Tensor(hidden_size))
+        # Biases
         self.b_ih_exc = nn.Parameter(torch.Tensor(hidden_size))  # Input excitatory
         self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
-        self.b_hh = nn.Parameter(torch.Tensor(hidden_size))
+        self.b_hh = nn.Parameter(torch.Tensor(hidden_size))  # Self-connection
 
         self._init_weights(weight_initialization_type)
 
@@ -132,8 +129,9 @@ class CustomRNNCell(nn.Module):
 
     def _init_normal_weights(self, mean: float = 0.02, std: float = 0.01):
         """
-        # TODO: more general usage
-        Initializes module weights using normal distribution that has larger mean in inhibitory part.
+        TODO: more general usage
+        Initializes module weights using normal distribution that has larger
+        mean in inhibitory part.
 
         :param mean: excitatory part mean.
         :param std: excitatory part std.
@@ -171,8 +169,8 @@ class CustomRNNCell(nn.Module):
 
     def _flip_weights_signs(self, constraint_multiplier: int):
         """
-        Flips weights based on the layer it belongs to either non-positive (inhibitory)
-        or non-negative (excitatory) values.
+        Flips weights of the model based on the layer it belongs to either
+        non-positive (inhibitory) or non-negative (excitatory) values.
 
         :param constraint_multiplier: Multiplier used on self-recurrent weights
         (either `-1` if inhibitory or `1` if excitatory).
@@ -183,14 +181,14 @@ class CustomRNNCell(nn.Module):
             self.weights_hh.weight.data
         )
 
-    def _init_weights(self, weight_initialization_type):
+    def _init_weights(self, weight_initialization_type: str):
         """
         Initializes module weights and biases. Weights are initialized using
         uniform distribution. Biases are initialized with zeros.
 
         :param weight_initialization_type: Which type of weight initialization we want to use.
         """
-        # How should we
+        # Set self-recurrent weight constraint based on the layer type.
         self_recurrent_multiplier = (
             1 if self.layer_name in nn_model.globals.EXCITATORY_LAYERS else -1
         )
@@ -222,15 +220,18 @@ class CustomRNNCell(nn.Module):
         :param input_data: Input data (all inputs without itself).
         :param hidden: Output data of the previous step (previous predictions of itself
         modified by non-linearity function).
-        :return: Returns linearity step of the RNNCell module (either sum of inhibitory and
-        excitatory (`complex_joint` model) or tuple of both outputs (`complex_separate` model).
+        :return: Returns result of linearity step of the RNN layer (either sum of inhibitory and
+        excitatory (`_joint` models) or tuple of both outputs separately (`_separate` models).
+
+        In case it returns excitatory and inhibitory results separately, it returns tuple where
+        first value is excitatory result and second value is inhibitory.
         NOTE: It expects that the non-linearity would be used outside of the module.
         """
         # Take excitatory and inhibitory parts
         input_excitatory = input_data[:, self.excitatory_indices]
         input_inhibitory = input_data[:, self.inhibitory_indices]
 
-        # Apply linear step to inhibitory and excitatory part
+        # Apply linear step to inhibitory and excitatory part.
         in_exc_linear = self.weights_ih_exc(input_excitatory) + self.b_ih_exc
         in_inh_linear = self.weights_ih_inh(input_inhibitory) + self.b_ih_inh
 
@@ -245,7 +246,8 @@ class CustomRNNCell(nn.Module):
             in_inh_linear += hidden_linear
 
         if self.model_type in [ModelTypes.DNN_JOINT.value, ModelTypes.RNN_JOINT.value]:
-            # In case we do not want to
+            # In case we want to return the sum of inhibitory and excitatory part.
             return in_exc_linear + in_inh_linear
 
+        # In case we want to return the tuple of excitatory and inhibitory linear part.
         return in_exc_linear, in_inh_linear

@@ -20,8 +20,8 @@ from nn_model.type_variants import (
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
-    RNNCellModel,
-    ConstrainedRNNCell,
+    PrimaryVisualCortexModel,
+    ModelLayer,
 )
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
 from nn_model.evaluation_results_saver import EvaluationResultsSaver
@@ -40,24 +40,25 @@ class ModelExecuter:
 
         :param arguments: command line arguments.
         """
-        # Basic arguments
+        # Basic arguments.
         self.num_epochs = arguments.num_epochs
         self.layer_sizes = nn_model.globals.MODEL_SIZES
 
-        # Dataset Init
+        # Dataset initialization.
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
         self.train_loader, self.test_loader = self._init_data_loaders()
 
-        # Model Init
+        # Model initialization.
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
         self.criterion = self._init_criterion()
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
 
-        self.gradient_clip = arguments.gradient_clip  # Gradient clipping upper bound
+        # Gradient clipping upper bound.
+        self.gradient_clip = arguments.gradient_clip
 
-        # Evaluation metric
+        # Evaluation metric.
         self.evaluation_metrics = NormalizedCrossCorrelation()
 
         # Placeholder for the best evaluation result value.
@@ -134,10 +135,7 @@ class ModelExecuter:
         if arguments.model == ModelTypes.SIMPLE.value:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
             return {}
-        if arguments.model in [
-            ModelTypes.DNN_JOINT.value,
-            ModelTypes.DNN_SEPARATE.value,
-        ]:
+        elif arguments.model in nn_model.globals.DNN_MODELS:
             # Model with neuron that consist of small NN.
             # of th same layer sizes in each layer.
             return {
@@ -148,10 +146,7 @@ class ModelExecuter:
                     "residual": not arguments.neuron_not_residual,
                 }
             }
-        if arguments.model in [
-            ModelTypes.RNN_JOINT.value,
-            ModelTypes.RNN_SEPARATE.value,
-        ]:
+        elif arguments.model in nn_model.globals.RNN_MODELS:
             return {
                 arguments.model: {
                     "model_type": arguments.model,
@@ -160,19 +155,23 @@ class ModelExecuter:
                     "residual": not arguments.neuron_not_residual,
                 }
             }
+        else:
 
-        # Wrongly defined complexity type -> treat as simple neuron.
-        print("Wrong complexity, using simple complexity layer.")
-        return {}
+            class NonExistingModelTypeException(Exception):
+                """
+                Exception class used when wrong model type is selected.
+                """
 
-    def _init_model(self, arguments) -> RNNCellModel:
+            raise NonExistingModelTypeException("Non-existing model type selected.")
+
+    def _init_model(self, arguments) -> PrimaryVisualCortexModel:
         """
-        Initializes model based on the provided arguments.
+        Initializes the model based on the provided arguments.
 
         :param arguments: command line arguments containing model setup info.
         :return: Returns initializes model.
         """
-        return RNNCellModel(
+        return PrimaryVisualCortexModel(
             self.layer_sizes,
             arguments.num_hidden_time_steps,
             arguments.model,
@@ -189,8 +188,20 @@ class ModelExecuter:
         return torch.nn.MSELoss()
 
     def _init_exc_inh_specific_learning_rate(self, learning_rate):
+        """
+        Splits the model parameters to two groups. One corresponding to inhibitory layer
+        values and one corresponding to excitatory layers. Inhibitory layer parameters
+        should use 4 times smaller learning rate than excitatory
+        (because of the properties of the model)
 
-        # Identify layers to apply a 4x lower learning rate
+        NOTE: This function is used in case we select `OptimizerTypes.EXC_INH_SPECIFIC`.
+
+        :param learning_rate: Base learning rate that should be applied for excitatory
+        layers (inhibitory should have learning rate 4 times smaller).
+        :return: Returns group of parameters for the optimizer.
+        """
+
+        # Identify inhibitory layers to apply a 4x lower learning rate on.
         selected_params = [
             self.model.layers.V1_Exc_L23.rnn_cell.weights_ih_inh.weight,
             self.model.layers.V1_Inh_L23.rnn_cell.weights_ih_inh.weight,
@@ -198,15 +209,15 @@ class ModelExecuter:
             self.model.layers.V1_Exc_L4.rnn_cell.weights_ih_inh.weight,
             self.model.layers.V1_Inh_L4.rnn_cell.weights_ih_inh.weight,
             self.model.layers.V1_Inh_L4.rnn_cell.weights_hh.weight,
-        ]  # List of selected layer objects
+        ]
 
         selected_param_ids = {id(p) for p in selected_params}
 
         # Create parameter groups
         param_groups = [
-            # Parameters with lower learning rate
+            # Parameters with lower learning rate (inhibitory).
             {"params": selected_params, "lr": learning_rate / 4},
-            # All other parameters
+            # All other parameters (excitatory).
             {
                 "params": [
                     p
@@ -300,7 +311,7 @@ class ModelExecuter:
         Applies model constraints on all model layers (excitatory/inhibitory).
         """
         for module in self.model.modules():
-            if isinstance(module, ConstrainedRNNCell):
+            if isinstance(module, ModelLayer):
                 module.apply_constraints()
 
     def _epoch_evaluation_step(
@@ -502,7 +513,6 @@ class ModelExecuter:
         total_loss.backward()
 
         # Gradient clipping to prevent exploding gradients.
-        # It might make more sense using some parameter to select max value.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
 
         self.optimizer.step()
@@ -645,14 +655,10 @@ class ModelExecuter:
                     prediction_type == PredictionTypes.FULL_PREDICTION.value
                     or save_recurrent_state
                 ):
-                    # In case we are doing full prediction or we specified we want RNN predictions
-                    # -> store them
+                    # In case we are doing full prediction or we specified we want RNN linearity values
+                    # (of layers) -> store them.
                     if prediction_type == PredictionTypes.RNN_PREDICTION.value:
-                        # if self.model.neuron_model.model_type in [
-                        #     ModelTypes.RNN_SEPARATE.value,
-                        #     ModelTypes.DNN_SEPARATE.value,
-                        # ]:
-                        #     continue
+                        # TODO: currently skipping this step as it does not work correctly.
                         continue
 
                     current_prediction = torch.cat(layers_prediction, dim=1)
@@ -679,7 +685,7 @@ class ModelExecuter:
         # Initialize dictionaries with the keys of all output layers names.
         all_predictions: Dict[str, Dict[str, List[torch.Tensor]]] = {
             prediction_type.value: {
-                layer: [] for layer in RNNCellModel.layers_input_parameters
+                layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
             }
             for prediction_type in list(PredictionTypes)
         }
@@ -780,7 +786,8 @@ class ModelExecuter:
                 continue
 
             if prediction_type == PredictionTypes.RNN_PREDICTION.value:
-                continue  # TODO: skip RNN predictions for now
+                # TODO: currently skipping RNN linearity results storage as it is broken.
+                continue
 
             return_predictions[prediction_type] = (
                 ModelExecuter._prepare_evaluation_predictions_for_return(

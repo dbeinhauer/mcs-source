@@ -1,3 +1,9 @@
+# TODO:
+- probably wrong manipulation with neuron RNN model hidden states (we reset them each time step 
+    - we probably want to let them (at least in evaluation)
+    - we probably want them original in both training and evaluation
+
+
 # Questions for meeting
 - loss calculation
     - is it better to calculate the loss separately for each layer or together concatenated?

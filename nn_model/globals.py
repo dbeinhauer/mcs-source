@@ -65,17 +65,33 @@ MODEL_SIZES = {
     layer: int(size * SIZE_MULTIPLIER) for layer, size in ORIGINAL_SIZES.items()
 }
 
+# All DNN complexity models
 DNN_MODELS = [
     ModelTypes.DNN_JOINT.value,
     ModelTypes.DNN_SEPARATE.value,
 ]
 
+# All RNN complexity models
 RNN_MODELS = [
     ModelTypes.RNN_JOINT.value,
     ModelTypes.RNN_SEPARATE.value,
 ]
 
+# All complexity models.
 COMPLEX_MODELS = DNN_MODELS + RNN_MODELS
+
+# All models that expects RNN output as 1 value.
+JOINT_MODELS = [
+    ModelTypes.SIMPLE.value,
+    ModelTypes.DNN_JOINT.value,
+    ModelTypes.RNN_JOINT.value,
+]
+
+# All models that expect RNN output to be 2 values (first excitatory and second inhibitory).
+SEPARATE_MODELS = [
+    ModelTypes.DNN_SEPARATE.value,
+    ModelTypes.RNN_SEPARATE.value,
+]
 
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {
