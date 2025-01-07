@@ -575,3 +575,13 @@ Notes after meetings:
         - this might significantly improve the model performance
 
 # 7.1.2025
+- separate RNN time steps to propagate across all time steps
+- add signal modulation RNN after output of each neuron
+    - it should be shared across the tuples input+output layers
+    - it should be also added before LGN input is passed to the input layers
+        - and after each output of the neurons too
+    - this part should correspond to signal modulation when multiple spikes happen in short time period
+        - the neurons diminish the signal in that case (needs to regenerate)
+    - as output of the model we want to still have unmodulated signal (same as we have)
+        - we just want to adjust the input signal to the other neurons
+            - the change happens in real example in the output neuron
