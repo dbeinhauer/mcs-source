@@ -5,25 +5,16 @@
 
 
 # Questions for meeting
-- loss calculation
-    - is it better to calculate the loss separately for each layer or together concatenated?
-
 
 
 # Notes from meeting
-- the problematic part still stays the dynamics during stimulus 
-    - in lately time steps there is not enough inhibition
-        - we want ideally to be under stable spiking
-- we want plots for different neurons
-    - not only the population of them
-    - to see there how it behaves on the neurons
-- we want to plot the trained model only on blank stimuli
-    - to see whether the spontaneous activity is ok
-- train on smaller time steps
-    - may better capture the dynamics
-- train on larger model size
-- add ReLU after DNN module (or other condition to have positive outputs)
-    - we want the responses of the neuron to be spikes
-- maybe make the DNN neuron module more complex to have some memory
-    - create RNN of the DNN module
-        - not sure if it works because there is already RNN (and memory) captured in the model architecture
+- separate RNN time steps to propagate across all time steps
+- add signal modulation RNN after output of each neuron
+    - it should be shared across the tuples input+output layers
+    - it should be also added before LGN input is passed to the input layers
+        - and after each output of the neurons too
+    - this part should correspond to signal modulation when multiple spikes happen in short time period
+        - the neurons diminish the signal in that case (needs to regenerate)
+    - as output of the model we want to still have unmodulated signal (same as we have)
+        - we just want to adjust the input signal to the other neurons
+            - the change happens in real example in the output neuron 

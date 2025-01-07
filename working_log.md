@@ -565,3 +565,13 @@ Notes after meetings:
 - using separate DNN module produces slightly better results than variant without it
     - currently, we are reaching 0.9 cc_norm (joint variant only 0.85)
 - long-term problems with the model still persist
+
+# 6.1.2025
+- we have added the possibility to run the model on separate excitatory and inhibitory layers
+    - seems to perform slightly better than having both joint
+- we also added RNN variant of the neuron model that used LSTM model
+    - currently it seems to be as good as classical feed-forward DNN approach
+    - although, we encountered bug in the implementation that does not propagate the states of the neuron to other time steps 
+        - this might significantly improve the model performance
+
+# 7.1.2025
