@@ -142,7 +142,7 @@ class DNNNeuron(SharedNeuronBase):
 
     def forward(
         self, hidden: torch.Tensor, complexity_hidden: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
         Performs forward step of the DNN model of neuron.
 
@@ -192,13 +192,19 @@ class LSTMNeuron(SharedNeuronBase):
         self.layer_size = layer_size
         self.num_layers = num_layers  # Number of hidden time steps
 
+        self.input_layer = nn.Linear(self.input_size, layer_size)
+        self.lstm_cell = nn.LSTMCell(layer_size, layer_size)
         # LSTM cells for memory processing
-        self.lstm_cells = nn.ModuleList(
-            [
-                nn.LSTMCell(self.input_size if i == 0 else layer_size, layer_size)
-                for i in range(num_layers)
-            ]
-        )
+        # self.lstm_cells = nn.ModuleList(
+        #     # [
+        #     #     nn.LSTMCell(self.input_size if i == 0 else layer_size, layer_size)
+        #     #     for i in range(num_layers)
+        #     # ]
+        #     [
+        #         # nn.LSTMCell(self.input_size, layer_size),
+        #         nn.LSTMCell(layer_size, layer_size),
+        #     ]
+        # )
 
         # Scalar output layer
         self.output_layer = nn.Linear(layer_size, 1)
@@ -210,7 +216,8 @@ class LSTMNeuron(SharedNeuronBase):
         self,
         inputs: torch.Tensor,
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
+
         # TODO: WHole definition is strange somehow (we have layers but we work with only the one of them as time step layer).
         """
         Forward pass of the memory neuron.
@@ -222,18 +229,18 @@ class LSTMNeuron(SharedNeuronBase):
         batch_size = inputs.size(0)
 
         if hidden is None:
-            hidden = [
-                (
-                    torch.zeros(batch_size, self.layer_size).to(inputs.device),
-                    torch.zeros(batch_size, self.layer_size).to(inputs.device),
-                )
-                for _ in range(self.num_layers)
-            ]
+            hidden = (
+                torch.zeros(batch_size, self.layer_size).to(inputs.device),
+                torch.zeros(batch_size, self.layer_size).to(inputs.device),
+            )
+            #     for _ in range(self.num_layers)
+            # ]
 
-        current_input = inputs
-        h, c = hidden[0]
-        for i, lstm_cell in enumerate(self.lstm_cells):
-            h, c = lstm_cell(current_input, (h, c))
+        current_input = self.input_layer(inputs)
+        h, c = hidden
+        for i in range(self.num_layers):
+            # h, c = lstm_cell(current_input, (h, c))
+            h, c = self.lstm_cell(current_input, (h, c))
             current_input = (
                 h  # The output of the current cell is the input to the next cell
             )

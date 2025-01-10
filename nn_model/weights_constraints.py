@@ -43,7 +43,7 @@ class WeightConstraint:
 
     def hidden_constraint(self, module, layer_type, kwargs):
         """
-        Applies constraints on the `weight_hh` (hidden) parameters
+        Applies constraints on the `weight_hh` (self-recurrent) parameters
         of the provided layer. Applying excitatory/inhibitory constraint.
 
         :param module: module (layer) to which we want to apply the constraint to.
@@ -61,6 +61,12 @@ class WeightConstraint:
             )
 
     def input_constraint(self, module):
+        """
+        Applies constraints on the input weights of the provided layer.
+        Differentiates between excitatory/inhibitory layers.
+
+        :param module: Module to apply the weight on.
+        """
         if hasattr(module, "weights_ih_exc"):
             module.weights_ih_exc.weight.data = torch.clamp(
                 module.weights_ih_exc.weight.data,

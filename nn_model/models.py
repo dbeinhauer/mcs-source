@@ -502,11 +502,11 @@ class PrimaryVisualCortexModel(nn.Module):
         self,
         current_time_outputs: Dict[str, torch.Tensor],
         hidden_layers: Dict[str, torch.Tensor],
-        neuron_hidden: Dict[str, Optional[torch.Tensor]],
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
     ) -> Tuple[
         Dict[str, torch.Tensor],
         Dict[str, Optional[Tuple[torch.Tensor, ...]]],
-        Dict[str, Tuple[torch.Tensor, ...]],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
     ]:
         """
         Performs model time step. It progresses the model architecture and
@@ -577,7 +577,12 @@ class PrimaryVisualCortexModel(nn.Module):
         self,
         inputs: Dict[str, torch.Tensor],
         hidden_states: Dict[str, torch.Tensor],
-    ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ) -> Tuple[
+        Dict[str, List[torch.Tensor]],
+        Dict[str, List[torch.Tensor]],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ]:
         """
         Performs forward step of the model iterating through all time steps of the provided
         inputs and targets.
@@ -595,6 +600,7 @@ class PrimaryVisualCortexModel(nn.Module):
         :param hidden_states: model previous time step inputs of size
         `(batch_size, num_time_steps, num_neurons)` for training mode or
         `(batch, neurons)` for evaluation (we need only first time step).
+        :param neuron_hidden: Tuple of hidden states of the neurons (needed for RNN models).
         :return: Returns model predictions for all time steps.
         """
         # Initialize dictionaries of all model predictions.
@@ -611,10 +617,10 @@ class PrimaryVisualCortexModel(nn.Module):
             # We add 1 to iterate through the visible time loop correctly (we want to iterate once).
             visible_time_steps = 1 + 1
 
-        # Hidden states of the neuron.
-        neuron_hidden = {
-            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+        # # Hidden states of the neuron.
+        # neuron_hidden = {
+        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        # }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
 
         for visible_time in range(1, visible_time_steps):
             # Prediction of the visible time steps
@@ -667,4 +673,4 @@ class PrimaryVisualCortexModel(nn.Module):
         del inputs, hidden_states
         torch.cuda.empty_cache()
 
-        return all_hidden_outputs, all_recurrent_outputs
+        return all_hidden_outputs, all_recurrent_outputs, neuron_hidden

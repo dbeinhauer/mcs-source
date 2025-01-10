@@ -469,7 +469,8 @@ class ModelExecuter:
         inputs: Dict[str, torch.Tensor],
         hidden_states: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
-    ) -> float:
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ) -> Tuple[float, Dict[str, Optional[Tuple[torch.Tensor, ...]]]]:
         """
         Performs time step prediction and optimizer step.
 
@@ -486,11 +487,17 @@ class ModelExecuter:
         # We want to zero optimizer gradient before each training step.
         self.optimizer.zero_grad()
 
-        all_predictions, _ = self.model(
+        # Hidden states of the neuron.
+        neuron_hidden = {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+
+        all_predictions, _, neuron_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
             # Time step is assigned based on model architecture during the forward function call.
             hidden_states,
+            neuron_hidden,
         )
 
         # Take last time step predictions (those are the visible time steps predictions).
@@ -520,7 +527,7 @@ class ModelExecuter:
         del all_predictions
         torch.cuda.empty_cache()
 
-        return total_loss.item()
+        return total_loss.item(), neuron_hidden
 
     def _train_perform_visible_time_step(
         self,
@@ -541,6 +548,12 @@ class ModelExecuter:
         # training. Moving them all at once significantly reduces time complexity.
         all_hidden_states = ModelExecuter._move_data_to_cuda(target_batch)
         time_loss_sum = 0.0
+
+        # Hidden states of the neuron.
+        neuron_hidden = {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+
         for visible_time in range(
             1, time_length
         ):  # We skip the first time step because we do not have initial hidden values for them.
@@ -548,7 +561,11 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            time_loss_sum += self._optimizer_step(inputs, hidden_states, targets)
+            current_loss, neuron_hidden = self._optimizer_step(
+                inputs, hidden_states, targets, neuron_hidden
+            )
+
+            time_loss_sum += current_loss
 
             # Save CUDA memory. Delete not needed variables.
             del (
@@ -705,10 +722,17 @@ class ModelExecuter:
                 }
             )
 
+            # Hidden states of the neuron.
+            neuron_hidden = {
+                layer: None
+                for layer in PrimaryVisualCortexModel.layers_input_parameters
+            }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+
             # Get all visible time steps predictions of the model.
-            trial_predictions, trial_rnn_predictions = self.model(
+            trial_predictions, trial_rnn_predictions, _ = self.model(
                 trial_inputs,
                 trial_hidden,
+                neuron_hidden,
             )
 
             # Accumulate all trials predictions.

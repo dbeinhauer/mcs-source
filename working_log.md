@@ -39,7 +39,7 @@
 - mozaik should be used only for data extraction
 - data consist of:
     - the image
-    - experiment lenght (and blank/stimuli parts)
+    - experiment length (and blank/stimuli parts)
     - spike trains for neurons in LGN, L4 and L3/2
         - we want to split them into smaller bins
         - each bin has number of spikes inside the bin (typical case might be just changing 0/1)

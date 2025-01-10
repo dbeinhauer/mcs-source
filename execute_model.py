@@ -102,8 +102,8 @@ def init_model_path(arguments) -> str:
                 f"_neuron-size-{arguments.neuron_layer_size}",
                 f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
                 f"_gradient-clip-{arguments.gradient_clip}",
-                f"optimizer-type-{arguments.optimizer_type}",
-                f"weight-initialization-{arguments.weight_initialization}",
+                f"_optimizer-type-{arguments.optimizer_type}",
+                f"_weight-initialization-{arguments.weight_initialization}",
                 ".pth",
             ]
         )
@@ -287,6 +287,7 @@ if __name__ == "__main__":
         "--optimizer_type",
         type=str,
         default=OptimizerTypes.DEFAULT.value,
+        choices=[optimizer_type.value for optimizer_type in OptimizerTypes],
         help="Optimizer type (either default or learning rate specific).",
     )
     parser.add_argument(
@@ -299,6 +300,7 @@ if __name__ == "__main__":
         "--weight_initialization",
         type=str,
         default=WeightsInitializationTypes.DEFAULT.value,
+        choices=[weights_type.value for weights_type in WeightsInitializationTypes],
         help="Which type of weights initialization we want to use.",
     )
     # Model parameters:
@@ -324,7 +326,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
-        default=20,
+        default=10,
         help="Size of the layers we want to use in feed-forward model of a neuron.",
     )
     parser.set_defaults(neuron_not_residual=False)

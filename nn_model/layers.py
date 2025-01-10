@@ -10,10 +10,11 @@ import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import ModelTypes
+from nn_model.type_variants import ModelTypes, LayerType
 from nn_model.custom_rnn import CustomRNNCell
 from nn_model.neurons import SharedNeuronBase
-from nn_model.models import PrimaryVisualCortexModel
+
+# from nn_model.models import PrimaryVisualCortexModel
 from nn_model.weights_constraints import WeightConstraint
 
 
@@ -54,7 +55,12 @@ class ModelLayer(nn.Module):
         self.hidden_size = hidden_size
 
         # Check layer type is one of our expected output layers.
-        assert layer_name in [PrimaryVisualCortexModel.layers_input_parameters.keys()]
+        assert layer_name in [
+            LayerType.V1_EXC_L4.value,
+            LayerType.V1_INH_L4.value,
+            LayerType.V1_EXC_L23.value,
+            LayerType.V1_INH_L23.value,
+        ], "Invalid layer type"
         self.layer_name = layer_name
 
         # Assign the model type.
