@@ -1,3 +1,3 @@
 # About
 
-Repository concerning my Masters thesis.
+This repository contains source code for the 
