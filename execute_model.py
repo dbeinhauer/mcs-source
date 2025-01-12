@@ -321,32 +321,32 @@ if __name__ == "__main__":
         "--neuron_num_layers",
         type=int,
         default=5,
-        help="Number of hidden layers we want to use in feed-forward model of a neuron.",
+        help="Number of hidden layers we want to use in the model of a neuron.",
     )
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
         default=10,
-        help="Size of the layers we want to use in feed-forward model of a neuron.",
+        help="Size of the layers we want to use in the model of a neuron.",
     )
     parser.set_defaults(neuron_not_residual=False)
     parser.add_argument(
         "--neuron_not_residual",
         action="store_true",
-        help="Whether we want to use residual connections in feed-forward model of a neuron.",
+        help="Whether we want to use residual connections in the model of a neuron.",
     )
     parser.add_argument(
         "--num_hidden_time_steps",
         type=int,
         default=1,
-        help="Number of hidden time steps in RNN (to use backtracking through time (not just use known targets)).",
+        help="Number of hidden time steps in RNN of the whole model (in case it is set to 1 the the model would just predict the following visible time step (without additional hidden steps in between)).",
     )
     # Dataset analysis:
     parser.add_argument(
         "--train_subset",
         type=float,
         default=1.0,
-        help="Number of batches to select as train subset (for model training performance).",
+        help="Number of batches to select as train subset (for modeling training performance on different dataset size).",
     )
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
