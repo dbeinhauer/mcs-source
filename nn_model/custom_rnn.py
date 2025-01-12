@@ -57,7 +57,7 @@ class CustomRNNCell(nn.Module):
         # List of properties of input.
         self.input_constraints = input_constraints
 
-        assert model_type in nn_model.globals.COMPLEX_MODELS
+        # assert model_type in nn_model.globals.COMPLEX_MODELS
         self.model_type = model_type
 
         # Select excitatory and inhibitory indices and determine their sizes.
@@ -245,7 +245,7 @@ class CustomRNNCell(nn.Module):
             # Inhibitory layer -> add self recurrent part to inhibitory
             in_inh_linear += hidden_linear
 
-        if self.model_type in [ModelTypes.DNN_JOINT.value, ModelTypes.RNN_JOINT.value]:
+        if self.model_type in nn_model.globals.JOINT_MODELS:
             # In case we want to return the sum of inhibitory and excitatory part.
             return in_exc_linear + in_inh_linear
 
