@@ -2,22 +2,28 @@
 This source code contains definition of all models used in our experiments.
 """
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import LayerType, TimeStepVariant, ModelTypes
+from nn_model.type_variants import (
+    LayerType,
+    TimeStepVariant,
+    ModelTypes,
+    NeuronModulePredictionFields,
+    LayerConstraintFields,
+)
 from nn_model.weights_constraints import (
     WeightTypes,
     ExcitatoryWeightConstraint,
     InhibitoryWeightConstraint,
 )
 from nn_model.layers import (
-    ConstrainedRNNCell,
+    ModelLayer,
 )
-from nn_model.neurons import FeedForwardNeuron
+from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase
 
 
 class LayerConfig:
@@ -49,8 +55,10 @@ class LayerConfig:
         self.neuron_model = neuron_model
 
         # Determine weight constraints for the layer (excitatory/inhibitory).
-        input_constraints = self._determine_input_constraints()
-        self.constraint = self._determine_constraint(layer_type, input_constraints)
+        self.input_constraints = (
+            self._determine_input_constraints()
+        )  # Constraints setup (for determining inh/excitatory in the architecture).
+        self.constraint = self._determine_constraint(layer_type, self.input_constraints)
 
     def _determine_input_constraints(self) -> List[Dict]:
         """
@@ -68,8 +76,10 @@ class LayerConfig:
         """
         return [
             {
-                "part_size": nn_model.globals.MODEL_SIZES[layer[0]],
-                "part_type": self._get_constraint_type(layer[0]),
+                LayerConstraintFields.SIZE.value: nn_model.globals.MODEL_SIZES[
+                    layer[0]
+                ],
+                LayerConstraintFields.TYPE.value: self._get_constraint_type(layer[0]),
             }
             for layer in self.input_layers_parameters
         ]
@@ -116,7 +126,7 @@ class LayerConfig:
         return None
 
 
-class RNNCellModel(nn.Module):
+class PrimaryVisualCortexModel(nn.Module):
     """
     Class defining models that use LGN outputs as input and predicts rest of the layers.
     """
@@ -205,6 +215,7 @@ class RNNCellModel(nn.Module):
         layer_sizes: Dict[str, int],
         num_hidden_time_steps: int,
         neuron_type: str,
+        weight_initialization: str,
         neuron_model_kwargs: Dict,
     ):
         """
@@ -215,13 +226,16 @@ class RNNCellModel(nn.Module):
         (where we do not know the targets).
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
+        :param weight_initialization: type of weight initialization that we want to use.
         :param neuron_model_kwargs: kwargs of the used neuronal models (if any).
         """
-        super(RNNCellModel, self).__init__()
+        super(PrimaryVisualCortexModel, self).__init__()
 
         # Number of hidden time steps (between individual targets) that we want to use
         # during training and evaluation (in order to learn the dynamics better).
         self.num_hidden_time_steps = num_hidden_time_steps
+
+        self.weight_initialization = weight_initialization
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -236,6 +250,8 @@ class RNNCellModel(nn.Module):
             layer_sizes, self._init_neuron_models()
         )
 
+        # Flag whether we want to return the RNN linearity results for analysis.
+        # TODO: currently broken functionality (not used).
         self.return_recurrent_state = False
 
         # Init model.
@@ -257,7 +273,9 @@ class RNNCellModel(nn.Module):
 
         :return: Returns dictionary of layer name (`LayerType`) and `None`s.
         """
-        return {layer: None for layer in RNNCellModel.layers_input_parameters}
+        return {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }
 
     def _init_complex_neuron_model(
         self,
@@ -271,9 +289,24 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and appropriate shared
         complex complexity object.
         """
+        neuron_model: Optional[SharedNeuronBase] = None
+        if self.neuron_type in nn_model.globals.DNN_MODELS:
+            neuron_model = DNNNeuron
+        elif self.neuron_type in nn_model.globals.RNN_MODELS:
+            neuron_model = LSTMNeuron
+
+        if neuron_model is None:
+
+            class WrongNeuronModelException(Exception):
+                """
+                Class used if wrong neuron model type is selected.
+                """
+
+            raise WrongNeuronModelException("Selected wrong neuron model type.")
+
         return {
-            layer: FeedForwardNeuron(**neuron_model_kwargs)
-            for layer in RNNCellModel.layers_input_parameters
+            layer: neuron_model(**neuron_model_kwargs)
+            for layer in PrimaryVisualCortexModel.layers_input_parameters
         }
 
     def _init_neuron_models(
@@ -285,10 +318,10 @@ class RNNCellModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and
         appropriate neuron model (shared complexity).
         """
-        if self.neuron_type == ModelTypes.COMPLEX.value:
+        if self.neuron_type in nn_model.globals.COMPLEX_MODELS:
             # Complex complexity.
             return self._init_complex_neuron_model(
-                self.neuron_model_kwargs[ModelTypes.COMPLEX.value]
+                self.neuron_model_kwargs[self.neuron_type]
             )
 
         # Simple neuron (no additional complexity).
@@ -313,10 +346,10 @@ class RNNCellModel(nn.Module):
                 input_parameters,
                 neuron_models[layer],
             )
-            for layer, input_parameters in RNNCellModel.layers_input_parameters.items()
+            for layer, input_parameters in PrimaryVisualCortexModel.layers_input_parameters.items()
         }
 
-    def _init_layer(self, layer: str) -> ConstrainedRNNCell:
+    def _init_layer(self, layer: str) -> ModelLayer:
         """
         Initializes one layer of the model.
 
@@ -324,13 +357,18 @@ class RNNCellModel(nn.Module):
         :param rnn_cell_cls: layer object variant.
         :return: Returns initializes layer object.
         """
-        return ConstrainedRNNCell(
+        return ModelLayer(
             sum(
                 self.layer_sizes[layer_name]
-                for layer_name, _ in RNNCellModel.layers_input_parameters[layer]
+                for layer_name, _ in PrimaryVisualCortexModel.layers_input_parameters[
+                    layer
+                ]
             ),
             self.layers_configs[layer].size,
+            layer,
             self.layers_configs[layer].constraint,
+            self.layers_configs[layer].input_constraints,
+            self.weight_initialization,
             self.layers_configs[layer].neuron_model,
         )
 
@@ -341,7 +379,7 @@ class RNNCellModel(nn.Module):
         """
         self.layers = nn.ModuleDict()
 
-        for layer in RNNCellModel.layers_input_parameters:
+        for layer in PrimaryVisualCortexModel.layers_input_parameters:
             self.layers[layer] = self._init_layer(layer)
 
     def _init_hidden_layers(self, targets) -> Dict[str, torch.Tensor]:
@@ -403,8 +441,10 @@ class RNNCellModel(nn.Module):
 
         return {
             layer: {
-                "input": input_data_range,
-                "output": self.apply_layer_neuron_complexity(layer, input_data_range),
+                NeuronModulePredictionFields.INPUT.value: input_data_range,
+                NeuronModulePredictionFields.OUTPUT.value: self.apply_layer_neuron_complexity(
+                    layer, input_data_range
+                ),
             }
             for layer in self.layers
         }
@@ -449,7 +489,7 @@ class RNNCellModel(nn.Module):
         for (
             input_part_layer_name,  # Name of teh input layer
             input_part_time_variant,  # Time variant of the input layer
-        ) in RNNCellModel.layers_input_parameters[layer_type]:
+        ) in PrimaryVisualCortexModel.layers_input_parameters[layer_type]:
             # Iterate through inputs of the given layer.
             if time_variant == input_part_time_variant:
                 # If the currently processed input layer belongs to given time variant
@@ -462,8 +502,12 @@ class RNNCellModel(nn.Module):
         self,
         current_time_outputs: Dict[str, torch.Tensor],
         hidden_layers: Dict[str, torch.Tensor],
-        # time: int,
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ) -> Tuple[
+        Dict[str, torch.Tensor],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ]:
         """
         Performs model time step. It progresses the model architecture and
         computes next time step results of each layer of the model.
@@ -471,18 +515,28 @@ class RNNCellModel(nn.Module):
         :param current_time_outputs: dictionary of input layers of the model (LGN inputs).
         :param hidden_layers: dictionary of all hidden layers values of the model
         from the previous time step (in our example those are all previous outputs).
-        :param time: time of the current step. Should be at least second time step.
-        During the first time step we do not have necessary hidden states.
+        :param neuron_hidden: Neuron model hidden states (if `None` then initialize
+        them using pytorch default approach).
         :return: Returns dictionary of model predictions for the current time step.
         """
         # We already have LGN inputs (assign them to current time layer outputs).
         recurrent_outputs = {}
-        for layer in RNNCellModel.layers_input_parameters:
+        # neuron_hidden = {
+        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        # }
+        # TODO: probably bug - we initialize neuron model hidden states each
+        # TODO: visible time step (probably not what we want (we want to have the memory of the neurons))
+
+        for layer in PrimaryVisualCortexModel.layers_input_parameters:
             # Iterate through all output layers of the model.
             # Perform model time step for the currently processed layer.
             # NOTE: It is necessary that these layers are sorted by the
             # processing order in the model.
-            current_time_outputs[layer], recurrent_outputs[layer] = self.layers[layer](
+            (
+                current_time_outputs[layer],
+                recurrent_outputs[layer],
+                neuron_hidden[layer],
+            ) = self.layers[layer](
                 self._get_layer_input_tensor(
                     self._get_list_by_time_variant(
                         layer,
@@ -496,9 +550,12 @@ class RNNCellModel(nn.Module):
                     ),  # inputs of the layer from time (t-1) (previous time step)
                 ),
                 hidden_layers[layer],  # Recurrent connection to itself from time (t-1)
+                neuron_hidden[
+                    layer
+                ],  # Hidden steps of the neuron models (needed for RNN neuron models).
             )
 
-        return current_time_outputs, recurrent_outputs
+        return current_time_outputs, recurrent_outputs, neuron_hidden
 
     def _append_outputs(
         self,
@@ -508,17 +565,24 @@ class RNNCellModel(nn.Module):
         """
         Appends outputs of each output layer to list of outputs of all time steps.
 
-        :param all_outputs: outputs of layers of all time steps.
+        :param all_outputs: outputs of layersFalse of all time steps.
         :param time_step_outputs: outputs of current time step.
         """
         for layer, layer_outputs in time_step_outputs.items():
-            if layer in RNNCellModel.layers_input_parameters:
+            if layer in PrimaryVisualCortexModel.layers_input_parameters:
                 # For each output layer append output of the current time step.
                 all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
 
     def forward(
-        self, inputs: Dict[str, torch.Tensor], hidden_states: Dict[str, torch.Tensor]
-    ) -> Tuple[Dict[str, List[torch.Tensor]], Dict[str, List[torch.Tensor]]]:
+        self,
+        inputs: Dict[str, torch.Tensor],
+        hidden_states: Dict[str, torch.Tensor],
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ) -> Tuple[
+        Dict[str, List[torch.Tensor]],
+        Dict[str, List[torch.Tensor]],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ]:
         """
         Performs forward step of the model iterating through all time steps of the provided
         inputs and targets.
@@ -531,27 +595,32 @@ class RNNCellModel(nn.Module):
         target values (so, we start in existing state). Other hidden states are the results
         of model predictions from the previous time step (+ LGN input from `inputs`).
 
-        :param inputs: model inputs of size `(batch_size, num_time_steps, num_neurons)`
+        :param inputs: model current time inputs of size `(batch_size, num_time_steps, num_neurons)`
         or `(batch_size, num_neurons)` for train.
-        :param targets: model targets - size `(batch_size, num_time_steps, num_neurons)`
-        for training mode or `(batch, neurons)` for evaluation (we need only first time step).
+        :param hidden_states: model previous time step inputs of size
+        `(batch_size, num_time_steps, num_neurons)` for training mode or
+        `(batch, neurons)` for evaluation (we need only first time step).
+        :param neuron_hidden: Tuple of hidden states of the neurons (needed for RNN models).
         :return: Returns model predictions for all time steps.
         """
         # Initialize dictionaries of all model predictions.
         all_recurrent_outputs: Dict[str, List[torch.Tensor]] = {
-            layer: [] for layer in RNNCellModel.layers_input_parameters
+            layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
         }
         all_hidden_outputs: Dict[str, List[torch.Tensor]] = {
-            layer: [] for layer in RNNCellModel.layers_input_parameters
+            layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
         }
 
-        visible_time_steps = inputs[LayerType.X_ON.value].size(
-            1
-        )  # Minus 1 time step because it is the initial time step
+        visible_time_steps = inputs[LayerType.X_ON.value].size(1)
         if self.training:
             # Training mode (only one visible step)
             # We add 1 to iterate through the visible time loop correctly (we want to iterate once).
             visible_time_steps = 1 + 1
+
+        # # Hidden states of the neuron.
+        # neuron_hidden = {
+        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        # }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
 
         for visible_time in range(1, visible_time_steps):
             # Prediction of the visible time steps
@@ -571,11 +640,13 @@ class RNNCellModel(nn.Module):
                     layer: layer_input[:, visible_time, :]
                     for layer, layer_input in inputs.items()
                 }
+
             for _ in range(self.num_hidden_time_steps):
                 # Perform all hidden time steps.
-                hidden_states, recurrent_outputs = self._perform_model_time_step(
-                    current_inputs,
-                    hidden_states,
+                hidden_states, recurrent_outputs, neuron_hidden = (
+                    self._perform_model_time_step(
+                        current_inputs, hidden_states, neuron_hidden
+                    )
                 )
 
                 if self.training:
@@ -589,11 +660,17 @@ class RNNCellModel(nn.Module):
             if self.return_recurrent_state:
                 # If the model is in evaluation mode
                 # -> save also the results of the RNNs before neuron model.
-                # Only the visible steps
-                self._append_outputs(all_recurrent_outputs, recurrent_outputs)
+                # Only the visible
+
+                if self.neuron_type in [
+                    ModelTypes.RNN_JOINT.value,
+                    ModelTypes.DNN_JOINT.value,
+                ]:
+                    self._append_outputs(all_recurrent_outputs, recurrent_outputs)
+                    # TODO: might work for all types
 
         # Clear caches
         del inputs, hidden_states
         torch.cuda.empty_cache()
 
-        return all_hidden_outputs, all_recurrent_outputs
+        return all_hidden_outputs, all_recurrent_outputs, neuron_hidden

@@ -16,11 +16,12 @@ from nn_model.type_variants import (
     LayerType,
     ModelTypes,
     PredictionTypes,
+    OptimizerTypes,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
-    RNNCellModel,
-    ConstrainedRNNCell,
+    PrimaryVisualCortexModel,
+    ModelLayer,
 )
 from nn_model.evaluation_metrics import NormalizedCrossCorrelation
 from nn_model.evaluation_results_saver import EvaluationResultsSaver
@@ -39,20 +40,25 @@ class ModelExecuter:
 
         :param arguments: command line arguments.
         """
-        # Basic arguments
+        # Basic arguments.
         self.num_epochs = arguments.num_epochs
         self.layer_sizes = nn_model.globals.MODEL_SIZES
 
-        # Dataset Init
+        # Dataset initialization.
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
         self.train_loader, self.test_loader = self._init_data_loaders()
 
-        # Model Init
+        # Model initialization.
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
         self.criterion = self._init_criterion()
-        self.optimizer = self._init_optimizer(arguments.learning_rate)
+        self.optimizer = self._init_optimizer(
+            arguments.optimizer_type, arguments.learning_rate
+        )
 
-        # Evaluation metric
+        # Gradient clipping upper bound.
+        self.gradient_clip = arguments.gradient_clip
+
+        # Evaluation metric.
         self.evaluation_metrics = NormalizedCrossCorrelation()
 
         # Placeholder for the best evaluation result value.
@@ -129,32 +135,47 @@ class ModelExecuter:
         if arguments.model == ModelTypes.SIMPLE.value:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
             return {}
-        if arguments.model == ModelTypes.COMPLEX.value:
-            # Model with neuron that consist of small multilayer Feed-Forward NN
+        elif arguments.model in nn_model.globals.DNN_MODELS:
+            # Model with neuron that consist of small NN.
             # of th same layer sizes in each layer.
             return {
-                ModelTypes.COMPLEX.value: {
+                arguments.model: {
+                    "model_type": arguments.model,
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
                     "residual": not arguments.neuron_not_residual,
                 }
             }
+        elif arguments.model in nn_model.globals.RNN_MODELS:
+            return {
+                arguments.model: {
+                    "model_type": arguments.model,
+                    "num_layers": arguments.neuron_num_layers,
+                    "layer_size": arguments.neuron_layer_size,
+                    "residual": not arguments.neuron_not_residual,
+                }
+            }
+        else:
 
-        # Wrongly defined complexity type -> treat as simple neuron.
-        print("Wrong complexity, using simple complexity layer.")
-        return {}
+            class NonExistingModelTypeException(Exception):
+                """
+                Exception class used when wrong model type is selected.
+                """
 
-    def _init_model(self, arguments) -> RNNCellModel:
+            raise NonExistingModelTypeException("Non-existing model type selected.")
+
+    def _init_model(self, arguments) -> PrimaryVisualCortexModel:
         """
-        Initializes model based on the provided arguments.
+        Initializes the model based on the provided arguments.
 
         :param arguments: command line arguments containing model setup info.
         :return: Returns initializes model.
         """
-        return RNNCellModel(
+        return PrimaryVisualCortexModel(
             self.layer_sizes,
             arguments.num_hidden_time_steps,
             arguments.model,
+            arguments.weight_initialization,
             neuron_model_kwargs=ModelExecuter._get_neuron_model_kwargs(arguments),
         )
 
@@ -166,14 +187,84 @@ class ModelExecuter:
         """
         return torch.nn.MSELoss()
 
-    def _init_optimizer(self, learning_rate: float):
+    def _init_exc_inh_specific_learning_rate(self, learning_rate):
+        """
+        Splits the model parameters to two groups. One corresponding to inhibitory layer
+        values and one corresponding to excitatory layers. Inhibitory layer parameters
+        should use 4 times smaller learning rate than excitatory
+        (because of the properties of the model)
+
+        NOTE: This function is used in case we select `OptimizerTypes.EXC_INH_SPECIFIC`.
+
+        :param learning_rate: Base learning rate that should be applied for excitatory
+        layers (inhibitory should have learning rate 4 times smaller).
+        :return: Returns group of parameters for the optimizer.
+        """
+
+        # Identify inhibitory layers to apply a 4x lower learning rate on.
+        selected_params = [
+            self.model.layers.V1_Exc_L23.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L23.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L23.rnn_cell.weights_hh.weight,
+            self.model.layers.V1_Exc_L4.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L4.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L4.rnn_cell.weights_hh.weight,
+        ]
+
+        selected_param_ids = {id(p) for p in selected_params}
+
+        # Create parameter groups
+        param_groups = [
+            # Parameters with lower learning rate (inhibitory).
+            {"params": selected_params, "lr": learning_rate / 4},
+            # All other parameters (excitatory).
+            {
+                "params": [
+                    p
+                    for p in self.model.parameters()
+                    if id(p) not in selected_param_ids
+                ],
+                "lr": learning_rate,
+            },
+        ]
+
+        return param_groups
+
+    def _init_optimizer(self, optimizer_type: str, learning_rate: float):
         """
         Initializes model optimizer.
 
         :param learning_rate: learning rate of the optimizer.
         :return: Returns used model optimizer (Adam).
         """
-        return optim.Adam(self.model.parameters(), lr=learning_rate)
+        # By default same learning rate for all layers.
+        param_groups = self.model.parameters()
+
+        if optimizer_type == OptimizerTypes.EXC_INH_SPECIFIC.value:
+            # Apply exc/inh specific learning rate.
+            param_groups = self._init_exc_inh_specific_learning_rate(learning_rate)
+
+        return optim.Adam(param_groups, lr=learning_rate)
+
+    @staticmethod
+    def _slice_and_covert_to_float(
+        data: Dict[str, torch.Tensor], slice_: Union[int, slice]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Slices the provided data in the trials interval and converts them to float.
+
+        NOTE: This function is used while calling `_get_data` method.
+
+        :param data: All layers data.
+        :param slice_: Slice for the trials dimension (to get rid of it in case of train step).
+        :return: Returns sliced data that were converted to float.
+        """
+        return DictionaryHandler.apply_methods_on_dictionary(
+            DictionaryHandler.apply_functions_on_dictionary(
+                data, [(DictionaryHandler.slice_given_axes, ({1: slice_},))]
+            ),
+            [("float",)],
+        )
 
     @staticmethod
     def _get_data(
@@ -202,20 +293,14 @@ class ModelExecuter:
         # Take `0` for train or all trials `slice(None) == :` for test.
         slice_: Union[int, slice] = slice(None) if test else 0
 
-        # inputs = DictionaryHandler.slice_given_axes()
-
         inputs = {
-            # layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
-            layer: DictionaryHandler.slice_given_axes(input_data, {1: slice_})
-            .float()
-            .to(nn_model.globals.DEVICE)
+            layer: input_data[:, slice_, :, :].float().to(nn_model.globals.DEVICE)
             for layer, input_data in inputs.items()
         }
         targets = {
-            # layer: output_data[
-            #     :, slice_, :, :
-            # ].float()  # Do not move it to GPU as it is not always used there (only in training).
-            layer: DictionaryHandler.slice_given_axes(output_data, {1: slice_}).float()
+            layer: output_data[
+                :, slice_, :, :
+            ].float()  # Do not move it to GPU as it is not always used there (only in training).
             for layer, output_data in targets.items()
         }
 
@@ -226,7 +311,7 @@ class ModelExecuter:
         Applies model constraints on all model layers (excitatory/inhibitory).
         """
         for module in self.model.modules():
-            if isinstance(module, ConstrainedRNNCell):
+            if isinstance(module, ModelLayer):
                 module.apply_constraints()
 
     def _epoch_evaluation_step(
@@ -384,7 +469,8 @@ class ModelExecuter:
         inputs: Dict[str, torch.Tensor],
         hidden_states: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
-    ) -> float:
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ) -> Tuple[float, Dict[str, Optional[Tuple[torch.Tensor, ...]]]]:
         """
         Performs time step prediction and optimizer step.
 
@@ -401,11 +487,17 @@ class ModelExecuter:
         # We want to zero optimizer gradient before each training step.
         self.optimizer.zero_grad()
 
-        all_predictions, _ = self.model(
+        # Hidden states of the neuron.
+        neuron_hidden = {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+
+        all_predictions, _, neuron_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
             # Time step is assigned based on model architecture during the forward function call.
             hidden_states,
+            neuron_hidden,
         )
 
         # Take last time step predictions (those are the visible time steps predictions).
@@ -426,12 +518,16 @@ class ModelExecuter:
 
         # Backward and optimizer steps for the sum of losses.
         total_loss.backward()
+
+        # Gradient clipping to prevent exploding gradients.
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+
         self.optimizer.step()
 
         del all_predictions
         torch.cuda.empty_cache()
 
-        return total_loss.item()
+        return total_loss.item(), neuron_hidden
 
     def _train_perform_visible_time_step(
         self,
@@ -452,6 +548,12 @@ class ModelExecuter:
         # training. Moving them all at once significantly reduces time complexity.
         all_hidden_states = ModelExecuter._move_data_to_cuda(target_batch)
         time_loss_sum = 0.0
+
+        # Hidden states of the neuron.
+        neuron_hidden = {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+
         for visible_time in range(
             1, time_length
         ):  # We skip the first time step because we do not have initial hidden values for them.
@@ -459,7 +561,11 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            time_loss_sum += self._optimizer_step(inputs, hidden_states, targets)
+            current_loss, neuron_hidden = self._optimizer_step(
+                inputs, hidden_states, targets, neuron_hidden
+            )
+
+            time_loss_sum += current_loss
 
             # Save CUDA memory. Delete not needed variables.
             del (
@@ -566,8 +672,12 @@ class ModelExecuter:
                     prediction_type == PredictionTypes.FULL_PREDICTION.value
                     or save_recurrent_state
                 ):
-                    # In case we are doing full prediction or we specified we want RNN predictions
-                    # -> store them
+                    # In case we are doing full prediction or we specified we want RNN linearity values
+                    # (of layers) -> store them.
+                    if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+                        # TODO: currently skipping this step as it does not work correctly.
+                        continue
+
                     current_prediction = torch.cat(layers_prediction, dim=1)
 
                 all_predictions[prediction_type][layer].append(current_prediction)
@@ -592,7 +702,7 @@ class ModelExecuter:
         # Initialize dictionaries with the keys of all output layers names.
         all_predictions: Dict[str, Dict[str, List[torch.Tensor]]] = {
             prediction_type.value: {
-                layer: [] for layer in RNNCellModel.layers_input_parameters
+                layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
             }
             for prediction_type in list(PredictionTypes)
         }
@@ -612,10 +722,17 @@ class ModelExecuter:
                 }
             )
 
+            # Hidden states of the neuron.
+            neuron_hidden = {
+                layer: None
+                for layer in PrimaryVisualCortexModel.layers_input_parameters
+            }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+
             # Get all visible time steps predictions of the model.
-            trial_predictions, trial_rnn_predictions = self.model(
+            trial_predictions, trial_rnn_predictions, _ = self.model(
                 trial_inputs,
                 trial_hidden,
+                neuron_hidden,
             )
 
             # Accumulate all trials predictions.
@@ -690,6 +807,10 @@ class ModelExecuter:
             ):
                 # In case we do not want to save RNN predictions -> skip them
                 return_predictions[prediction_type] = {}
+                continue
+
+            if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+                # TODO: currently skipping RNN linearity results storage as it is broken.
                 continue
 
             return_predictions[prediction_type] = (

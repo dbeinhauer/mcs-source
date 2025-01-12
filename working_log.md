@@ -39,7 +39,7 @@
 - mozaik should be used only for data extraction
 - data consist of:
     - the image
-    - experiment lenght (and blank/stimuli parts)
+    - experiment length (and blank/stimuli parts)
     - spike trains for neurons in LGN, L4 and L3/2
         - we want to split them into smaller bins
         - each bin has number of spikes inside the bin (typical case might be just changing 0/1)
@@ -508,3 +508,80 @@ Notes after meetings:
 - as far as I get the information I would say it is essential to perform the optimizer step before each target state reset
 - the optimizer step and backward step should be performed for all layers together
     - not sure about calculation of the loss (whether separate the losses or not)
+
+# 3.12.2024
+- model DNN module was applied in the wrong way
+    - first it was applied non-linearity -> DNN module
+        - we wanted DNN module instead of non-linearity
+    - this might be the reason of very strange behavior of the DNN module
+    - also might be the reason of the bad model dynamics
+    -> solution was create custom RNNCell module
+- also code refined
+
+# 5.12.2024
+- possible future steps after model captures the dynamics same as the spiking model:
+    - checking that the connections are similar (the spiking model is bio-inspired)
+    - not-showing some neurons -> predicting them from others
+        - natural transition to real-data (in the future)
+    - constraining the neurons with some connectivity rules
+        - neurons that are further has less probability to be connected
+
+# 13.12.2024
+- implemented model variant where we split the inhibitory and excitatory inputs and pass two values to DNN
+    - inputs to DNN are then sum of excitatory and inhibitory layer (separate 2 values)
+- there was a problem caused by weight clipping mainly probably
+    - we had a bug in code so the original model did not clip weights
+    - after application of weight clipping we were encountering NaNs mainly in predictions of evaluation
+    - after some inspection of gradients it looks that exploding gradients are the main cause of this problem
+        - we applied gradient clipping (to prevent it)
+    - we also applied bounded ReLU (max value 20) for last neuron activation to prevent large spike predictions
+        - does not make sense to predict larger values (it is not realistic to have such many spikes in 20 ms).
+        - due our model resolution (1 ms) we set the max value to 20
+
+# 17.12.2024
+- currently we are encountering issues with the training the model caused by the weight constraints
+    - clipping to absolute value might help (instead of clipping to 0)
+    - better initialization of the inhibitory/excitatory weights
+        - as there are approximately 4 times less inhibitory neurons the weights should be 4 times higher
+        - it might be also good to use adaptive learning rate for each layer
+            - inhibitory should have 4 time lower (because they are in average 4 times higher)
+        - also we know that the weights are generally distributed using Gauss distribution
+            - try to apply this too
+    - generally dealing with gradients might improve the training
+    - maybe study gradient exploding problem and its improvements on weights in general case and try to apply this to constraint example (find the analogies)
+
+# 30.12.2024
+- changed activation non-linearity to combination of sigmoid and tanh
+    - sigmoid - applied for output values of DNN module smaller than 1
+    - `5 * torch.tanh(x / 5)` - for values greater than 1
+    - this should make the non-linearity smoother in comparison to hardtanh (bounder ReLU)
+    - the predictions are now bounded to interval (0, 5)
+        - should not be a problem (in training dataset there are only few data with 4 spikes in 20ms window)
+        - it is very improbable to have more spikes
+- using grading clipping seems to be problematic
+    - we are not using it now (only with very large boundary)
+- using different weight initialization or adaptive learning rate for inh/exc layers does not seem to work
+- using hidden time steps does not seem to be working
+- using separate DNN module produces slightly better results than variant without it
+    - currently, we are reaching 0.9 cc_norm (joint variant only 0.85)
+- long-term problems with the model still persist
+
+# 6.1.2025
+- we have added the possibility to run the model on separate excitatory and inhibitory layers
+    - seems to perform slightly better than having both joint
+- we also added RNN variant of the neuron model that used LSTM model
+    - currently it seems to be as good as classical feed-forward DNN approach
+    - although, we encountered bug in the implementation that does not propagate the states of the neuron to other time steps 
+        - this might significantly improve the model performance
+
+# 7.1.2025
+- separate RNN time steps to propagate across all time steps
+- add signal modulation RNN after output of each neuron
+    - it should be shared across the tuples input+output layers
+    - it should be also added before LGN input is passed to the input layers
+        - and after each output of the neurons too
+    - this part should correspond to signal modulation when multiple spikes happen in short time period
+        - the neurons diminish the signal in that case (needs to regenerate)
+    - as output of the model we want to still have unmodulated signal (same as we have)
+        - we just want to adjust the input signal to the other neurons
+            - the change happens in real example in the output neuron

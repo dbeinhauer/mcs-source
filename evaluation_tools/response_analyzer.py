@@ -12,12 +12,19 @@ import pickle
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import seaborn as sns
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import nn_model.globals
-from nn_model.type_variants import LayerType
+from nn_model.type_variants import (
+    LayerType,
+    NeuronModulePredictionFields,
+    PathPlotDefaults,
+    PathDefaultFields,
+    EvaluationMeanVariants,
+)
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.model_executer import ModelExecuter, RNNCellModel
 from nn_model.type_variants import EvaluationFields
@@ -45,6 +52,7 @@ class ResponseAnalyzer:
         train_dataset_dir: str,
         test_dataset_dir: str,
         responses_dir: str,
+        dnn_responses_path: str,
         neurons_path: str,
     ):
         """
@@ -54,46 +62,64 @@ class ResponseAnalyzer:
         :param responses_dir: Directory containing averaged responses of the model and
         its targets per trial.
         """
+        # TODO: make loading of the files optional
 
+        # Set the input directories
         self.train_dataset_dir = train_dataset_dir
         self.test_dataset_dir = test_dataset_dir
         self.responses_dir = responses_dir
+        self.dnn_responses_path = dnn_responses_path
 
         # Initialize batch size (for loader) as default batch size for test dataset.
         self.batch_size = nn_model.globals.TEST_BATCH_SIZE
 
-        # Number of time-step in which there is the overlap of stimuli and blank part
-        self.stimulus_blank_step = int(
-            nn_model.globals.IMAGE_DURATION // nn_model.globals.TIME_STEP
-        )
-
-        # Raw data loaders
+        # Raw data loaders:
         self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
         self.test_dataset, self.test_loader = self._init_dataloader()
 
-        self.selected_neurons = self.load_selected_neurons(neurons_path)
-        self.images_batches = self.randomly_select_batches()
-        self.batch_image_indices = self.randomly_select_img_index(
+        # Selected neurons for the plotting:
+        self.selected_neurons = ResponseAnalyzer.load_selected_neurons(neurons_path)
+        # Selected image batches for plotting:
+        self.images_batches = ResponseAnalyzer.randomly_select_batches()
+        # Selected image indices for each selected batch selected for plotting.
+        self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
             range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
         )
 
-        # Total number of responses batches to analysis
-        self.num_responses = 0
-
-        self._load_responses_filenames()
+        # Load all batch responses filenames and count its number.
+        self.responses_filenames = self._load_responses_filenames()
+        self.num_responses = len(self.responses_filenames)
 
         # Dictionary of layers and its mean neural responses through time
         # (all examples, all neurons). For both targets and predictions.
-        self.mean_layer_responses = {}
+        self.mean_layer_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Dictionary of layers and its mean neural responses through time
         # (all examples, all neurons). Only for targets (loading from Dataloader).
-        self.mean_input_layer_responses = {}
+        self.mean_input_layer_responses: Dict[str, torch.Tensor] = {}
         # Dictionary of `neuron ids` and its mean responses through time
-        self.mean_neurons_responses = {}
+        self.mean_neurons_responses: Dict[str, torch.Tensor] = {}
         # Dictionary of `neuron ids` and its dictionary of responses on selected images (key is `image_id`)
-        self.selected_neurons_responses = {}
+        self.selected_neurons_responses: Dict[
+            str, Dict[int, Dict[int, torch.Tensor]]
+        ] = {}
         # Dictionary of RNN responses and its transformations from DNN neuron for each layer.
-        self.rnn_to_prediction_responses = {}
+        self.rnn_to_prediction_responses: Dict[str, Dict[str, torch.Tensor]] = {}
+        # Histogram bins and edges:
+        self.hist_counts = np.zeros(0, dtype=np.float32)
+        self.bin_edges = np.zeros(0, dtype=np.int32)
+
+        # self.dnn_responses = self.load_pickle_file(dnn_responses_path)
+
+    @staticmethod
+    def load_pickle_file(filename: str):
+        """
+        Loads pickle file.
+
+        :param filename: Name of the pickle file.
+        :return: Returns content of the pickle file.
+        """
+        with open(filename, "rb") as f:
+            return pickle.load(f)
 
     @staticmethod
     def load_selected_neurons(path: str) -> Dict:
@@ -103,9 +129,7 @@ class ResponseAnalyzer:
         :param path: Path of the pickle file where the neuron IDs are stored.
         :return: Returns dictionary of loaded neurons IDs for each layer.
         """
-        selected_neurons = {}
-        with open(path, "rb") as f:
-            selected_neurons = pickle.load(f)
+        selected_neurons = ResponseAnalyzer.load_pickle_file(path)
 
         return {
             layer: data
@@ -166,11 +190,13 @@ class ResponseAnalyzer:
 
         return dataset, loader
 
-    def _load_responses_filenames(self):
-        self.responses_filenames = os.listdir(os.path.join(self.responses_dir))
-        self.num_responses = len(self.responses_filenames)
+    def _load_responses_filenames(self) -> List[str]:
+        """
+        Loads all filenames from the responses directory (batches of responses).
+        """
+        return os.listdir(os.path.join(self.responses_dir))
 
-    def create_spikes_histogram(
+    def create_spikes_histogram_values(
         self,
         processed_layer: str = "",
         subset: int = -1,
@@ -198,7 +224,6 @@ class ResponseAnalyzer:
         NOTE: In case neither input nor output included use output.
         :return: Returns tuple of bin counts and bin edges of histogram.
         """
-
         # Initialize the histogram variables.
         bin_edges = np.arange(0, num_bins)
         hist_counts = np.zeros(len(bin_edges) - 1, dtype=np.float32)
@@ -232,17 +257,10 @@ class ResponseAnalyzer:
 
                 hist_counts += batch_counts
 
+        self.hist_counts = hist_counts
+        self.bin_edges = bin_edges
+
         return hist_counts, bin_edges
-
-    def load_pickle_file(self, filename: str):
-        """
-        Loads pickle file.
-
-        :param filename: Name of the pickle file.
-        :return: Returns content of the pickle file.
-        """
-        with open(filename, "rb") as f:
-            return pickle.load(f)
 
     @staticmethod
     def _pad_vector_to_size(vector: torch.Tensor, size: int) -> torch.Tensor:
@@ -264,6 +282,48 @@ class ResponseAnalyzer:
         )
 
     @staticmethod
+    def pad_tensors(tensor1, tensor2):
+
+        size1 = tensor1.size()
+        size2 = tensor2.size()
+
+        # Find the maximum size for each dimension
+        max_size = [max(s1, s2) for s1, s2 in zip(size1, size2)]
+
+        # Calculate the padding needed for each tensor
+        padding1 = [max_dim - s for s, max_dim in zip(size1, max_size)]
+        padding2 = [max_dim - s for s, max_dim in zip(size2, max_size)]
+
+        # # Create padding tuples (reverse order for F.pad)
+        # padding1 = sum([[0, p] for p in padding1], [])
+        # padding2 = sum([[0, p] for p in padding2], [])
+
+        # Create padding tuples (reverse order for F.pad, last dimension first)
+        padding1 = [
+            item for sublist in reversed([[0, p] for p in padding1]) for item in sublist
+        ]
+        padding2 = [
+            item for sublist in reversed([[0, p] for p in padding2]) for item in sublist
+        ]
+
+        # Pad both tensors
+        padded_tensor1 = torch.nn.functional.pad(
+            tensor1,
+            padding1,
+            "constant",
+            0,
+        )
+        padded_tensor2 = torch.nn.functional.pad(
+            tensor2,
+            padding2,
+            "constant",
+            0,
+        )
+
+        # Sum the tensors
+        return padded_tensor1 + padded_tensor2
+
+    @staticmethod
     def _sum_vectors(vector1: torch.Tensor, vector2: torch.Tensor) -> torch.Tensor:
         """
         Takes two 1D vectors checks their sizes. If sizes are not matching then pads the smaller
@@ -273,12 +333,14 @@ class ResponseAnalyzer:
         :param vector2: Second vector to be summed.
         :return: Returns summed vectors.
         """
-        if vector1.shape[0] < vector2.shape[0]:
-            vector1 = ResponseAnalyzer._pad_vector_to_size(vector1, vector2.shape[0])
-        else:
-            vector2 = ResponseAnalyzer._pad_vector_to_size(vector2, vector1.shape[0])
+        # if vector1.shape[0] < vector2.shape[0]:
+        #     vector1 = ResponseAnalyzer._pad_vector_to_size(vector1, vector2.shape[0])
+        # else:
+        #     vector2 = ResponseAnalyzer._pad_vector_to_size(vector2, vector1.shape[0])
 
-        return vector1 + vector2
+        # return vector1 + vector2
+
+        return ResponseAnalyzer.pad_tensors(vector1, vector2)
 
     @staticmethod
     def _sum_over_neurons(data: torch.Tensor, dim: int = 2) -> torch.Tensor:
@@ -314,10 +376,13 @@ class ResponseAnalyzer:
             ResponseAnalyzer._sum_over_neurons(data)
         )
 
-    @staticmethod
+    # @staticmethod
     def _update_time_sum(
+        self,
         all_layer_data_batch: Dict[str, torch.Tensor],
         sums_dictionary: Dict[str, torch.Tensor],
+        variant: str,
+        selected_sum: bool = False,
     ):
         """
         Takes data batch, iterates through all layers and updates each layer
@@ -326,24 +391,42 @@ class ResponseAnalyzer:
         :param all_layer_data_batch: One batch of data to add to sum of spikes in all data in time.
         :param sums_dictionary: Current sum of spikes in all layers in time.
         """
+        summing_function = ResponseAnalyzer._time_sum_over_layer
+        if variant == EvaluationMeanVariants.NEURON_MEAN.value:
+            summing_function = ResponseAnalyzer._sum_over_images
+        elif variant == EvaluationMeanVariants.IMAGE_MEAN.value:
+            summing_function = ResponseAnalyzer._sum_over_neurons
+
         for layer, layer_data in all_layer_data_batch.items():
             # Sum first across neurons dimension -> sum across batch dimension (images)
             # -> I get 1D tensor of sum of time responses
             if layer not in sums_dictionary:
                 sums_dictionary[layer] = torch.zeros(0)
+                if variant == EvaluationMeanVariants.NEURON_MEAN.value:
+                    sums_dictionary[layer] = torch.zeros((1, layer_data.size(2)))
+
+            if selected_sum:
+                if variant == EvaluationMeanVariants.NEURON_MEAN.value:
+                    # layer_data = layer_data[:, :, self.selected_neurons[layer]]
+                    layer_data = layer_data
+                elif variant == EvaluationMeanVariants.IMAGE_MEAN.value:
+                    # layer_data = layer_data[self.selected_images, :, :]
+                    pass
 
             sums_dictionary[layer] = ResponseAnalyzer._sum_vectors(
                 sums_dictionary[layer],
-                ResponseAnalyzer._time_sum_over_layer(layer_data),
+                summing_function(layer_data),
             )
 
     @staticmethod
     def _compute_mean_responses(
-        responses_sum: Dict,
+        responses_sum: Dict[str, torch.Tensor],
         total_number_examples: int,
         batch_multiplier: int,
+        # neuron_multiplier: int,
+        mean_over_neurons: bool = True,
         subset: int = -1,
-    ) -> Dict:
+    ) -> Dict[str, torch.Tensor]:
         """
         Computes mean response of each provided layer in time.
 
@@ -362,7 +445,12 @@ class ResponseAnalyzer:
         if subset != -1:
             counter = subset * batch_multiplier
         return {
-            layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
+            # layer: layer_data / (counter * nn_model.globals.MODEL_SIZES[layer])
+            layer: layer_data
+            / (
+                counter
+                * (nn_model.globals.MODEL_SIZES[layer] if mean_over_neurons else 1)
+            )
             for layer, layer_data in responses_sum.items()
         }
 
@@ -401,12 +489,13 @@ class ResponseAnalyzer:
                 if include_input:
                     batch_to_process = {**inputs, **targets}
 
-            ResponseAnalyzer._update_time_sum(
+            self._update_time_sum(
                 {
                     layer: torch.sum(data.float(), dim=1)
                     for layer, data in batch_to_process.items()
                 },
                 layer_responses_sum,
+                variant=EvaluationMeanVariants.LAYER_MEAN.value,
             )
 
         self.mean_input_layer_responses = self._compute_mean_responses(
@@ -415,6 +504,8 @@ class ResponseAnalyzer:
             nn_model.globals.TEST_BATCH_SIZE * trials_multiplier,
             subset=subset,
         )
+
+        return self.mean_input_layer_responses
 
     def _get_data_from_responses_file(self, filename, keys_to_select):
         return {
@@ -425,21 +516,19 @@ class ResponseAnalyzer:
             if key in keys_to_select
         }
 
-    # def _load_responses_filenames(self):
-    #     self.responses_filenames = os.listdir(os.path.join(self.responses_dir))
-    #     self.num_responses = len(self.responses_filenames)
-
     def get_mean_from_evaluated_data(self, subset: int = -1):
         """
         Iterates through all mean responses (both predictions and targets).
         While iterating performs selected task.
 
+        :param
         """
-        layer_responses_sum: Dict[str, Dict] = {
+        layer_responses_sum: Dict[str, Dict[str, torch.Tensor]] = {
             identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
         }
-        # all_batch_response_filenames = os.listdir(os.path.join(self.responses_dir))
-        # self.num_responses = len(all_batch_response_filenames)
+        neuron_responses_sum: Dict[str, Dict[str, torch.Tensor]] = {
+            identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
+        }
 
         for i, response_filename in enumerate(tqdm(self.responses_filenames)):
             if i == subset:
@@ -454,7 +543,16 @@ class ResponseAnalyzer:
                 # if identifier not in layer_responses_sum:
                 #     layer_responses_sum[identifier] = {}
 
-                ResponseAnalyzer._update_time_sum(data, layer_responses_sum[identifier])
+                self._update_time_sum(
+                    data,
+                    layer_responses_sum[identifier],
+                    variant=EvaluationMeanVariants.LAYER_MEAN.value,
+                )
+                self._update_time_sum(
+                    data,
+                    neuron_responses_sum[identifier],
+                    variant=EvaluationMeanVariants.NEURON_MEAN.value,
+                )
 
         self.mean_layer_responses = {
             identifier: self._compute_mean_responses(
@@ -466,6 +564,18 @@ class ResponseAnalyzer:
             )
             for identifier, layer_sum in layer_responses_sum.items()
         }
+        self.mean_neurons_responses = {
+            identifier: self._compute_mean_responses(
+                neuron_sum,
+                self.num_responses,
+                nn_model.globals.TEST_BATCH_SIZE,
+                mean_over_neurons=False,
+                subset=subset,
+            )
+            for identifier, neuron_sum in neuron_responses_sum.items()
+        }
+
+        return self.mean_layer_responses, self.mean_neurons_responses
 
     def get_rnn_responses_to_neuron_responses(self, subset: int = -1):
         self.rnn_to_prediction_responses = {
@@ -500,10 +610,6 @@ class ResponseAnalyzer:
 
         return self.rnn_to_prediction_responses
 
-    def plot_rnn_to_prediction_responses(self, responses_data):
-        rnn_responses = responses_data[EvaluationFields.RNN_PREDICTIONS.value]
-        predictions = responses_data[EvaluationFields.PREDICTIONS.value]
-
     def compute_mean_neuron_response_per_all_images(self, neuron_id: int, layer: str):
         """
         Computes mean spatio-temporal response of a selected neurons through all images.
@@ -513,171 +619,19 @@ class ResponseAnalyzer:
         """
         pass
 
-    def plot_neuron_responses_on_multiple_images(
-        self, neuron_id: int, layer: str, selected_images_ids: List[int]
-    ):
-        """
-        Plots mean neuron responses/targets per selected images.
-
-        :param neuron_id: ID of the neuron to plot the responses for.
-        :param layer: name of the layer where the selected neuron lies.
-        :param selected_images_ids: list of image ids that we are interested to plot.
-        """
-        pass
-
-    def _init_mean_response_in_time_plot_object(self, num_layers: int) -> List:
-        """
-        Initializes plot object where we would plot the results of each layer.
-
-        :param num_layers: Number of layers that we want to plot.
-        :return: Returns initializes subplots list of `axs` objects.
-        """
-
-        # Create subplots for each layer.
-        _, axs = plt.subplots(num_layers, 1, figsize=(10, 5 * num_layers))
-
-        # If there's only one layer, we ensure axs is a list for easier handling
-        if num_layers == 1:
-            axs = [axs]
-
-        return axs
-
-    def _set_mean_response_in_time_plot_variables(
-        self,
-        axs,
-        idx: int,
-        layer: str,
-        y_range: Optional[Tuple[float, float]],
-        stimulus_blank_border: Optional[float],
-    ):
-        """
-        Sets all necessary parameters of the plot of mean response in time.
-
-        :param axs: Axis object where we want to plot the results.
-        :param idx: Index of the subplot where we want to plot the results.
-        :param layer: Name of the layer that we want to plot.
-        :param y_range: Range in y-axis to plot. If `None` then use the default.
-        :param stimuli_blank_border: Time step of stimulus/blank border.
-        If `None` then use default time step computed from the stimulus duration
-        and time step length defined in `nn_model.globals`.
-        """
-
-        if not stimulus_blank_border:
-            # Stimuli/blank border time step not provided
-            # -> use default time step computed from the stimulus duration
-            # and time step length defined in `nn_model.globals`.
-            stimulus_blank_border = self.stimulus_blank_step
-
-        # Set line defining stimulus/blank border
-        axs[idx].axvline(
-            x=stimulus_blank_border,
-            color="green",
-            linestyle="--",
-            label="Stimulus/Blank border",
-        )
-
-        # Adding titles and labels
-        axs[idx].set_title(f"Layer {layer} - Mean neural response through time")
-        axs[idx].set_xlabel("Time")
-        axs[idx].set_ylabel("Mean response")
-        if y_range:
-            # y range defined
-            axs[idx].set_ylim(*y_range)  # y axis limit
-        axs[idx].legend()
-
-    def _plot_execution(self, save_fig_path: str):
-        """
-        Either show the plot or save it to given path.
-
-        :param save_fig_path: Path where to store the figure. If empty string
-        then do not save the figure (only show it).
-        """
-        plt.tight_layout()
-        if save_fig_path:
-            # Path specified (not empty) -> save the figure
-            plt.savefig(save_fig_path)
-        else:
-            # Path not specified -> only show the plot
-            plt.show()
-
-    def plot_mean_layer_data(
-        self,
-        data: Dict,
-        include_predictions: bool,
-        identifier: str = "",
-        y_range: Optional[Tuple[float, float]] = None,
-        save_fig_path: str = "",
-        stimuli_blank_border: Optional[float] = None,
-    ):
-        """
-        Plots mean layer responses either only mean targets or also together with mean predictions.
-
-        :param data: Data to be plotted. Either dictionary of `predictions` and `targets`
-        or just layers of targets.
-        :param include_predictions: Flag whether we want to include predictions in the plot creation.
-        The plot should include both mean prediction and mean target in time.
-        :param identifier: Identifier of the specific computed means to plot.
-        Possible options are: `['prediction_mean', input_mean']`. If everything else then plot the `data`.
-        :param y_range: Range in y-axis to plot. If `None` then use the default.
-        :param save_fig_path: Path where we want to store the created figure.
-        If empty string then do not save the figure and just show it.
-        :param stimuli_blank_border: Time step where is the border between stimulus
-        and blank stage.
-        """
-
-        if identifier == "prediction_mean":
-            data = self.mean_layer_responses
-        elif identifier == "input_mean":
-            data = self.mean_input_layer_responses
-
-        predictions = {}
-        targets = data
-        if include_predictions:
-            predictions = data["predictions"]
-            targets = data["targets"]
-
-        axs = self._init_mean_response_in_time_plot_object(len(targets))
-
-        # Iterate over each layer
-        for idx, layer in enumerate(targets.keys()):
-            # pred_tensor = predictions[layer].detach().numpy()
-            target_tensor = targets[layer].detach().numpy()
-
-            if include_predictions:
-                pred_tensor = predictions[layer].detach().numpy()
-                axs[idx].plot(
-                    # Insert first target value (starting point of the predictions)
-                    np.insert(pred_tensor, 0, target_tensor[0], axis=0),
-                    label="Predictions",
-                    color="blue",
-                )
-
-            axs[idx].plot(target_tensor, label="Targets", color="red")
-
-            self._set_mean_response_in_time_plot_variables(
-                axs, idx, layer, y_range, stimuli_blank_border
-            )
-
-        self._plot_execution(save_fig_path)
-
 
 if __name__ == "__main__":
-    train_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
-    test_spikes_dir = f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{nn_model.globals.TIME_STEP}"
 
-    all_responses_dir = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10"
-    neuron_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_10_subset_10.pkl"
-    images_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl"
+    train_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value]
+    test_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value]
+    model_name = "model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10_num-hidden-time-steps-1"
+    responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/{model_name}/"
+    dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pth"
+    neurons_path = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl"
+
     response_analyzer = ResponseAnalyzer(
-        train_spikes_dir,
-        test_spikes_dir,
-        all_responses_dir,
-        neuron_ids_path,
-        # images_ids_path,
+        train_dir, test_dir, responses_dir, dnn_responses_dir, neurons_path
     )
 
-    # response_analyzer.get_mean_from_evaluated_data()
-    # response_analyzer.get_original_data_mean_over_time(subset=2)
-    response_analyzer.get_rnn_responses_to_neuron_responses(subset=1)
-    # response_analyzer.plot_mean_layer_data(response_analyzer.mean_layer_responses, True)
-    # response_analyzer.plot_mean_layer_data({}, False, identifier="input_mean")
+    response_analyzer.get_mean_from_evaluated_data(subset=5)
+    print(response_analyzer.mean_neurons_responses)

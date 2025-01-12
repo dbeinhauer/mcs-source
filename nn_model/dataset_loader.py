@@ -106,7 +106,7 @@ class SparseSpikeDataset(Dataset):
         in either of the two provided formats:
             `spikes_{experiment_id}.npz`
             or
-            `spikes_trial_{trial_id}_{experiment_id}npz`
+            `spikes_trial_{trial_id}_{experiment_id}.npz`
         The necessary is that the `experiment_id` is in second-to-last
         position when we split by `_` symbol. And that there are at least
         2 parts while splitting by `_` symbol.

@@ -4,7 +4,12 @@ are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
-from nn_model.type_variants import LayerType, PathDefaultFields
+from nn_model.type_variants import (
+    LayerType,
+    PathDefaultFields,
+    PathPlotDefaults,
+    ModelTypes,
+)
 
 # GPU Devices:
 DEVICE = "cuda"
@@ -18,6 +23,7 @@ SIZE_MULTIPLIER = 0.1
 # SIZE_MULTIPLIER = 0.5
 
 # Model time step size
+# TIME_STEP = 1
 # TIME_STEP = 5
 # TIME_STEP = 10
 # TIME_STEP = 15
@@ -59,15 +65,60 @@ MODEL_SIZES = {
     layer: int(size * SIZE_MULTIPLIER) for layer, size in ORIGINAL_SIZES.items()
 }
 
+# All DNN complexity models
+DNN_MODELS = [
+    ModelTypes.DNN_JOINT.value,
+    ModelTypes.DNN_SEPARATE.value,
+]
+
+# All RNN complexity models
+RNN_MODELS = [
+    ModelTypes.RNN_JOINT.value,
+    ModelTypes.RNN_SEPARATE.value,
+]
+
+# All complexity models.
+COMPLEX_MODELS = DNN_MODELS + RNN_MODELS
+
+# All models that expects RNN output as 1 value.
+JOINT_MODELS = [
+    ModelTypes.SIMPLE.value,
+    ModelTypes.DNN_JOINT.value,
+    ModelTypes.RNN_JOINT.value,
+]
+
+# All models that expect RNN output to be 2 values (first excitatory and second inhibitory).
+SEPARATE_MODELS = [
+    ModelTypes.DNN_SEPARATE.value,
+    ModelTypes.RNN_SEPARATE.value,
+]
+
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {
-    PathDefaultFields.TRAIN_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.TEST_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.SUBSET_DIR: f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
-    PathDefaultFields.MODEL_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/best_models/",
-    PathDefaultFields.EXPERIMENT_SELECTION_PATH: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
-    PathDefaultFields.NEURON_SELECTION_PATH: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
-    PathDefaultFields.SELECTION_RESULTS_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
-    PathDefaultFields.FULL_EVALUATION_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
-    PathDefaultFields.NEURON_MODEL_RESPONSES_DIR: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/",
+    PathDefaultFields.TRAIN_DIR.value: f"/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.TEST_DIR.value: f"/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.SUBSET_DIR.value: f"/home/beinhaud/diplomka/mcs-source/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
+    PathDefaultFields.MODEL_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/best_models/",
+    PathDefaultFields.EXPERIMENT_SELECTION_PATH.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
+    PathDefaultFields.NEURON_SELECTION_PATH.value: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
+    PathDefaultFields.SELECTION_RESULTS_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_responses/",
+    PathDefaultFields.FULL_EVALUATION_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/",
+    PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/",
+}
+
+# Change default dataset paths in case the time step is 1 (not compressed).
+if TIME_STEP == 1:
+    DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value] = (
+        "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset/trimmed_spikes"
+    )
+    DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value] = (
+        "/home/beinhaud/diplomka/mcs-source/dataset/test_dataset/trimmed_spikes"
+    )
+
+
+# All default paths of the plots.
+DEFAULT_PLOT_PATHS = {
+    PathPlotDefaults.NEURON_MODULE_SEPARATE.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/dnn_module_dependencies_separate.png",
+    PathPlotDefaults.NEURON_MODULE_TOGETHER.value: "/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/dnn_module_dependencies_together.png",
+    PathPlotDefaults.MEAN_LAYER_RESPONSES.value: f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/plot_images/mean_layer_responses_size_{int(SIZE_MULTIPLIER*100)}.png",
 }

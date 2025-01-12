@@ -10,7 +10,12 @@ import wandb
 
 import nn_model.globals
 from nn_model.model_executer import ModelExecuter
-from nn_model.type_variants import ModelTypes, PathDefaultFields
+from nn_model.type_variants import (
+    ModelTypes,
+    PathDefaultFields,
+    OptimizerTypes,
+    WeightsInitializationTypes,
+)
 from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
@@ -38,6 +43,9 @@ def init_wandb(arguments):
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
         "train_subset_size": arguments.train_subset,
+        "gradient_clip": arguments.gradient_clip,
+        "optimizer_type": arguments.optimizer_type,
+        "weight_initialization": arguments.weight_initialization,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -93,6 +101,9 @@ def init_model_path(arguments) -> str:
                 f"_neuron-layers-{arguments.neuron_num_layers}",
                 f"_neuron-size-{arguments.neuron_layer_size}",
                 f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
+                f"_gradient-clip-{arguments.gradient_clip}",
+                f"_optimizer-type-{arguments.optimizer_type}",
+                f"_weight-initialization-{arguments.weight_initialization}",
                 ".pth",
             ]
         )
@@ -191,25 +202,25 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value],
         help="Directory where train dataset is stored.",
     )
     parser.add_argument(
         "--test_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value],
         help="Directory where tests dataset is stored.",
     )
     parser.add_argument(
         "--subset_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value],
         help="Directory where model subset indices are stored.",
     )
     parser.add_argument(
         "--model_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.MODEL_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.MODEL_DIR.value],
         help="Directory where to store the best model parameters.",
     )
     parser.add_argument(
@@ -222,26 +233,32 @@ if __name__ == "__main__":
         "--experiment_selection_path",
         type=str,
         default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.EXPERIMENT_SELECTION_PATH
+            PathDefaultFields.EXPERIMENT_SELECTION_PATH.value
         ],
         help="Path to selected experiments used for model analysis during evaluation.",
     )
     parser.add_argument(
         "--neuron_selection_path",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.NEURON_SELECTION_PATH],
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.NEURON_SELECTION_PATH.value
+        ],
         help="Path to selected neuron IDs used for model analysis during evaluation.",
     )
     parser.add_argument(
         "--selection_results_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SELECTION_RESULTS_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.SELECTION_RESULTS_DIR.value
+        ],
         help="Path to selected neuron IDs used for model analysis during evaluation.",
     )
     parser.add_argument(
         "--full_evaluation_dir",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[PathDefaultFields.FULL_EVALUATION_DIR],
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.FULL_EVALUATION_DIR.value
+        ],
         help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
     )
     parser.add_argument(
@@ -254,23 +271,45 @@ if __name__ == "__main__":
         "--neuron_model_responses_dir",
         type=str,
         default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.NEURON_MODEL_RESPONSES_DIR
+            PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value
         ],
         help="Directory where the results of neuron DNN model on testing range should be stored (filename is best model name).",
     )
-    # Model parameters:
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="complex",
-        choices=[model_type.value for model_type in ModelTypes],
-        help="Model variant that we want to use.",
-    )
+    # Training parameters
     parser.add_argument(
         "--learning_rate",
         type=float,
         default=0.00001,
         help="Learning rate to use in model training.",
+    )
+    # Training parameters
+    parser.add_argument(
+        "--optimizer_type",
+        type=str,
+        default=OptimizerTypes.DEFAULT.value,
+        choices=[optimizer_type.value for optimizer_type in OptimizerTypes],
+        help="Optimizer type (either default or learning rate specific).",
+    )
+    parser.add_argument(
+        "--gradient_clip",
+        type=float,
+        default=10000.0,
+        help="Gradient clipping max norm.",
+    )
+    parser.add_argument(
+        "--weight_initialization",
+        type=str,
+        default=WeightsInitializationTypes.DEFAULT.value,
+        choices=[weights_type.value for weights_type in WeightsInitializationTypes],
+        help="Which type of weights initialization we want to use.",
+    )
+    # Model parameters:
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=ModelTypes.RNN_SEPARATE.value,
+        choices=[model_type.value for model_type in ModelTypes],
+        help="Model variant that we want to use.",
     )
     parser.add_argument(
         "--num_epochs",

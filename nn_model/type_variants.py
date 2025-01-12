@@ -42,7 +42,10 @@ class ModelTypes(Enum):
     """
 
     SIMPLE = "simple"
-    COMPLEX = "complex"
+    DNN_JOINT = "dnn_joint"
+    DNN_SEPARATE = "dnn_separate"
+    RNN_JOINT = "rnn_joint"
+    RNN_SEPARATE = "rnn_separate"
 
 
 class MetricTypes(Enum):
@@ -53,6 +56,33 @@ class MetricTypes(Enum):
     CC_NORM = "cc_norm"
 
 
+class OptimizerTypes(Enum):
+    """
+    All possible optimizer types.
+    """
+
+    DEFAULT = "default"
+    EXC_INH_SPECIFIC = "exc_inh_specific"
+
+
+class WeightsInitializationTypes(Enum):
+    """
+    All possible weights initialization variants.
+    """
+
+    DEFAULT = "default"
+    NORMAL = "normal"
+
+
+class LayerConstraintFields(Enum):
+    """
+    All fields of the layer constraints (to determine excitatory/inhibitory layers).
+    """
+
+    SIZE = "size"
+    TYPE = "type"
+
+
 class PredictionTypes(Enum):
     """
     All variants of predictions that are provided by the model.
@@ -60,6 +90,15 @@ class PredictionTypes(Enum):
 
     FULL_PREDICTION = "full_prediction"
     RNN_PREDICTION = "rnn_prediction"
+
+
+class NeuronModulePredictionFields(Enum):
+    """
+    All keys of the predictions of the DNN neuron module.
+    """
+
+    INPUT = "input"
+    OUTPUT = "output"
 
 
 class EvaluationFields(Enum):
@@ -86,3 +125,23 @@ class PathDefaultFields(Enum):
     SELECTION_RESULTS_DIR = "selection_results_dir"
     FULL_EVALUATION_DIR = "full_evaluation_dir"
     NEURON_MODEL_RESPONSES_DIR = "neuron_model_responses_dir"
+
+
+class PathPlotDefaults(Enum):
+    """
+    All default paths fields where to store the plots.
+    """
+
+    NEURON_MODULE_SEPARATE = "neuron_module_separate"
+    NEURON_MODULE_TOGETHER = "neuron_module_together"
+    MEAN_LAYER_RESPONSES = "mean_layer_responses"
+
+
+class EvaluationMeanVariants(Enum):
+    """
+    All variants of evaluation mean.
+    """
+
+    LAYER_MEAN = "layer_mean"
+    NEURON_MEAN = "neuron_mean"
+    IMAGE_MEAN = "image_mean"

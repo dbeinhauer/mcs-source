@@ -5,7 +5,7 @@ are typically used for determination of excitatory/inhibitory layer.
 
 import torch
 
-from nn_model.type_variants import WeightTypes
+from nn_model.type_variants import WeightTypes, LayerConstraintFields
 
 
 class WeightConstraint:
@@ -41,46 +41,42 @@ class WeightConstraint:
         # List of dictionaries of each input layer of this layer information.
         self.input_parameters = input_parameters
 
-    def hidden_constraint(self, module, kwargs):
+    def hidden_constraint(self, module, layer_type, kwargs):
         """
-        Applies constraints on the `weight_hh` (hidden) parameters
+        Applies constraints on the `weight_hh` (self-recurrent) parameters
         of the provided layer. Applying excitatory/inhibitory constraint.
 
         :param module: module (layer) to which we want to apply the constraint to.
+        :param layer_type: Identifier whether the layer is inhibitory or excitatory.
         :param kwargs: kwargs of the `torch.clamp` function specifying the
         operation on the weights.
         """
-        if hasattr(module, "W_hh"):
-            module.W_hh.weight.data = torch.clamp(module.W_hh.weight.data, **kwargs)
+        assert layer_type in [
+            WeightTypes.EXCITATORY.value,
+            WeightTypes.INHIBITORY.value,
+        ]
+        if hasattr(module, "weights_hh"):
+            module.weights_hh.weight.data = torch.clamp(
+                module.weights_hh.weight.data, **kwargs
+            )
 
     def input_constraint(self, module):
         """
-        Applies constraint on the `weight_ih` (input) parameters of the provided
-        layer. Applying excitatory/inhibitory constraint on the given
-        part of the input of the layer.
+        Applies constraints on the input weights of the provided layer.
+        Differentiates between excitatory/inhibitory layers.
 
-        Applies the constrain in ascending order to the parts of the weights
-        based on the properties of the input of the layer specified in the
-        attribute `self.input_parameters`.
-
-        :param module: module (layer) to which we want to apply the constraint to.
+        :param module: Module to apply the weight on.
         """
-        if hasattr(module, "W_ih"):
-            end_index = 0
-            for item in self.input_parameters:
-                # Iterate each input layer part (input neuron layers).
-                part_size = item["part_size"]
-                part_kwargs = WeightConstraint.layer_kwargs[item["part_type"]]
-
-                # Define the section where the constraint should be applied.
-                start_index = end_index
-                end_index += part_size
-
-                # Apply constraint to the selected section of input weights.
-                module.W_ih.weight.data[start_index:end_index] = torch.clamp(
-                    module.W_ih.weight.data[start_index:end_index],
-                    **part_kwargs,
-                )
+        if hasattr(module, "weights_ih_exc"):
+            module.weights_ih_exc.weight.data = torch.clamp(
+                module.weights_ih_exc.weight.data,
+                **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
+            )
+        if hasattr(module, "weights_ih_inh"):
+            module.weights_ih_inh.weight.data = torch.clamp(
+                module.weights_ih_inh.weight.data,
+                **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
+            )
 
 
 class ExcitatoryWeightConstraint(WeightConstraint):
@@ -103,7 +99,9 @@ class ExcitatoryWeightConstraint(WeightConstraint):
         """
         # Apply excitatory condition to all hidden neurons.
         self.hidden_constraint(
-            module, WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value]
+            module,
+            WeightTypes.EXCITATORY.value,
+            WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
         )
         self.input_constraint(module)
 
@@ -128,6 +126,8 @@ class InhibitoryWeightConstraint(WeightConstraint):
         """
         # Apply inhibitory condition to all hidden neurons.
         self.hidden_constraint(
-            module, WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value]
+            module,
+            WeightTypes.INHIBITORY.value,
+            WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
         )
         self.input_constraint(module)
