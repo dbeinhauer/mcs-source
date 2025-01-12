@@ -17,7 +17,7 @@ Main Components of the repository:
 - `dataset_processor/` - Directory containing definition of all tools used for dataset processing and preparation.
 - `evaluation_tools/` - Directory containing definition of all tools used for evaluation of the model results.
 - `neural_simulation/` - Auxiliary directory for correct installation of the Poetry project.
-- `nn_model/` - Directory containing the major part of the source code. It contains the definition of the model and code for its execution.
+- `nn_model/` - Directory containing the major part of the source code. It contains the definition of the model and code for its execution. There is also description of the model architecture and dataset structure.
 - `execute_model.py` - The source code used for execution of the model (training/evaluation).
 - `requirements.txt` - Requirements file to execute the model.
 - `run_model.sh` - Script used to execute the model training as a background process on the CGG servers.
@@ -58,7 +58,7 @@ requirements to run the model (and evaluation tools) correctly. This file might 
 helpful in case there are problems with the installation.
 
 ## Dataset Processor
-IMPORTANT NONE: If one would like to generate additional dataset data it is needed 
+IMPORTANT NOTE: If one would like to generate additional dataset data it is needed 
 to do so using the Mozaik environment 
 (more info: https://github.com/CSNG-MFF/mozaik) and on the Wintermute cluster 
 of the Neuroscience Group (CSNG).
@@ -86,7 +86,7 @@ is possible to do so while running the command:
 
 ## Required Files
 Alongside with the source code there needs to be several files provided to execute
-the model. If you run the model on CGG machine with already generated setups, it 
+the model. Especially there needs to be proper paths to dataset defined (for more information about the dataset structure please inspect documentation in `dataset_processor/` directory). If you run the model on CGG machine with already generated setups, it 
 should not be problem using the default paths. Otherwise, the appropriate files
 should be provided.
 
@@ -122,4 +122,18 @@ change them often). Those parameters are:
 - `TRAIN_BATCH_SIZE`, `TEST_BATCH_SIZE` - Batch sizes (these are hardcoded as they are optimized for a given dataset and CGG machines). There are separate train and test batch sizes as test batch size is typically larger (the test dataset contains multiple trials) and it might be challenging to use same batch size as for train dataset.
 
 For the rest of the variables from the file `nn_model/globals`, it is 
-not expected to change their values unless we want to do some major modification in the program functionality.
+not expected to change their values unless we want to do some major 
+modification in the program functionality.
+
+## Weights and Biases tool
+During training it is also possible to use `Weights and Biases` tool 
+to track the training procedure and model performance. To use such
+tool one needs to create an account in for this tool and properly 
+log in. For further information please check the source code 
+(look specifically in the `wand` parts).
+
+# Dataset Processing and Evaluation Tools
+In case you are interested in dataset processing including the 
+description of the dataset structure please see documentation in 
+directory `dataset_processor/`. For all kinds of evaluation tools 
+please inspect the `evaluation_tools/` directory.
