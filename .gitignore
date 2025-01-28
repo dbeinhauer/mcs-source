@@ -4,7 +4,6 @@ __pycache__
 
 dataset/
 output_dir/
-testing_dataset/*
 evaluation_tools/evaluation_results/*
 evaluation_tools/evaluation_results_old/*
 wandb/*
