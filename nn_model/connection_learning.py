@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class NeuralConnections(nn.Module):
-    def __init(self, n_neurons: int, n_features: int = 3, ):
+    def __init__(self, n_neurons: int, n_features: int = 3, ):
         super().__init__()
         assert n_neurons > 0
         assert n_features > 0
