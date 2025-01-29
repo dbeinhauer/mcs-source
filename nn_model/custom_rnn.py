@@ -81,9 +81,9 @@ class CustomRNNCell(nn.Module):
         self.weights_hh = nn.Linear(hidden_size, hidden_size)  # Self-connection
 
         # Biases
-        self.b_ih_exc = nn.Parameter(torch.Tensor(hidden_size))  # Input excitatory
-        self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
-        self.b_hh = nn.Parameter(torch.Tensor(hidden_size))  # Self-connection
+        # self.b_ih_exc = nn.Parameter(torch.Tensor(hidden_size))  # Input excitatory
+        # self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
+        # self.b_hh = nn.Parameter(torch.Tensor(hidden_size))  # Self-connection
 
         self._init_weights(weight_initialization_type)
 
@@ -207,9 +207,9 @@ class CustomRNNCell(nn.Module):
         self._flip_weights_signs(self_recurrent_multiplier)
 
         # Init biases.
-        nn.init.zeros_(self.b_ih_exc)
-        nn.init.zeros_(self.b_ih_inh)
-        nn.init.zeros_(self.b_hh)
+        # nn.init.zeros_(self.b_ih_exc)
+        # nn.init.zeros_(self.b_ih_inh)
+        # nn.init.zeros_(self.b_hh)
 
     def forward(
         self, input_data: torch.Tensor, hidden: torch.Tensor
@@ -232,12 +232,12 @@ class CustomRNNCell(nn.Module):
         input_inhibitory = input_data[:, self.inhibitory_indices]
 
         # Apply linear step to inhibitory and excitatory part.
-        in_exc_linear = self.weights_ih_exc(input_excitatory) + self.b_ih_exc
-        in_inh_linear = self.weights_ih_inh(input_inhibitory) + self.b_ih_inh
+        in_exc_linear = self.weights_ih_exc(input_excitatory) # + self.b_ih_exc
+        in_inh_linear = self.weights_ih_inh(input_inhibitory) # + self.b_ih_inh
 
         # Apply linear step to self recurrent connection and
         # decide whether it is excitatory or inhibitory.
-        hidden_linear = self.weights_hh(hidden) + self.b_hh
+        hidden_linear = self.weights_hh(hidden) # + self.b_hh
         if self.layer_name in nn_model.globals.EXCITATORY_LAYERS:
             # In case excitatory layer -> add to excitatory part the self recurrent part
             in_exc_linear += hidden_linear
