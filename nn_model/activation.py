@@ -4,6 +4,7 @@ import torch.nn as nn
 
 class LeakyTanh(nn.Module):
     def __init(self, scale: float = 5., leak: float = .001):
+        super().__init__()
         self.scale = scale
         self.leak = leak
 
