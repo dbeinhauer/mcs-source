@@ -1,12 +1,15 @@
 #!/bin/bash
 
-# Set Weights and Biases API Key
-source ./.wandb_api_key.sh
-
 # Check if the correct number of arguments is passed
-if [ "$#" -ne 4 ]; then
-    echo "Usage: $0 <output_dir> <model> <learning_rate> <num_epochs>"
+if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then
+    echo "Usage: $0 <output_dir> <model> <learning_rate> <num_epochs> [wandb_api_key]"
     exit 1
+fi
+
+# Set Weights and Biases API Key if not specified
+if [ "$#" -eq  4 ]; then
+    echo "Running .wandb_api_key.sh because wandb_api_key wasn't specified."
+    source ./.wandb_api_key.sh || exit 1
 fi
 
 # Directory to store the output log
@@ -15,6 +18,14 @@ OUTPUT_DIR=$1
 MODEL=$2
 LEARNING_RATE=$3
 NUM_EPOCHS=$4
+
+# Set wandb api key if specified
+if [ "$#" -eq 5 ]; then
+    echo "Setting wandb api key based on passed argument"
+    API_KEY=$5
+    export WANDB_API_KEY=$API_KEY
+    wandb login
+fi
 
 # usage() {
 #     echo "Usage: $0 output_dir model_type learning_rate num_epochs [-]"
