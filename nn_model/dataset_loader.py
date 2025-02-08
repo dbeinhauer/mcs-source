@@ -210,12 +210,11 @@ class SparseSpikeDataset(Dataset):
         subset for all layers (keys are layer names). In case we want to select
         all neurons it returns `None`.
         """
-        if model_subset_path != "":
-            # Load indices of subset.
-            with open(model_subset_path, "rb") as pickle_file:
-                return pickle.load(pickle_file)
-
-        return None
+        if not model_subset_path:
+            return None
+        # Load indices of subset.
+        with open(model_subset_path, "rb") as pickle_file:
+            return pickle.load(pickle_file)
 
     def _prepare_experiment_data(self, file_path: str, layer: str) -> torch.Tensor:
         """

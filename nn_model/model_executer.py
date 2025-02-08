@@ -144,6 +144,7 @@ class ModelExecuter:
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
                     "residual": not arguments.neuron_not_residual,
+                    "activation_function": arguments.neuron_activation_function,
                 }
             }
         elif arguments.model in nn_model.globals.RNN_MODELS:
@@ -153,6 +154,7 @@ class ModelExecuter:
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
                     "residual": not arguments.neuron_not_residual,
+                    "activation_function": arguments.neuron_activation_function,
                 }
             }
         else:

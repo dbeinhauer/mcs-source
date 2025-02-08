@@ -15,7 +15,9 @@ from nn_model.type_variants import (
     PathDefaultFields,
     OptimizerTypes,
     WeightsInitializationTypes,
+    NeuronActivationTypes,
 )
+
 from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
@@ -39,6 +41,7 @@ def init_wandb(arguments):
         "neuron_model_num_layers": arguments.neuron_num_layers,
         "neuron_model_layer_size": arguments.neuron_layer_size,
         "neuron_model_is_residual": not arguments.neuron_not_residual,
+        "neuron_activation_function": arguments.neuron_activation_function,
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
@@ -100,6 +103,7 @@ def init_model_path(arguments) -> str:
                 f"_residual-{not arguments.neuron_not_residual}",
                 f"_neuron-layers-{arguments.neuron_num_layers}",
                 f"_neuron-size-{arguments.neuron_layer_size}",
+                f"_neuron-activation-{arguments.neuron_activation_function}",
                 f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
                 f"_gradient-clip-{arguments.gradient_clip}",
                 f"_optimizer-type-{arguments.optimizer_type}",
@@ -334,6 +338,13 @@ if __name__ == "__main__":
         "--neuron_not_residual",
         action="store_true",
         help="Whether we want to use residual connections in the model of a neuron.",
+    )
+    parser.add_argument(
+        "--neuron_activation_function",
+        type=str,
+        default=NeuronActivationTypes.LEAKYTANH.value,
+        choices=[activation_type.value for activation_type in NeuronActivationTypes],
+        help="Final activation function of the neuron model.",
     )
     parser.add_argument(
         "--num_hidden_time_steps",

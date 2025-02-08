@@ -4,7 +4,7 @@ It is especially needed due the need to play with custom neuron models instead
 of just simple non-linearity function.
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -13,7 +13,6 @@ import nn_model.globals
 from nn_model.type_variants import (
     LayerConstraintFields,
     WeightTypes,
-    ModelTypes,
     WeightsInitializationTypes,
 )
 
@@ -79,11 +78,6 @@ class CustomRNNCell(nn.Module):
             self.inhibitory_size, hidden_size
         )  # Input inhibitory
         self.weights_hh = nn.Linear(hidden_size, hidden_size)  # Self-connection
-
-        # Biases
-        self.b_ih_exc = nn.Parameter(torch.Tensor(hidden_size))  # Input excitatory
-        self.b_ih_inh = nn.Parameter(torch.Tensor(hidden_size))  # Input inhibitory
-        self.b_hh = nn.Parameter(torch.Tensor(hidden_size))  # Self-connection
 
         self._init_weights(weight_initialization_type)
 
@@ -201,15 +195,16 @@ class CustomRNNCell(nn.Module):
             # Use Normal distribution initialization (with shifted larger mean in inhibitory).
             self._init_normal_weights()
         else:
-            raise Exception("Wrong weights initialization type.")
+
+            class WrongWeightsInitializationType(Exception):
+                """
+                Exception raised when wrong weights initialization type is used.
+                """
+
+            raise WrongWeightsInitializationType("Wrong weights initialization type.")
 
         # Flip weights to its correct sign (exc/inh).
         self._flip_weights_signs(self_recurrent_multiplier)
-
-        # Init biases.
-        nn.init.zeros_(self.b_ih_exc)
-        nn.init.zeros_(self.b_ih_inh)
-        nn.init.zeros_(self.b_hh)
 
     def forward(
         self, input_data: torch.Tensor, hidden: torch.Tensor
@@ -232,12 +227,12 @@ class CustomRNNCell(nn.Module):
         input_inhibitory = input_data[:, self.inhibitory_indices]
 
         # Apply linear step to inhibitory and excitatory part.
-        in_exc_linear = self.weights_ih_exc(input_excitatory) + self.b_ih_exc
-        in_inh_linear = self.weights_ih_inh(input_inhibitory) + self.b_ih_inh
+        in_exc_linear = self.weights_ih_exc(input_excitatory)
+        in_inh_linear = self.weights_ih_inh(input_inhibitory)
 
         # Apply linear step to self recurrent connection and
         # decide whether it is excitatory or inhibitory.
-        hidden_linear = self.weights_hh(hidden) + self.b_hh
+        hidden_linear = self.weights_hh(hidden)
         if self.layer_name in nn_model.globals.EXCITATORY_LAYERS:
             # In case excitatory layer -> add to excitatory part the self recurrent part
             in_exc_linear += hidden_linear

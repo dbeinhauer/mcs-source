@@ -48,6 +48,15 @@ class ModelTypes(Enum):
     RNN_SEPARATE = "rnn_separate"
 
 
+class NeuronActivationTypes(Enum):
+    """
+    All possible neuron activation types.
+    """
+
+    LEAKYTANH = "leakytanh"
+    SIGMOIDTANH = "sigmoidtanh"
+
+
 class MetricTypes(Enum):
     """
     All possible metric types.
