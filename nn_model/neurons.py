@@ -11,32 +11,8 @@ import torch
 import torch.nn as nn
 
 import nn_model.globals
-
-
-class CustomNeuronActivation(torch.nn.Module):
-    """
-    Custom neuron activation function designed the way that should better capture the
-    expected output values of the neurons.
-
-    We expect that neurons return values in interval (0, 5) because when we inspect our
-    training data there is no such time interval that contains more than 4 spikes in the
-    20 ms time window (largest window that we use). We then safely assume that our values
-    should be smaller than 5 (in case it is not true it is permissible exception).
-
-    Alongside with this, the majority of data lays in the interval (0, 1). So, we use
-    sigmoid function for all predictions smaller than 1 (for those we would get value
-    from 0 to 1 always). When this threshold is reached we apply scaled tanh to spread the
-    rest of the input values to interval (0, 5).
-    """
-
-    def forward(self, x):
-        # TODO: improve the function definition (especially better tanh case)
-        # Apply sigmoid to get values between 0 and 1
-        sigmoid_output = torch.sigmoid(x)
-        # Apply scaled tanh for values greater than 1
-        tanh_output = 5 * torch.tanh(x / 5)  # Scale tanh to range [0, 5]
-        # Combine the two outputs
-        return torch.where(x <= 1, sigmoid_output, tanh_output)
+from nn_model.type_variants import NeuronActivationTypes
+from nn_model.activation_functions import SigmoidTanh, LeakyTanh
 
 
 class SharedNeuronBase(nn.Module, ABC):
@@ -44,11 +20,17 @@ class SharedNeuronBase(nn.Module, ABC):
     Base class of the shared neuron module.
     """
 
-    def __init__(self, model_type: str, residual: bool = True):
+    def __init__(
+        self,
+        model_type: str,
+        activation_function: str,
+        residual: bool = True,
+    ):
         """
         Initializes neuron model base parameters (shared across all neuron models).
 
         :param model_type: Type of the neuron model.
+        :param activation_function: Final activation function of the neuron model.
         :param residual: Flag whether we want to use residual connection in the neuron model.
         """
         super(SharedNeuronBase, self).__init__()
@@ -62,8 +44,11 @@ class SharedNeuronBase(nn.Module, ABC):
         # Flag whether we want to use the residual connection.
         self.residual = residual
 
-        # Neuron activation function layer. TODO: maybe not needed
-        self.custom_activation = CustomNeuronActivation()
+        self.custom_activation = (
+            SigmoidTanh()
+            if activation_function == NeuronActivationTypes.SIGMOIDTANH.value
+            else LeakyTanh()
+        )
 
     def _select_input_size(self) -> int:
         """
@@ -100,6 +85,7 @@ class DNNNeuron(SharedNeuronBase):
     def __init__(
         self,
         model_type: str,
+        activation_function: str,
         num_layers: int = 5,
         layer_size: int = 10,
         residual: bool = True,
@@ -108,11 +94,12 @@ class DNNNeuron(SharedNeuronBase):
         Initializes DNN model of the neuron.
 
         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
+        :param activation_function: Final activation function of the neuron model.
         :param num_layers: Number of layers of the model.
         :param layer_size: Size of the layer of the model.
         :param residual: Flag whether there is a residual connection used in the model.
         """
-        super(DNNNeuron, self).__init__(model_type, residual)
+        super(DNNNeuron, self).__init__(model_type, activation_function, residual)
 
         self.network = self._init_model_architecture(layer_size, num_layers)
 
@@ -176,6 +163,7 @@ class LSTMNeuron(SharedNeuronBase):
     def __init__(
         self,
         model_type: str,
+        activation_function: str,
         num_layers: int = 1,
         layer_size: int = 10,
         residual: bool = True,
@@ -184,11 +172,12 @@ class LSTMNeuron(SharedNeuronBase):
         Initialize the neuron module.
 
         :param model_type: Variant of the complex neuron (value from `ModelTypes`).
+        :param activation_function: Final activation function of the neuron model.
         :param num_layers: Number of LSTM layers for richer memory (neuron hidden time steps).
         :param layer_size: Size of the hidden state in the LSTM.
         :param residual: Whether to use a residual connection.
         """
-        super(LSTMNeuron, self).__init__(model_type, residual)
+        super(LSTMNeuron, self).__init__(model_type, activation_function, residual)
         self.layer_size = layer_size
         self.num_layers = num_layers  # Number of hidden time steps
 
@@ -210,7 +199,7 @@ class LSTMNeuron(SharedNeuronBase):
         self.output_layer = nn.Linear(layer_size, 1)
 
         # Custom activation function
-        self.custom_activation = CustomNeuronActivation()
+        # self.custom_activation = SigmoidTanh()
 
     def forward(
         self,
