@@ -22,7 +22,7 @@ from nn_model.logger import LoggerModel
 
 # from nn_model.evaluation_results_saver import EvaluationResultsSaver
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 

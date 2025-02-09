@@ -469,6 +469,15 @@ class ModelExecuter:
 
         return current_inputs, current_targets, current_hidden_states
 
+    def _detach_hidden_states(self, hidden_state):
+        if self.model.neuron_type in nn_model.globals.RNN_MODELS:
+            return (
+                hidden_state[0].detach(),
+                hidden_state[1].detach(),
+            )
+
+        return None
+
     def _optimizer_step(
         self,
         inputs: Dict[str, torch.Tensor],
@@ -523,6 +532,11 @@ class ModelExecuter:
 
         # Backward and optimizer steps for the sum of losses.
         total_loss.backward()  # retain_graph=True)
+
+        neuron_hidden = {
+            layer: self._detach_hidden_states(hidden)
+            for layer, hidden in neuron_hidden.items()
+        }
 
         # Gradient clipping to prevent exploding gradients.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
