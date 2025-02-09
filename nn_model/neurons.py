@@ -227,12 +227,14 @@ class LSTMNeuron(SharedNeuronBase):
 
         current_input = self.input_layer(inputs)
         h, c = hidden
-        for i in range(self.num_layers):
-            # h, c = lstm_cell(current_input, (h, c))
-            h, c = self.lstm_cell(current_input, (h, c))
-            current_input = (
-                h  # The output of the current cell is the input to the next cell
-            )
+        # for i in range(self.num_layers):
+        #     # h, c = lstm_cell(current_input, (h, c))
+        #     h, c = self.lstm_cell(current_input, (h, c))
+        #     current_input = (
+        #         h  # The output of the current cell is the input to the next cell
+        #     )
+
+        h, c = self.lstm_cell(current_input, (h, c))
 
         # Apply the output layer to the last hidden state
         output = self.output_layer(h)

@@ -585,3 +585,13 @@ Notes after meetings:
     - as output of the model we want to still have unmodulated signal (same as we have)
         - we just want to adjust the input signal to the other neurons
             - the change happens in real example in the output neuron
+
+# 9.2.2025
+- question whether the model should propagate the results of final activation to other states (it seems that this approach is correct as we pass neuronal responses as hidden states during the training)
+- there is probably problem with the hidden states of the LSTM neuron module
+    - the hidden states should be propagated through time
+        - it is questionable how to deal with the gradients
+        - we need to decide whether we want to try to learn the correct inner states or whether we just need the whole block to predict the expected result
+            - if we just care about the learning the correct activation function it is ok to work without gradient
+            - if we want to kind of improve the module itself (using for example specific loss function also for the module itself), we need to pass the gradient
+    - we want to omit usage of retain graph as it is very memory demanding
