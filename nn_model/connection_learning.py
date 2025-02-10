@@ -24,21 +24,15 @@ class NeuralConnectionMatrix(nn.Module):
             nn.ReLU(),
             nn.Linear(16, 1)
         )
-        ar = torch.arange(n_neurons)
-        # prepare indices for all (N^2) possible connections
-        self.cartesian_indices = torch.cartesian_prod(ar, ar)
 
     def forward(self) -> torch.Tensor:
         # all possible pairs of neural features
-        feature_pairs = torch.cat(
-            [
-                self.feature_vectors[self.cartesian_indices[:, 0]],
-                self.feature_vectors[self.cartesian_indices[:, 1]]
-            ],
-            dim=1
-        )
+        expanded = self.feature_vectors.expand(self.n_neurons, self.n_neurons, self.n_features)
+        x_left = expanded.reshape(self.n_neurons ** 2, self.n_features)
+        x_right = expanded.transpose(0, 1).reshape(self.n_neurons ** 2, self.n_features)
+        x = torch.cat([x_left, x_right], dim=1)
         # infer connection weight based on learned neural features
-        weights = self.weight_dnn(feature_pairs) # shape (N^2)
+        weights = self.weight_dnn(x) # shape (N^2)
         # transform to shape (N, N)
         return weights.view(self.n_neurons, self.n_neurons)
 
