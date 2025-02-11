@@ -467,6 +467,12 @@ class ModelExecuter:
         return current_inputs, current_targets, current_hidden_states
 
     def _detach_hidden_states(self, hidden_state):
+        """
+        Detaches RNN neuron hidden states (LSTM cell) from the computation graph.
+
+        :param hidden_state: State of the neuron hidden state to be detached.
+        :return: Returns detached hidden state.
+        """
         if self.model.neuron_type in nn_model.globals.RNN_MODELS:
             return (
                 hidden_state[0].detach(),
@@ -588,7 +594,6 @@ class ModelExecuter:
 
             # Apply weight constrains (excitatory/inhibitory) for all the layers.
             self._apply_model_constraints()
-            # torch.cuda.empty_cache()
 
         del all_hidden_states
         torch.cuda.empty_cache()
