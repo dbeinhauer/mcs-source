@@ -326,6 +326,9 @@ class PrimaryVisualCortexModel(nn.Module):
 
         # Simple neuron (no additional complexity).
         return self._init_simple_neuron_model()
+    
+    def _init_synaptic_adaptation_models(self):
+        adaptation_model = LSTMNeuron(self.)
 
     def _init_layer_configs(
         self,
@@ -521,11 +524,6 @@ class PrimaryVisualCortexModel(nn.Module):
         """
         # We already have LGN inputs (assign them to current time layer outputs).
         recurrent_outputs = {}
-        # neuron_hidden = {
-        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        # }
-        # TODO: probably bug - we initialize neuron model hidden states each
-        # TODO: visible time step (probably not what we want (we want to have the memory of the neurons))
 
         for layer in PrimaryVisualCortexModel.layers_input_parameters:
             # Iterate through all output layers of the model.
@@ -616,11 +614,6 @@ class PrimaryVisualCortexModel(nn.Module):
             # Training mode (only one visible step)
             # We add 1 to iterate through the visible time loop correctly (we want to iterate once).
             visible_time_steps = 1 + 1
-
-        # # Hidden states of the neuron.
-        # neuron_hidden = {
-        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        # }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
 
         for visible_time in range(1, visible_time_steps):
             # Prediction of the visible time steps
