@@ -17,6 +17,7 @@ from nn_model.type_variants import (
     ModelTypes,
     PredictionTypes,
     OptimizerTypes,
+    ModelModulesFields,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -129,17 +130,19 @@ class ModelExecuter:
         """
         Retrieve kwargs of the neuronal model based on the specified model.
 
-        :param arguments: command line arguments.
-        :return: Returns dictionary of kwargs for the neuronal model based on the specified model.
+        :param arguments: Command line arguments.
+        :return: Returns dictionary with one item with key `"neuron_model"` and
+        value is dictionary of kwargs for the neuronal model based on the
+        specified model, `None` value if we do not want to use this module.
         """
         if arguments.model == ModelTypes.SIMPLE.value:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
-            return {}
+            return {ModelModulesFields.NEURON_MODULE.value: None}
         elif arguments.model in nn_model.globals.DNN_MODELS:
             # Model with neuron that consist of small NN.
             # of th same layer sizes in each layer.
             return {
-                arguments.model: {
+                ModelModulesFields.NEURON_MODULE.value: {
                     "model_type": arguments.model,
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
@@ -149,7 +152,7 @@ class ModelExecuter:
             }
         elif arguments.model in nn_model.globals.RNN_MODELS:
             return {
-                arguments.model: {
+                ModelModulesFields.NEURON_MODULE.value: {
                     "model_type": arguments.model,
                     "num_layers": arguments.neuron_num_layers,
                     "layer_size": arguments.neuron_layer_size,
@@ -166,6 +169,33 @@ class ModelExecuter:
 
             raise NonExistingModelTypeException("Non-existing model type selected.")
 
+    @staticmethod
+    def _get_synaptic_adaptation_model_kwargs(arguments) -> Dict:
+        """
+        Retrieves kwargs of the synaptic adaptation model.
+
+        :param arguments: Command line arguments.
+        :return: Returns dictionary with one item with key `"synaptic_adaptation_model"` and
+        value is dictionary of kwargs for the synaptic adaptation model, `None` value if we
+        do not want to use this module.
+        """
+        if (
+            arguments.model == ModelTypes.SIMPLE.value
+            or arguments.not_synaptic_adaptation
+        ):
+            # Model with simple neuron (no additional neuronal model) -> no kwargs
+            return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None}
+
+        return {
+            ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: {
+                "model_type": ModelTypes.DNN_JOINT.value,  # Trick, we want to use 1 input value (so we need to use joint neuron type).
+                "layer_size": arguments.synaptic_adaptation_size,
+                "num_layers": arguments.synaptic_adaptation_time_steps,
+                "residual": not arguments.neuron_not_residual,
+                "activation_function": arguments.neuron_activation_function,
+            }
+        }
+
     def _init_model(self, arguments) -> PrimaryVisualCortexModel:
         """
         Initializes the model based on the provided arguments.
@@ -178,7 +208,10 @@ class ModelExecuter:
             arguments.num_hidden_time_steps,
             arguments.model,
             arguments.weight_initialization,
-            neuron_model_kwargs=ModelExecuter._get_neuron_model_kwargs(arguments),
+            model_modules_kwargs={
+                **ModelExecuter._get_neuron_model_kwargs(arguments),
+                **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
+            },
         )
 
     def _init_criterion(self):
@@ -468,12 +501,12 @@ class ModelExecuter:
 
     def _detach_hidden_states(self, hidden_state):
         """
-        Detaches RNN neuron hidden states (LSTM cell) from the computation graph.
+        Detaches hidden states of the recurrent modules (LSTM cell) from the computation graph.
 
-        :param hidden_state: State of the neuron hidden state to be detached.
+        :param hidden_state: Hidden state of the module to be detached.
         :return: Returns detached hidden state.
         """
-        if self.model.neuron_type in nn_model.globals.RNN_MODELS:
+        if hidden_state is not None:
             return (
                 hidden_state[0].detach(),
                 hidden_state[1].detach(),
@@ -487,7 +520,14 @@ class ModelExecuter:
         hidden_states: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
-    ) -> Tuple[float, Dict[str, Optional[Tuple[torch.Tensor, ...]]]]:
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
+    ) -> Tuple[
+        float,
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
         """
         Performs time step prediction and optimizer step.
 
@@ -504,12 +544,13 @@ class ModelExecuter:
         # We want to zero optimizer gradient before each training step.
         self.optimizer.zero_grad()
 
-        all_predictions, _, neuron_hidden = self.model(
+        all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
             # Time step is assigned based on model architecture during the forward function call.
             hidden_states,
             neuron_hidden,
+            synaptic_adaptation_hidden,
         )
 
         # Take last time step predictions (those are the visible time steps predictions).
@@ -535,6 +576,13 @@ class ModelExecuter:
             layer: self._detach_hidden_states(hidden)
             for layer, hidden in neuron_hidden.items()
         }
+        synaptic_adaptation_hidden = {
+            layer: {
+                input_layer: self._detach_hidden_states(hidden)
+                for input_layer, hidden in input_hidden_states.items()
+            }
+            for layer, input_hidden_states in synaptic_adaptation_hidden.items()
+        }
 
         # Gradient clipping to prevent exploding gradients.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
@@ -544,7 +592,7 @@ class ModelExecuter:
         del all_predictions
         torch.cuda.empty_cache()
 
-        return total_loss.item(), neuron_hidden
+        return total_loss.item(), neuron_hidden, synaptic_adaptation_hidden
 
     def _train_perform_visible_time_step(
         self,
@@ -569,7 +617,18 @@ class ModelExecuter:
         # Hidden states of the neuron.
         neuron_hidden = {
             layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+        }
+
+        synaptic_adaptation_hidden = {
+            layer: {
+                input_layer: None
+                for input_layer, _ in PrimaryVisualCortexModel.layers_input_parameters[
+                    layer
+                ]
+                + [(layer, "")]  # Add the self-recurrent connection.
+            }
+            for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }
 
         for visible_time in range(
             1, time_length
@@ -578,8 +637,14 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            current_loss, neuron_hidden = self._optimizer_step(
-                inputs, hidden_states, targets, neuron_hidden
+            current_loss, neuron_hidden, synaptic_adaptation_hidden = (
+                self._optimizer_step(
+                    inputs,
+                    hidden_states,
+                    targets,
+                    neuron_hidden,
+                    synaptic_adaptation_hidden,
+                )
             )
 
             time_loss_sum += current_loss

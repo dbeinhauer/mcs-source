@@ -53,6 +53,9 @@ def init_wandb(arguments):
         "gradient_clip": arguments.gradient_clip,
         "optimizer_type": arguments.optimizer_type,
         "weight_initialization": arguments.weight_initialization,
+        "synaptic_adaptation": not arguments.not_synaptic_adaptation,
+        "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
+        "synaptic_adaptation_time_steps": arguments.synaptic_adaptation_time_steps,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -112,6 +115,9 @@ def init_model_path(arguments) -> str:
                 f"_gradient-clip-{arguments.gradient_clip}",
                 f"_optimizer-type-{arguments.optimizer_type}",
                 f"_weight-initialization-{arguments.weight_initialization}",
+                f"_synaptic-adaptation-{not arguments.not_synaptic_adaptation}",
+                f"_synaptic-size-{arguments.synaptic_adaptation_size}",
+                f"_synaptic-time-steps-{arguments.synaptic_adaptation_time_steps}",
                 ".pth",
             ]
         )
@@ -356,7 +362,24 @@ if __name__ == "__main__":
         default=1,
         help="Number of hidden time steps in RNN of the whole model (in case it is set to 1 the the model would just predict the following visible time step (without additional hidden steps in between)).",
     )
-
+    parser.set_defaults(not_synaptic_adaptation=False)
+    parser.add_argument(
+        "--not_synaptic_adaptation",
+        action="store_true",
+        help="Whether we want to use synaptic adaptation module.",
+    )
+    parser.add_argument(
+        "--synaptic_adaptation_size",
+        type=int,
+        default=10,
+        help="Size of the layer in the synaptic adaptation LSTM module.",
+    )
+    parser.add_argument(
+        "--synaptic_adaptation_time_steps",
+        type=int,
+        default=1,
+        help="Number of (hidden) time steps in the synaptic adaptation LSTM module.",
+    )
     # Dataset analysis:
     parser.add_argument(
         "--train_subset",
