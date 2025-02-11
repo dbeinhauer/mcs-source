@@ -356,6 +356,7 @@ if __name__ == "__main__":
         default=1,
         help="Number of hidden time steps in RNN of the whole model (in case it is set to 1 the the model would just predict the following visible time step (without additional hidden steps in between)).",
     )
+
     # Dataset analysis:
     parser.add_argument(
         "--train_subset",
