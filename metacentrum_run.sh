@@ -8,14 +8,13 @@
 # This script should be run from the your home directory on a frontend server
 # Fill these variables in order for the script to work
 PROJECT_NAME="mcs-source"
-SERVER_LOCATION="redacted" # for example "plzen1". Look for it in ($pwd)
-USERNAME="redacted"
+SERVER_LOCATION="praha1"
 WANDB_API_KEY="redacted"
 
 ########################################################################################################################
 echo "Task started at $(date)"
 
-DATADIR="/storage/$SERVER_LOCATION/home/$USERNAME/$PROJECT_NAME"
+DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
 export TMPDIR=$SCRATCHDIR
 
 test -n "$SCRATCHDIR" || { echo >&2 "SCRATCHDIR is not set!"; exit 1; }
