@@ -29,9 +29,6 @@ from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
 
 
-torch.autograd.set_detect_anomaly(True)
-
-
 class ModelExecuter:
     """
     Class used for execution of training and evaluation steps of the models.
@@ -469,6 +466,21 @@ class ModelExecuter:
 
         return current_inputs, current_targets, current_hidden_states
 
+    def _detach_hidden_states(self, hidden_state):
+        """
+        Detaches RNN neuron hidden states (LSTM cell) from the computation graph.
+
+        :param hidden_state: State of the neuron hidden state to be detached.
+        :return: Returns detached hidden state.
+        """
+        if self.model.neuron_type in nn_model.globals.RNN_MODELS:
+            return (
+                hidden_state[0].detach(),
+                hidden_state[1].detach(),
+            )
+
+        return None
+
     def _optimizer_step(
         self,
         inputs: Dict[str, torch.Tensor],
@@ -491,11 +503,6 @@ class ModelExecuter:
         """
         # We want to zero optimizer gradient before each training step.
         self.optimizer.zero_grad()
-
-        # Hidden states of the neuron.
-        # neuron_hidden = {
-        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        # }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
 
         all_predictions, _, neuron_hidden = self.model(
             inputs,  # input of time t
@@ -522,7 +529,12 @@ class ModelExecuter:
             )
 
         # Backward and optimizer steps for the sum of losses.
-        total_loss.backward()  # retain_graph=True)
+        total_loss.backward()
+
+        neuron_hidden = {
+            layer: self._detach_hidden_states(hidden)
+            for layer, hidden in neuron_hidden.items()
+        }
 
         # Gradient clipping to prevent exploding gradients.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
@@ -582,7 +594,6 @@ class ModelExecuter:
 
             # Apply weight constrains (excitatory/inhibitory) for all the layers.
             self._apply_model_constraints()
-            # torch.cuda.empty_cache()
 
         del all_hidden_states
         torch.cuda.empty_cache()
