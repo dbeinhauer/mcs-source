@@ -29,9 +29,6 @@ from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
 
 
-torch.autograd.set_detect_anomaly(True)
-
-
 class ModelExecuter:
     """
     Class used for execution of training and evaluation steps of the models.
@@ -501,11 +498,6 @@ class ModelExecuter:
         # We want to zero optimizer gradient before each training step.
         self.optimizer.zero_grad()
 
-        # Hidden states of the neuron.
-        # neuron_hidden = {
-        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        # }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
-
         all_predictions, _, neuron_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
@@ -531,7 +523,7 @@ class ModelExecuter:
             )
 
         # Backward and optimizer steps for the sum of losses.
-        total_loss.backward()  # retain_graph=True)
+        total_loss.backward()
 
         neuron_hidden = {
             layer: self._detach_hidden_states(hidden)
