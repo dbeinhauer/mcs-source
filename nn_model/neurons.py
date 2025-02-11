@@ -218,21 +218,21 @@ class LSTMNeuron(SharedNeuronBase):
         batch_size = inputs.size(0)
 
         if hidden is None:
+            # Initialize hidden state if not provided.
             hidden = (
                 torch.zeros(batch_size, self.layer_size).to(inputs.device),
                 torch.zeros(batch_size, self.layer_size).to(inputs.device),
             )
-            #     for _ in range(self.num_layers)
-            # ]
 
         current_input = self.input_layer(inputs)
         h, c = hidden
         for i in range(self.num_layers):
-            # h, c = lstm_cell(current_input, (h, c))
             h, c = self.lstm_cell(current_input, (h, c))
             current_input = (
                 h  # The output of the current cell is the input to the next cell
             )
+
+        h, c = self.lstm_cell(current_input, (h, c))
 
         # Apply the output layer to the last hidden state
         output = self.output_layer(h)

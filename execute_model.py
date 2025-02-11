@@ -3,6 +3,7 @@ This script serves as the interface that is used to execute experiments and eval
 """
 
 import os
+import socket
 import argparse
 from typing import Dict
 
@@ -20,9 +21,12 @@ from nn_model.type_variants import (
 
 from nn_model.logger import LoggerModel
 
-# from nn_model.evaluation_results_saver import EvaluationResultsSaver
+hostname = socket.gethostname()
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+# Select the GPU to use in case we are working in CGG server.
+if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 

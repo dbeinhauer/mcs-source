@@ -26,7 +26,7 @@ from nn_model.type_variants import (
     EvaluationMeanVariants,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
-from nn_model.model_executer import ModelExecuter, RNNCellModel
+from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import EvaluationFields
 from nn_model.dictionary_handler import DictionaryHandler
 
