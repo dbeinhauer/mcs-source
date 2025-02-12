@@ -1,0 +1,25 @@
+from pathlib import Path
+import subprocess
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+SHEETS = (
+    "V1_Exc_L23",
+    "V1_Exc_L4",
+    "V1_Inh_L23",
+    "V1_Inh_L4",
+    "X_OFF",
+    "X_ON",
+)
+VARIANTS = ('train_dataset', 'test_dataset')
+TIME_MERGER_DIR = PROJECT_ROOT / 'dataset_processor' / 'time_merger'
+BASE_DIR = PROJECT_ROOT / 'dataset'
+INTERVAL_SIZE = 20
+SHELL_SCRIPT = TIME_MERGER_DIR / "meta_job.sh"
+
+for variant in VARIANTS:
+    input_dir = BASE_DIR / variant / 'trimmed_spikes'
+    out_dir = BASE_DIR / variant / 'compressed_spikes' / 'trimmed' / f'size_{INTERVAL_SIZE}'
+    for sheet in SHEETS:
+        args = [str(x) for x in [input_dir, out_dir, INTERVAL_SIZE, sheet]]
+        subprocess.run(['qsub', SHELL_SCRIPT] + args)
