@@ -5,7 +5,7 @@ are typically used for determination of excitatory/inhibitory layer.
 
 import torch
 
-from nn_model.type_variants import WeightTypes, LayerConstraintFields
+from nn_model.type_variants import WeightTypes
 
 
 class WeightConstraint:

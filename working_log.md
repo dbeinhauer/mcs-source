@@ -595,3 +595,7 @@ Notes after meetings:
             - if we just care about the learning the correct activation function it is ok to work without gradient
             - if we want to kind of improve the module itself (using for example specific loss function also for the module itself), we need to pass the gradient
     - we want to omit usage of retain graph as it is very memory demanding
+
+# 12.2.2025
+- LSTM neuron without hidden time steps and learning rate 0.00001 seems to be the best variant till now
+    - it reaches the CC_NORM=0.935

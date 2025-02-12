@@ -36,6 +36,15 @@ class WeightTypes(Enum):
     INHIBITORY = "inh"
 
 
+class ModelModulesFields(Enum):
+    """
+    All fields of the model modules.
+    """
+
+    NEURON_MODULE = "neuron_module"
+    SYNAPTIC_ADAPTION_MODULE = "synaptic_adaption_module"
+
+
 class ModelTypes(Enum):
     """
     All possible model types.

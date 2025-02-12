@@ -2,7 +2,7 @@
 This source code contains definition of all models used in our experiments.
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Type
 
 import torch
 import torch.nn as nn
@@ -13,117 +13,13 @@ from nn_model.type_variants import (
     TimeStepVariant,
     ModelTypes,
     NeuronModulePredictionFields,
-    LayerConstraintFields,
-)
-from nn_model.weights_constraints import (
-    WeightTypes,
-    ExcitatoryWeightConstraint,
-    InhibitoryWeightConstraint,
+    ModelModulesFields,
 )
 from nn_model.layers import (
     ModelLayer,
 )
 from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase
-
-
-class LayerConfig:
-    """
-    Class for storing configuration of model layer.
-    """
-
-    def __init__(
-        self,
-        size: int,
-        layer_type: str,
-        input_layers_parameters: List[Tuple[str, str]],
-        neuron_model=None,
-    ):
-        """
-        Initializes configuration based on the given parameters.
-        Determines weight constraints.
-
-        :param size: size of the layer (number of neurons).
-        :param layer_type: name of the layer.
-        :param input_layers_parameters: ordered list of input layer parameters of the layer.
-        The parameters are in form of tuple with first value its name from `LayerType`
-        and second value its time step name from `TimeStepVariant`.
-        :param shared_complexity: shared complexity model(s), if no then `None`.
-        """
-        self.size: int = size
-        self.layer_type: str = layer_type
-        self.input_layers_parameters: List[Tuple[str, str]] = input_layers_parameters
-        self.neuron_model = neuron_model
-
-        # Determine weight constraints for the layer (excitatory/inhibitory).
-        self.input_constraints = (
-            self._determine_input_constraints()
-        )  # Constraints setup (for determining inh/excitatory in the architecture).
-        self.constraint = self._determine_constraint(layer_type, self.input_constraints)
-
-    def _determine_input_constraints(self) -> List[Dict]:
-        """
-        Determines input weights constraint (chooses between excitatory/inhibitory).
-
-        :return: Returns list of dictionaries with parameters specifying
-        the distribution of input weight types of each input layer.
-
-        The format is same as the expected kwargs for `WeightConstraint` objects.
-        The order of the dictionaries should be same as the order of the input layers.
-
-        The keys in the dictionaries are:
-            `part_size` (int): size of the input layer.
-            `part_type` (WeightTypes value): type of the layer (exc/inh).
-        """
-        return [
-            {
-                LayerConstraintFields.SIZE.value: nn_model.globals.MODEL_SIZES[
-                    layer[0]
-                ],
-                LayerConstraintFields.TYPE.value: self._get_constraint_type(layer[0]),
-            }
-            for layer in self.input_layers_parameters
-        ]
-
-    def _get_constraint_type(self, layer_type: str) -> str:
-        """
-        Determines type of the constraint that should be used for given layer.
-
-        :param layer_type: name of the layer. Should be value from `LayerType`.
-        :return: Returns identifier of constraint type (value from `WeightTypes`).
-        """
-        if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            return WeightTypes.EXCITATORY.value
-        if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            return WeightTypes.INHIBITORY.value
-
-        class WrongLayerException(Exception):
-            """
-            Exception class to be raised while wrong layer type chosen.
-            """
-
-        raise WrongLayerException(
-            f"Wrong layer type. The type {layer_type} does not exist."
-        )
-
-    def _determine_constraint(self, layer_type: str, input_constraints: List[Dict]):
-        """
-        Determines weight constraints of the layer.
-
-        :param layer_type: name of the layer. Should be value from `LayerType`,
-        or different if we do not want to use the weight constraints.
-        :param input_constraints: list of constraint kwargs for input layer weight constraints.
-        :return: Returns appropriate `WeightConstraint` object,
-        or `None` if we do not want to use the weight constraint.
-        """
-        if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            # Excitatory neurons.
-            return ExcitatoryWeightConstraint(input_constraints)
-        if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            # Inhibitory neurons.
-            return InhibitoryWeightConstraint(input_constraints)
-
-        # Apply no constraint.
-        return None
+from nn_model.layer_config import LayerConfig
 
 
 class PrimaryVisualCortexModel(nn.Module):
@@ -216,7 +112,7 @@ class PrimaryVisualCortexModel(nn.Module):
         num_hidden_time_steps: int,
         neuron_type: str,
         weight_initialization: str,
-        neuron_model_kwargs: Dict,
+        model_modules_kwargs: Dict[str, Optional[Dict]],
     ):
         """
         Initializes model parameters, sets weights constraints and creates model architecture.
@@ -227,7 +123,7 @@ class PrimaryVisualCortexModel(nn.Module):
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
         :param weight_initialization: type of weight initialization that we want to use.
-        :param neuron_model_kwargs: kwargs of the used neuronal models (if any).
+        :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic adaptation models.
         """
         super(PrimaryVisualCortexModel, self).__init__()
 
@@ -240,14 +136,21 @@ class PrimaryVisualCortexModel(nn.Module):
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
 
-        # Kwargs to store complexity properties for various complexity types.
-        self.neuron_model_kwargs = neuron_model_kwargs
+        # Kwargs defining neuron module properties and synaptic adaptation module properties.
+        self.neuron_model_kwargs = model_modules_kwargs[
+            ModelModulesFields.NEURON_MODULE.value
+        ]
+        self.synaptic_adaptation_kwargs = model_modules_kwargs[
+            ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value
+        ]
 
         self.layer_sizes = layer_sizes  # Needed for model architecture definition
 
         # Layer configuration.
         self.layers_configs = self._init_layer_configs(
-            layer_sizes, self._init_neuron_models()
+            layer_sizes,
+            self._init_neuron_models(),
+            self._init_synaptic_adaptation_models(),
         )
 
         # Flag whether we want to return the RNN linearity results for analysis.
@@ -267,7 +170,7 @@ class PrimaryVisualCortexModel(nn.Module):
         for layer in self.layers.values():
             layer.switch_to_return_recurrent_state()
 
-    def _init_simple_neuron_model(self) -> Dict:
+    def _init_simple_neuron_model(self) -> Dict[str, Optional[SharedNeuronBase]]:
         """
         Initializes simple neurons (`None` complexity).
 
@@ -280,7 +183,7 @@ class PrimaryVisualCortexModel(nn.Module):
     def _init_complex_neuron_model(
         self,
         neuron_model_kwargs: Dict,
-    ) -> Dict:
+    ) -> Dict[str, Optional[SharedNeuronBase]]:
         """
         Initializes complex neuron layers.
 
@@ -289,7 +192,7 @@ class PrimaryVisualCortexModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and appropriate shared
         complex complexity object.
         """
-        neuron_model: Optional[SharedNeuronBase] = None
+        neuron_model: Optional[Type[SharedNeuronBase]] = None
         if self.neuron_type in nn_model.globals.DNN_MODELS:
             neuron_model = DNNNeuron
         elif self.neuron_type in nn_model.globals.RNN_MODELS:
@@ -311,32 +214,63 @@ class PrimaryVisualCortexModel(nn.Module):
 
     def _init_neuron_models(
         self,
-    ) -> Dict:
+    ) -> Dict[str, Optional[SharedNeuronBase]]:
         """
         Initializes shared complexities (neuronal models) of the model.
 
         :return: Returns dictionary of layer name (`LayerType`) and
         appropriate neuron model (shared complexity).
         """
-        if self.neuron_type in nn_model.globals.COMPLEX_MODELS:
-            # Complex complexity.
-            return self._init_complex_neuron_model(
-                self.neuron_model_kwargs[self.neuron_type]
-            )
+        # if self.neuron_type in nn_model.globals.COMPLEX_MODELS:
+        if self.neuron_model_kwargs is not None:
+            # Complex neuron module.
+            return self._init_complex_neuron_model(self.neuron_model_kwargs)
 
         # Simple neuron (no additional complexity).
         return self._init_simple_neuron_model()
 
+    def _init_synaptic_adaptation_models(
+        self,
+    ) -> Dict[str, Optional[Dict[str, LSTMNeuron]]]:
+        """
+        Initializes synaptic adaptation model.
+
+        :return: Returns synaptic adaptation models for all layers (dictionary of `None`
+        if we do not want to use it).
+        """
+        if self.synaptic_adaptation_kwargs is not None:
+            return {
+                layer: {
+                    input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs).to(
+                        nn_model.globals.DEVICE
+                    )
+                    for (
+                        input_layer,
+                        _,
+                    ) in PrimaryVisualCortexModel.layers_input_parameters[layer]
+                    + [(layer, "")]  # Add the recurrent connection.
+                }
+                for layer in PrimaryVisualCortexModel.layers_input_parameters
+            }
+
+        # We do not want to use synaptic adaptation model.
+        return {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }
+
     def _init_layer_configs(
         self,
         layer_sizes: Dict[str, int],
-        neuron_models: Dict,
+        neuron_models: Dict[str, Optional[SharedNeuronBase]],
+        synaptic_adaptation_models: Dict[str, Optional[Dict[str, LSTMNeuron]]],
     ) -> Dict[str, LayerConfig]:
         """
         Initializes `LayerConfig` objects for all layers of the model.
 
         :param layer_sizes: sizes of the layers.
         :param neuron_models: shared complexities of the layers (neuron models of each layer).
+        :param synaptic_adaptation_models: synaptic adaptation models of the layers (models
+        for each layer under specific key).
         :return: Returns dictionary of layer configurations for all model layers.
         """
         return {
@@ -345,6 +279,7 @@ class PrimaryVisualCortexModel(nn.Module):
                 layer,
                 input_parameters,
                 neuron_models[layer],
+                synaptic_adaptation_models[layer],
             )
             for layer, input_parameters in PrimaryVisualCortexModel.layers_input_parameters.items()
         }
@@ -354,7 +289,6 @@ class PrimaryVisualCortexModel(nn.Module):
         Initializes one layer of the model.
 
         :param layer: layer name (`LayerType`).
-        :param rnn_cell_cls: layer object variant.
         :return: Returns initializes layer object.
         """
         return ModelLayer(
@@ -470,7 +404,8 @@ class PrimaryVisualCortexModel(nn.Module):
         layer_type: str,
         time_variant: str,
         values_of_given_time: Dict[str, torch.Tensor],
-    ) -> List[torch.Tensor]:
+        synaptic_adaptation_layer_hidden: Dict[str, Tuple[torch.Tensor, ...]],
+    ) -> Tuple[List[torch.Tensor], Dict[str, Tuple[torch.Tensor, ...]]]:
         """
         Retrieves input tensors of the given time variant from the provided list of all
         possible input tensors. The tensors are selected from the input tensors of the
@@ -482,31 +417,48 @@ class PrimaryVisualCortexModel(nn.Module):
         :param values_of_given_time: values for the processed time variant. In case of
         the previous time variant they are `hidden_layer`s, in case of current time values
         they are`current_time_values`).
+        :param synaptic_adaptation_layer_hidden: hidden states of the synaptic adaptation model.
         :return: Returns list of tensors of the
         """
         # List of all input tensors we want to retrieve.
         time_variant_list = []
         for (
-            input_part_layer_name,  # Name of teh input layer
+            input_part_layer_name,  # Name of the input layer
             input_part_time_variant,  # Time variant of the input layer
         ) in PrimaryVisualCortexModel.layers_input_parameters[layer_type]:
             # Iterate through inputs of the given layer.
             if time_variant == input_part_time_variant:
                 # If the currently processed input layer belongs to given time variant
                 # -> append it to the list
-                time_variant_list.append(values_of_given_time[input_part_layer_name])
+                synaptic_adaptation_model = self.layers_configs[
+                    layer_type
+                ].synaptic_activation_models[input_part_layer_name]
+                if synaptic_adaptation_model is not None:
+                    (
+                        modified_input,
+                        synaptic_adaptation_layer_hidden[input_part_layer_name],
+                    ) = self.layers_configs[layer_type].apply_synaptic_adaptation(
+                        input_part_layer_name,
+                        values_of_given_time[input_part_layer_name],
+                        synaptic_adaptation_layer_hidden[input_part_layer_name],
+                    )
+                    time_variant_list.append(modified_input)
 
-        return time_variant_list
+        return time_variant_list, synaptic_adaptation_layer_hidden
 
     def _perform_model_time_step(
         self,
         current_time_outputs: Dict[str, torch.Tensor],
         hidden_layers: Dict[str, torch.Tensor],
         neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
     ) -> Tuple[
         Dict[str, torch.Tensor],
         Dict[str, Optional[Tuple[torch.Tensor, ...]]],
         Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
     ]:
         """
         Performs model time step. It progresses the model architecture and
@@ -521,41 +473,63 @@ class PrimaryVisualCortexModel(nn.Module):
         """
         # We already have LGN inputs (assign them to current time layer outputs).
         recurrent_outputs = {}
-        # neuron_hidden = {
-        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        # }
-        # TODO: probably bug - we initialize neuron model hidden states each
-        # TODO: visible time step (probably not what we want (we want to have the memory of the neurons))
 
         for layer in PrimaryVisualCortexModel.layers_input_parameters:
             # Iterate through all output layers of the model.
             # Perform model time step for the currently processed layer.
             # NOTE: It is necessary that these layers are sorted by the
             # processing order in the model.
+
+            current_time_inputs, synaptic_adaptation_hidden[layer] = (
+                self._get_list_by_time_variant(
+                    layer,
+                    TimeStepVariant.CURRENT.value,
+                    current_time_outputs,
+                    synaptic_adaptation_hidden[layer],
+                )
+            )
+            # inputs of the layer from time (t).
+            previous_time_inputs, synaptic_adaptation_hidden[layer] = (
+                self._get_list_by_time_variant(
+                    layer,
+                    TimeStepVariant.PREVIOUS.value,
+                    hidden_layers,
+                    synaptic_adaptation_hidden[layer],
+                )
+            )  # inputs of the layer from time (t-1) (previous time step)
+
+            (
+                recurrent_input,
+                synaptic_adaptation_hidden[layer][layer],
+            ) = self.layers_configs[layer].apply_synaptic_adaptation(
+                layer,
+                hidden_layers[layer],
+                synaptic_adaptation_hidden[layer][layer],
+            )
+            # hidden_layers[layer],
+            # )  # Recurrent connection to itself from time (t-1)
+
             (
                 current_time_outputs[layer],
                 recurrent_outputs[layer],
                 neuron_hidden[layer],
             ) = self.layers[layer](
-                self._get_layer_input_tensor(
-                    self._get_list_by_time_variant(
-                        layer,
-                        TimeStepVariant.CURRENT.value,
-                        current_time_outputs,
-                    ),  # inputs of the layer from time (t).
-                    self._get_list_by_time_variant(
-                        layer,
-                        TimeStepVariant.PREVIOUS.value,
-                        hidden_layers,
-                    ),  # inputs of the layer from time (t-1) (previous time step)
-                ),
-                hidden_layers[layer],  # Recurrent connection to itself from time (t-1)
+                self._get_layer_input_tensor(current_time_inputs, previous_time_inputs),
+                recurrent_input.to(nn_model.globals.DEVICE),
                 neuron_hidden[
                     layer
                 ],  # Hidden steps of the neuron models (needed for RNN neuron models).
             )
 
-        return current_time_outputs, recurrent_outputs, neuron_hidden
+            del current_time_inputs, previous_time_inputs, recurrent_input
+            torch.cuda.empty_cache()
+
+        return (
+            current_time_outputs,
+            recurrent_outputs,
+            neuron_hidden,
+            synaptic_adaptation_hidden,
+        )
 
     def _append_outputs(
         self,
@@ -578,6 +552,9 @@ class PrimaryVisualCortexModel(nn.Module):
         inputs: Dict[str, torch.Tensor],
         hidden_states: Dict[str, torch.Tensor],
         neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
     ) -> Tuple[
         Dict[str, List[torch.Tensor]],
         Dict[str, List[torch.Tensor]],
@@ -617,11 +594,6 @@ class PrimaryVisualCortexModel(nn.Module):
             # We add 1 to iterate through the visible time loop correctly (we want to iterate once).
             visible_time_steps = 1 + 1
 
-        # # Hidden states of the neuron.
-        # neuron_hidden = {
-        #     layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        # }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
-
         for visible_time in range(1, visible_time_steps):
             # Prediction of the visible time steps
             # (in training only one step, in evaluation all time steps)
@@ -643,10 +615,16 @@ class PrimaryVisualCortexModel(nn.Module):
 
             for _ in range(self.num_hidden_time_steps):
                 # Perform all hidden time steps.
-                hidden_states, recurrent_outputs, neuron_hidden = (
-                    self._perform_model_time_step(
-                        current_inputs, hidden_states, neuron_hidden
-                    )
+                (
+                    hidden_states,
+                    recurrent_outputs,
+                    neuron_hidden,
+                    synaptic_adaptation_hidden,
+                ) = self._perform_model_time_step(
+                    current_inputs,
+                    hidden_states,
+                    neuron_hidden,
+                    synaptic_adaptation_hidden,
                 )
 
                 if self.training:
@@ -673,4 +651,9 @@ class PrimaryVisualCortexModel(nn.Module):
         del inputs, hidden_states
         torch.cuda.empty_cache()
 
-        return all_hidden_outputs, all_recurrent_outputs, neuron_hidden
+        return (
+            all_hidden_outputs,
+            all_recurrent_outputs,
+            neuron_hidden,
+            synaptic_adaptation_hidden,
+        )
