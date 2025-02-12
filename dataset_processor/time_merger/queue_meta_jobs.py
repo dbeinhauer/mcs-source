@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path("/storage/praha1/home/$USER/mcs-source")
 
 SHEETS = (
     "V1_Exc_L23",
@@ -21,5 +21,7 @@ for variant in VARIANTS:
     input_dir = BASE_DIR / variant / 'trimmed_spikes'
     out_dir = BASE_DIR / variant / 'compressed_spikes' / 'trimmed' / f'size_{INTERVAL_SIZE}'
     for sheet in SHEETS:
-        args = [str(x) for x in [input_dir, out_dir, INTERVAL_SIZE, sheet]]
-        subprocess.run(['qsub', SHELL_SCRIPT] + args)
+        args = [str(x) for x in [SHELL_SCRIPT, input_dir, out_dir, INTERVAL_SIZE, sheet]]
+        args = ['qsub', '--'] + args
+        print(' '.join(args))
+        subprocess.run(args)
