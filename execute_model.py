@@ -74,22 +74,7 @@ def init_model_path(arguments) -> str:
     """
     Initializes path where to store the best model parameters.
 
-    By default (if not specified other version in `arguments`) the path is in format:
-        ```
-        arguments.model_dir/ +
-            model_ +
-            [train-subset-{train_subset_size}] +
-            lr-{learning_rate} +
-            _{model_type} +
-            _residual-{True/False} +
-            _neuron_layers-{num_neuron_layers} +
-            _neuron-size-{size_neuron_layer} +
-            _num-hidden-time-steps-{num_hidden_time_steps} +
-            .pth
-        ```
-        or in case `arguments.model_filename` is defined:
-        `arguments.model_dir/arguments.model_filename`
-
+    By default the format of the filename is exhaustive list of all model parameters.
 
     :param arguments: command line arguments
     :return: Returns the path where the best model parameters should be stored.
@@ -179,7 +164,7 @@ def main(arguments):
         )
 
     if not arguments.best_model_evaluation and not arguments.neuron_model_responses:
-        # Train the model used the given parameters.
+        # Train the model using the given parameters.
         model_executer.train(
             continuous_evaluation_kwargs={
                 "epoch_offset": 1,
@@ -323,7 +308,7 @@ if __name__ == "__main__":
         type=str,
         default=ModelTypes.RNN_SEPARATE.value,
         choices=[model_type.value for model_type in ModelTypes],
-        help="Model variant that we want to use.",
+        help="Neuron model variant that we want to use.",
     )
     parser.add_argument(
         "--num_epochs",
@@ -335,19 +320,19 @@ if __name__ == "__main__":
         "--neuron_num_layers",
         type=int,
         default=5,
-        help="Number of hidden layers we want to use in the model of a neuron.",
+        help="Number of hidden layers we want to use in the model of the feed-forward neuron (recommended is 5) or number of hidden time steps we want to use in case of the RNN neuron variants (recommended is 1).",
     )
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
         default=10,
-        help="Size of the layers we want to use in the model of a neuron.",
+        help="Size of the layers of the neuron model.",
     )
     parser.set_defaults(neuron_not_residual=False)
     parser.add_argument(
         "--neuron_not_residual",
         action="store_true",
-        help="Whether we want to use residual connections in the model of a neuron.",
+        help="Whether we want to use residual connections in the model of a neuron (and in the synaptic adaptation module).",
     )
     parser.add_argument(
         "--neuron_activation_function",
@@ -366,7 +351,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--not_synaptic_adaptation",
         action="store_true",
-        help="Whether we want to use synaptic adaptation module.",
+        help="Whether we want to use synaptic adaptation LSTM module.",
     )
     parser.add_argument(
         "--synaptic_adaptation_size",
