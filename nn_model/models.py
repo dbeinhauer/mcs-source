@@ -148,7 +148,9 @@ class LayerConfig:
         # for batch processing (parallel application of the neuron module for all
         # the layer output values).
         synaptic_activation_model = self.synaptic_activation_models[input_layer]
-        complexity_result = input_tensor.view(-1, synaptic_activation_model.input_size)
+        complexity_result = input_tensor.reshape(
+            -1, synaptic_activation_model.input_size
+        )
 
         # Apply the neuron model to all values at parallel.
         complexity_result, neuron_hidden = synaptic_activation_model(
