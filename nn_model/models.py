@@ -698,6 +698,9 @@ class PrimaryVisualCortexModel(nn.Module):
                 ],  # Hidden steps of the neuron models (needed for RNN neuron models).
             )
 
+            del current_time_inputs, previous_time_inputs, recurrent_input
+            torch.cuda.empty_cache()
+
         return (
             current_time_outputs,
             recurrent_outputs,
