@@ -87,7 +87,7 @@ class ModelExecuter:
         }
 
     @staticmethod
-    def _get_neuron_model_kwargs(arguments) -> Dict:
+    def _get_neuron_model_kwargs(arguments) -> Dict[str, Optional[Dict]]:
         """
         Retrieve kwargs of the neuronal model based on the specified model.
 
@@ -119,7 +119,7 @@ class ModelExecuter:
             raise NonExistingModelTypeException("Non-existing model type selected.")
 
     @staticmethod
-    def _get_synaptic_adaptation_model_kwargs(arguments) -> Dict:
+    def _get_synaptic_adaptation_model_kwargs(arguments) -> Dict[str, Optional[Dict]]:
         """
         Retrieves kwargs of the synaptic adaptation model.
 

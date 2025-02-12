@@ -2,7 +2,7 @@
 This source code contains definition of all models used in our experiments.
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Type
 
 import torch
 import torch.nn as nn
@@ -13,162 +13,13 @@ from nn_model.type_variants import (
     TimeStepVariant,
     ModelTypes,
     NeuronModulePredictionFields,
-    LayerConstraintFields,
     ModelModulesFields,
-)
-from nn_model.weights_constraints import (
-    WeightTypes,
-    ExcitatoryWeightConstraint,
-    InhibitoryWeightConstraint,
 )
 from nn_model.layers import (
     ModelLayer,
 )
 from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase
-
-
-class LayerConfig:
-    """
-    Class for storing configuration of model layer.
-    """
-
-    def __init__(
-        self,
-        size: int,
-        layer_type: str,
-        input_layers_parameters: List[Tuple[str, str]],
-        neuron_model=None,
-        synaptic_activation_models=None,
-    ):
-        """
-        Initializes configuration based on the given parameters.
-        Determines weight constraints.
-
-        :param size: size of the layer (number of neurons).
-        :param layer_type: name of the layer.
-        :param input_layers_parameters: ordered list of input layer parameters of the layer.
-        The parameters are in form of tuple with first value its name from `LayerType`
-        and second value its time step name from `TimeStepVariant`.
-        :param neuron_model: shared complexity model(s), if no then `None`.
-        :param synaptic_activation_models: synaptic adaptation models for the layer, if no then `None`.
-        """
-        self.size: int = size
-        self.layer_type: str = layer_type
-        self.input_layers_parameters: List[Tuple[str, str]] = input_layers_parameters
-        self.neuron_model = neuron_model
-        self.synaptic_activation_models = synaptic_activation_models
-
-        # Determine weight constraints for the layer (excitatory/inhibitory).
-        self.input_constraints = (
-            self._determine_input_constraints()
-        )  # Constraints setup (for determining inh/excitatory in the architecture).
-        self.constraint = self._determine_constraint(layer_type, self.input_constraints)
-
-    def _determine_input_constraints(self) -> List[Dict]:
-        """
-        Determines input weights constraint (chooses between excitatory/inhibitory).
-
-        :return: Returns list of dictionaries with parameters specifying
-        the distribution of input weight types of each input layer.
-
-        The format is same as the expected kwargs for `WeightConstraint` objects.
-        The order of the dictionaries should be same as the order of the input layers.
-
-        The keys in the dictionaries are:
-            `part_size` (int): size of the input layer.
-            `part_type` (WeightTypes value): type of the layer (exc/inh).
-        """
-        return [
-            {
-                LayerConstraintFields.SIZE.value: nn_model.globals.MODEL_SIZES[
-                    layer[0]
-                ],
-                LayerConstraintFields.TYPE.value: self._get_constraint_type(layer[0]),
-            }
-            for layer in self.input_layers_parameters
-        ]
-
-    def _get_constraint_type(self, layer_type: str) -> str:
-        """
-        Determines type of the constraint that should be used for given layer.
-
-        :param layer_type: name of the layer. Should be value from `LayerType`.
-        :return: Returns identifier of constraint type (value from `WeightTypes`).
-        """
-        if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            return WeightTypes.EXCITATORY.value
-        if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            return WeightTypes.INHIBITORY.value
-
-        class WrongLayerException(Exception):
-            """
-            Exception class to be raised while wrong layer type chosen.
-            """
-
-        raise WrongLayerException(
-            f"Wrong layer type. The type {layer_type} does not exist."
-        )
-
-    def _determine_constraint(self, layer_type: str, input_constraints: List[Dict]):
-        """
-        Determines weight constraints of the layer.
-
-        :param layer_type: name of the layer. Should be value from `LayerType`,
-        or different if we do not want to use the weight constraints.
-        :param input_constraints: list of constraint kwargs for input layer weight constraints.
-        :return: Returns appropriate `WeightConstraint` object,
-        or `None` if we do not want to use the weight constraint.
-        """
-        if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            # Excitatory neurons.
-            return ExcitatoryWeightConstraint(input_constraints)
-        if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            # Inhibitory neurons.
-            return InhibitoryWeightConstraint(input_constraints)
-
-        # Apply no constraint.
-        return None
-
-    def apply_synaptic_adaptation(
-        self,
-        input_layer: str,
-        input_tensor: torch.Tensor,
-        hidden_states: Tuple[torch.Tensor, ...],
-    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
-        """
-        Applies proper synaptic adaptation model based on input layer to the input tensor.
-
-        :param input_layer: Layer from which the input comes.
-        :param input_tensor: Input values of the synaptic adaptation model.
-        :param hidden_states: Hidden states of the synaptic adaptation model.
-        :return: Returns output of the synaptic adaptation model.
-        """
-
-        # Reshape the layer output to [batch_size * hidden_size, neuron_model_input_size]
-        # for batch processing (parallel application of the neuron module for all
-        # the layer output values).
-        synaptic_activation_model = self.synaptic_activation_models[input_layer]
-        complexity_result = input_tensor.reshape(
-            -1, synaptic_activation_model.input_size
-        )
-
-        # print(complexity_result.device)
-        # if hidden_states is not None:
-        #     print(hidden_states[0].device)
-        #     print(hidden_states[1].device)
-
-        # Apply the neuron model to all values at parallel.
-        complexity_result, hidden_states = synaptic_activation_model(
-            complexity_result, hidden_states
-        )
-
-        # Define the output shape.
-        viewing_shape: torch.Tensor = input_tensor
-
-        # Reshape back to [batch_size, hidden_size]
-        complexity_result = complexity_result.view_as(viewing_shape)
-
-        return complexity_result, hidden_states
+from nn_model.layer_config import LayerConfig
 
 
 class PrimaryVisualCortexModel(nn.Module):
@@ -261,7 +112,7 @@ class PrimaryVisualCortexModel(nn.Module):
         num_hidden_time_steps: int,
         neuron_type: str,
         weight_initialization: str,
-        model_modules_kwargs: Dict,
+        model_modules_kwargs: Dict[str, Optional[Dict]],
     ):
         """
         Initializes model parameters, sets weights constraints and creates model architecture.
@@ -285,12 +136,10 @@ class PrimaryVisualCortexModel(nn.Module):
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
 
-        # Kwargs to store complexity properties for various complexity types.
+        # Kwargs defining neuron module properties and synaptic adaptation module properties.
         self.neuron_model_kwargs = model_modules_kwargs[
             ModelModulesFields.NEURON_MODULE.value
         ]
-
-        # Kwargs to store synaptic adaptation module properties.
         self.synaptic_adaptation_kwargs = model_modules_kwargs[
             ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value
         ]
@@ -321,7 +170,7 @@ class PrimaryVisualCortexModel(nn.Module):
         for layer in self.layers.values():
             layer.switch_to_return_recurrent_state()
 
-    def _init_simple_neuron_model(self) -> Dict:
+    def _init_simple_neuron_model(self) -> Dict[str, Optional[SharedNeuronBase]]:
         """
         Initializes simple neurons (`None` complexity).
 
@@ -334,7 +183,7 @@ class PrimaryVisualCortexModel(nn.Module):
     def _init_complex_neuron_model(
         self,
         neuron_model_kwargs: Dict,
-    ) -> Dict:
+    ) -> Dict[str, Optional[SharedNeuronBase]]:
         """
         Initializes complex neuron layers.
 
@@ -343,7 +192,7 @@ class PrimaryVisualCortexModel(nn.Module):
         :return: Returns dictionary of layer name (`LayerType`) and appropriate shared
         complex complexity object.
         """
-        neuron_model: Optional[SharedNeuronBase] = None
+        neuron_model: Optional[Type[SharedNeuronBase]] = None
         if self.neuron_type in nn_model.globals.DNN_MODELS:
             neuron_model = DNNNeuron
         elif self.neuron_type in nn_model.globals.RNN_MODELS:
@@ -365,7 +214,7 @@ class PrimaryVisualCortexModel(nn.Module):
 
     def _init_neuron_models(
         self,
-    ) -> Dict:
+    ) -> Dict[str, Optional[SharedNeuronBase]]:
         """
         Initializes shared complexities (neuronal models) of the model.
 
@@ -382,7 +231,7 @@ class PrimaryVisualCortexModel(nn.Module):
 
     def _init_synaptic_adaptation_models(
         self,
-    ) -> Dict:
+    ) -> Dict[str, Optional[Dict[str, LSTMNeuron]]]:
         """
         Initializes synaptic adaptation model.
 
@@ -412,15 +261,16 @@ class PrimaryVisualCortexModel(nn.Module):
     def _init_layer_configs(
         self,
         layer_sizes: Dict[str, int],
-        neuron_models: Dict,
-        synaptic_adaptation_models: Dict,
+        neuron_models: Dict[str, Optional[SharedNeuronBase]],
+        synaptic_adaptation_models: Dict[str, Optional[Dict[str, LSTMNeuron]]],
     ) -> Dict[str, LayerConfig]:
         """
         Initializes `LayerConfig` objects for all layers of the model.
 
         :param layer_sizes: sizes of the layers.
         :param neuron_models: shared complexities of the layers (neuron models of each layer).
-        :param synaptic_adaptation_models: synaptic adaptation models of the layers (models for each layer under specific key).
+        :param synaptic_adaptation_models: synaptic adaptation models of the layers (models
+        for each layer under specific key).
         :return: Returns dictionary of layer configurations for all model layers.
         """
         return {
@@ -439,7 +289,6 @@ class PrimaryVisualCortexModel(nn.Module):
         Initializes one layer of the model.
 
         :param layer: layer name (`LayerType`).
-        :param rnn_cell_cls: layer object variant.
         :return: Returns initializes layer object.
         """
         return ModelLayer(
@@ -568,11 +417,9 @@ class PrimaryVisualCortexModel(nn.Module):
         :param values_of_given_time: values for the processed time variant. In case of
         the previous time variant they are `hidden_layer`s, in case of current time values
         they are`current_time_values`).
+        :param synaptic_adaptation_layer_hidden: hidden states of the synaptic adaptation model.
         :return: Returns list of tensors of the
         """
-
-        # TODO: In this part add the synaptic adaptation model call.
-
         # List of all input tensors we want to retrieve.
         time_variant_list = []
         for (
@@ -632,30 +479,6 @@ class PrimaryVisualCortexModel(nn.Module):
             # Perform model time step for the currently processed layer.
             # NOTE: It is necessary that these layers are sorted by the
             # processing order in the model.
-
-            # synaptic_adaptation_hidden[layer]
-            # (
-            #     current_time_outputs[layer],
-            #     recurrent_outputs[layer],
-            #     neuron_hidden[layer],
-            # ) = self.layers[layer](
-            #     self._get_layer_input_tensor(
-            #         self._get_list_by_time_variant(
-            #             layer,
-            #             TimeStepVariant.CURRENT.value,
-            #             current_time_outputs,
-            #         ),  # inputs of the layer from time (t).
-            #         self._get_list_by_time_variant(
-            #             layer,
-            #             TimeStepVariant.PREVIOUS.value,
-            #             hidden_layers,
-            #         ),  # inputs of the layer from time (t-1) (previous time step)
-            #     ),
-            #     hidden_layers[layer],  # Recurrent connection to itself from time (t-1)
-            #     neuron_hidden[
-            #         layer
-            #     ],  # Hidden steps of the neuron models (needed for RNN neuron models).
-            # )
 
             current_time_inputs, synaptic_adaptation_hidden[layer] = (
                 self._get_list_by_time_variant(
