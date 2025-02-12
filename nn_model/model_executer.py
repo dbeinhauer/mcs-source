@@ -809,11 +809,23 @@ class ModelExecuter:
                 for layer in PrimaryVisualCortexModel.layers_input_parameters
             }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
 
+            synaptic_adaptation_hidden = {
+                layer: {
+                    input_layer: None
+                    for input_layer, _ in PrimaryVisualCortexModel.layers_input_parameters[
+                        layer
+                    ]
+                    + [(layer, "")]  # Add the self-recurrent connection.
+                }
+                for layer in PrimaryVisualCortexModel.layers_input_parameters
+            }
+
             # Get all visible time steps predictions of the model.
-            trial_predictions, trial_rnn_predictions, _ = self.model(
+            trial_predictions, trial_rnn_predictions, _, _ = self.model(
                 trial_inputs,
                 trial_hidden,
                 neuron_hidden,
+                synaptic_adaptation_hidden,
             )
 
             # Accumulate all trials predictions.

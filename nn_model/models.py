@@ -152,8 +152,13 @@ class LayerConfig:
             -1, synaptic_activation_model.input_size
         )
 
+        # print(complexity_result.device)
+        # if hidden_states is not None:
+        #     print(hidden_states[0].device)
+        #     print(hidden_states[1].device)
+
         # Apply the neuron model to all values at parallel.
-        complexity_result, neuron_hidden = synaptic_activation_model(
+        complexity_result, hidden_states = synaptic_activation_model(
             complexity_result, hidden_states
         )
 
@@ -163,7 +168,7 @@ class LayerConfig:
         # Reshape back to [batch_size, hidden_size]
         complexity_result = complexity_result.view_as(viewing_shape)
 
-        return complexity_result, neuron_hidden
+        return complexity_result, hidden_states
 
 
 class PrimaryVisualCortexModel(nn.Module):
@@ -387,7 +392,9 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.synaptic_adaptation_kwargs is not None:
             return {
                 layer: {
-                    input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs)
+                    input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs).to(
+                        nn_model.globals.DEVICE
+                    )
                     for (
                         input_layer,
                         _,
@@ -588,7 +595,7 @@ class PrimaryVisualCortexModel(nn.Module):
                         values_of_given_time[input_part_layer_name],
                         synaptic_adaptation_layer_hidden[input_part_layer_name],
                     )
-                time_variant_list.append(modified_input)
+                    time_variant_list.append(modified_input)
 
         return time_variant_list, synaptic_adaptation_layer_hidden
 
@@ -656,16 +663,18 @@ class PrimaryVisualCortexModel(nn.Module):
                     TimeStepVariant.CURRENT.value,
                     current_time_outputs,
                     synaptic_adaptation_hidden[layer],
-                ),
-            )  # inputs of the layer from time (t).
+                )
+            )
+            # inputs of the layer from time (t).
             previous_time_inputs, synaptic_adaptation_hidden[layer] = (
                 self._get_list_by_time_variant(
                     layer,
                     TimeStepVariant.PREVIOUS.value,
                     hidden_layers,
                     synaptic_adaptation_hidden[layer],
-                ),
+                )
             )  # inputs of the layer from time (t-1) (previous time step)
+
             (
                 recurrent_input,
                 synaptic_adaptation_hidden[layer][layer],
@@ -683,7 +692,7 @@ class PrimaryVisualCortexModel(nn.Module):
                 neuron_hidden[layer],
             ) = self.layers[layer](
                 self._get_layer_input_tensor(current_time_inputs, previous_time_inputs),
-                recurrent_input,
+                recurrent_input.to(nn_model.globals.DEVICE),
                 neuron_hidden[
                     layer
                 ],  # Hidden steps of the neuron models (needed for RNN neuron models).
@@ -816,4 +825,9 @@ class PrimaryVisualCortexModel(nn.Module):
         del inputs, hidden_states
         torch.cuda.empty_cache()
 
-        return all_hidden_outputs, all_recurrent_outputs, neuron_hidden
+        return (
+            all_hidden_outputs,
+            all_recurrent_outputs,
+            neuron_hidden,
+            synaptic_adaptation_hidden,
+        )
