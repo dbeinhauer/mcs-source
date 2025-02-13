@@ -23,7 +23,6 @@ class SigmoidTanh(torch.nn.Module):
     """
 
     def forward(self, x):
-        # TODO: improve the function definition (especially better tanh case)
         # Apply sigmoid to get values between 0 and 1
         sigmoid_output = torch.sigmoid(x)
         # Apply scaled tanh for values greater than 1
@@ -32,6 +31,7 @@ class SigmoidTanh(torch.nn.Module):
         return torch.where(x <= 1, sigmoid_output, tanh_output)
 
 
+# Preferred activation function.
 class LeakyTanh(nn.Module):
     def __init__(
         self,

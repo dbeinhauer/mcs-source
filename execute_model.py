@@ -92,17 +92,19 @@ def init_model_path(arguments) -> str:
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
-                f"_residual-{not arguments.neuron_not_residual}",
-                f"_neuron-layers-{arguments.neuron_num_layers}",
-                f"_neuron-size-{arguments.neuron_layer_size}",
-                f"_neuron-activation-{arguments.neuron_activation_function}",
-                f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
-                f"_gradient-clip-{arguments.gradient_clip}",
-                f"_optimizer-type-{arguments.optimizer_type}",
-                f"_weight-initialization-{arguments.weight_initialization}",
-                f"_synaptic-adaptation-{not arguments.not_synaptic_adaptation}",
-                f"_synaptic-size-{arguments.synaptic_adaptation_size}",
-                f"_synaptic-time-steps-{arguments.synaptic_adaptation_time_steps}",
+                "_neuron",
+                f"-layers-{arguments.neuron_num_layers}",
+                f"-size-{arguments.neuron_layer_size}",
+                f"-activation-{arguments.neuron_activation_function}",
+                f"-res-{not arguments.neuron_not_residual}",
+                f"_hid-time-{arguments.num_hidden_time_steps}",
+                f"_grad-clip-{arguments.gradient_clip}",
+                f"_optim-{arguments.optimizer_type}",
+                f"_weight-init-{arguments.weight_initialization}",
+                "_synaptic",
+                f"-{not arguments.not_synaptic_adaptation}",
+                f"-size-{arguments.synaptic_adaptation_size}",
+                f"-time-{arguments.synaptic_adaptation_time_steps}",
                 ".pth",
             ]
         )
@@ -319,7 +321,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=5,
+        default=1,
         help="Number of hidden layers we want to use in the model of the feed-forward neuron (recommended is 5) or number of hidden time steps we want to use in case of the RNN neuron variants (recommended is 1).",
     )
     parser.add_argument(
@@ -347,7 +349,7 @@ if __name__ == "__main__":
         default=1,
         help="Number of hidden time steps in RNN of the whole model (in case it is set to 1 the the model would just predict the following visible time step (without additional hidden steps in between)).",
     )
-    parser.set_defaults(not_synaptic_adaptation=False)
+    parser.set_defaults(not_synaptic_adaptation=True)
     parser.add_argument(
         "--not_synaptic_adaptation",
         action="store_true",

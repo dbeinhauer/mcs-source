@@ -123,7 +123,8 @@ class PrimaryVisualCortexModel(nn.Module):
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
         :param weight_initialization: type of weight initialization that we want to use.
-        :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic adaptation models.
+        :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic
+        adaptation models.
         """
         super(PrimaryVisualCortexModel, self).__init__()
 
@@ -247,10 +248,10 @@ class PrimaryVisualCortexModel(nn.Module):
                     for (
                         input_layer,
                         _,
-                    ) in PrimaryVisualCortexModel.layers_input_parameters[layer]
+                    ) in layer_inputs
                     + [(layer, "")]  # Add the recurrent connection.
                 }
-                for layer in PrimaryVisualCortexModel.layers_input_parameters
+                for layer, layer_inputs in PrimaryVisualCortexModel.layers_input_parameters.items()
             }
 
         # We do not want to use synaptic adaptation model.
@@ -404,12 +405,13 @@ class PrimaryVisualCortexModel(nn.Module):
         layer_type: str,
         time_variant: str,
         values_of_given_time: Dict[str, torch.Tensor],
-        synaptic_adaptation_layer_hidden: Dict[str, Tuple[torch.Tensor, ...]],
-    ) -> Tuple[List[torch.Tensor], Dict[str, Tuple[torch.Tensor, ...]]]:
+        synaptic_adaptation_layer_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+    ) -> Tuple[List[torch.Tensor], Dict[str, Optional[Tuple[torch.Tensor, ...]]]]:
         """
         Retrieves input tensors of the given time variant from the provided list of all
         possible input tensors. The tensors are selected from the input tensors of the
-        provided layer for the specified time step (previous/current).
+        provided layer for the specified time step (previous/current). After selection
+        it applies synaptic adaptation model on the selected input tensors (if using it).
 
         :param layer_type: type of the layer to obtain the inputs for. Value from `LayerType`.
         :param time_variant: time variant (previous, current) we want to obtain the values for.
@@ -429,11 +431,13 @@ class PrimaryVisualCortexModel(nn.Module):
             # Iterate through inputs of the given layer.
             if time_variant == input_part_time_variant:
                 # If the currently processed input layer belongs to given time variant
-                # -> append it to the list
-                synaptic_adaptation_model = self.layers_configs[
-                    layer_type
-                ].synaptic_activation_models[input_part_layer_name]
-                if synaptic_adaptation_model is not None:
+                # -> optionally apply synaptic adaptation and append it to the list
+
+                if (
+                    self.layers_configs[layer_type].synaptic_activation_models
+                    is not None
+                ):
+                    # We want to use synaptic adaptation model to the input values.
                     (
                         modified_input,
                         synaptic_adaptation_layer_hidden[input_part_layer_name],
@@ -443,8 +447,80 @@ class PrimaryVisualCortexModel(nn.Module):
                         synaptic_adaptation_layer_hidden[input_part_layer_name],
                     )
                     time_variant_list.append(modified_input)
+                else:
+                    # We do not want to use synaptic adaptation -> just pass the input value.
+                    time_variant_list.append(
+                        values_of_given_time[input_part_layer_name]
+                    )
 
         return time_variant_list, synaptic_adaptation_layer_hidden
+
+    def _get_inputs_for_layer(
+        self,
+        current_time_data: Dict[str, torch.Tensor],
+        previous_time_data: Dict[str, torch.Tensor],
+        layer: str,
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
+        """
+        Retrieves input tensors for the given layer of the appropriate time step and
+        apply the synaptic adaptation module if it is used.
+
+        :param current_time_data: Neuron responses of the current time step.
+        :param previous_time_data: Neuron responses of the previous time step.
+        :param layer: Layer for which we want to obtain the inputs.
+        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
+        :return: Returns tuple of input tensor of the input layers of the specified layer,
+        its recurrent input and hidden states of the synaptic adaptation model. The input
+        from layers and recurrent input are processed by synaptic adaptation model if selected.
+        """
+        current_time_inputs, synaptic_adaptation_hidden[layer] = (
+            self._get_list_by_time_variant(
+                layer,
+                TimeStepVariant.CURRENT.value,
+                current_time_data,
+                synaptic_adaptation_hidden[layer],
+            )
+        )  # Inputs of the layer from time (t).
+
+        previous_time_inputs, synaptic_adaptation_hidden[layer] = (
+            self._get_list_by_time_variant(
+                layer,
+                TimeStepVariant.PREVIOUS.value,
+                previous_time_data,
+                synaptic_adaptation_hidden[layer],
+            )
+        )  # inputs of the layer from time (t-1) (previous time step)
+
+        # Concatenate all input tensors into one big input tensor (of all input layers).
+        layers_input = self._get_layer_input_tensor(
+            current_time_inputs, previous_time_inputs
+        )
+
+        # Recurrent connection to itself from time (t-1)
+        recurrent_input = previous_time_data[layer]
+        if self.layers_configs[layer].synaptic_activation_models is not None:
+            # Apply synaptic adaptation module if it is used.
+            (
+                recurrent_input,
+                synaptic_adaptation_hidden[layer][layer],
+            ) = self.layers_configs[layer].apply_synaptic_adaptation(
+                layer,
+                previous_time_data[layer],
+                synaptic_adaptation_hidden[layer][layer],
+            )
+
+        return (
+            layers_input,
+            recurrent_input,
+            synaptic_adaptation_hidden,
+        )
 
     def _perform_model_time_step(
         self,
@@ -469,59 +545,43 @@ class PrimaryVisualCortexModel(nn.Module):
         from the previous time step (in our example those are all previous outputs).
         :param neuron_hidden: Neuron model hidden states (if `None` then initialize
         them using pytorch default approach).
-        :return: Returns dictionary of model predictions for the current time step.
+        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
+        :return: Returns tuple of dictionary of model predictions for the current time step,
+        recurrent network prediction (for evaluation of neuron model functionality) and hidden
+        states of neuron models and synaptic adaptation models.
         """
         # We already have LGN inputs (assign them to current time layer outputs).
-        recurrent_outputs = {}
+        recurrent_outputs: Dict[str, Optional[Tuple[torch.Tensor, ...]]] = {}
 
         for layer in PrimaryVisualCortexModel.layers_input_parameters:
             # Iterate through all output layers of the model.
             # Perform model time step for the currently processed layer.
             # NOTE: It is necessary that these layers are sorted by the
             # processing order in the model.
-
-            current_time_inputs, synaptic_adaptation_hidden[layer] = (
-                self._get_list_by_time_variant(
-                    layer,
-                    TimeStepVariant.CURRENT.value,
-                    current_time_outputs,
-                    synaptic_adaptation_hidden[layer],
-                )
-            )
-            # inputs of the layer from time (t).
-            previous_time_inputs, synaptic_adaptation_hidden[layer] = (
-                self._get_list_by_time_variant(
-                    layer,
-                    TimeStepVariant.PREVIOUS.value,
-                    hidden_layers,
-                    synaptic_adaptation_hidden[layer],
-                )
-            )  # inputs of the layer from time (t-1) (previous time step)
-
             (
+                layers_input,
                 recurrent_input,
-                synaptic_adaptation_hidden[layer][layer],
-            ) = self.layers_configs[layer].apply_synaptic_adaptation(
+                synaptic_adaptation_hidden,
+            ) = self._get_inputs_for_layer(
+                current_time_outputs,
+                hidden_layers,
                 layer,
-                hidden_layers[layer],
-                synaptic_adaptation_hidden[layer][layer],
+                synaptic_adaptation_hidden,
             )
-            # hidden_layers[layer],
-            # )  # Recurrent connection to itself from time (t-1)
 
             (
                 current_time_outputs[layer],
                 recurrent_outputs[layer],
                 neuron_hidden[layer],
             ) = self.layers[layer](
-                self._get_layer_input_tensor(current_time_inputs, previous_time_inputs),
+                layers_input,
                 recurrent_input.to(nn_model.globals.DEVICE),
                 neuron_hidden[
                     layer
                 ],  # Hidden steps of the neuron models (needed for RNN neuron models).
             )
 
-            del current_time_inputs, previous_time_inputs, recurrent_input
+            del layers_input, recurrent_input
             torch.cuda.empty_cache()
 
         return (
@@ -534,7 +594,7 @@ class PrimaryVisualCortexModel(nn.Module):
     def _append_outputs(
         self,
         all_outputs: Dict[str, List[torch.Tensor]],
-        time_step_outputs: Dict[str, torch.Tensor],
+        time_step_outputs,
     ):
         """
         Appends outputs of each output layer to list of outputs of all time steps.
@@ -559,6 +619,7 @@ class PrimaryVisualCortexModel(nn.Module):
         Dict[str, List[torch.Tensor]],
         Dict[str, List[torch.Tensor]],
         Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
     ]:
         """
         Performs forward step of the model iterating through all time steps of the provided
@@ -566,7 +627,9 @@ class PrimaryVisualCortexModel(nn.Module):
 
         Training forward step: It initializes hidden states as the previous time step from the
         provided targets (because of that it skips the first time step). This means that the
-        model predicts only the next step during training.
+        model predicts only the next step during training. The hidden states of the neuron
+        and synaptic adaptation models are propagated through all time steps (backpropagation
+        is performed only for the last time step though).
 
         Evaluation forward step: It initializes hidden state only for time 0 as the time 0
         target values (so, we start in existing state). Other hidden states are the results
@@ -578,6 +641,7 @@ class PrimaryVisualCortexModel(nn.Module):
         `(batch_size, num_time_steps, num_neurons)` for training mode or
         `(batch, neurons)` for evaluation (we need only first time step).
         :param neuron_hidden: Tuple of hidden states of the neurons (needed for RNN models).
+        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
         :return: Returns model predictions for all time steps.
         """
         # Initialize dictionaries of all model predictions.
@@ -600,7 +664,7 @@ class PrimaryVisualCortexModel(nn.Module):
 
             # Placeholder for RNN outputs in case we would like
             # to store RNN outputs for model analysis.
-            recurrent_outputs: Dict[str, torch.Tensor] = {}
+            recurrent_outputs: Dict[str, Optional[Tuple[torch.Tensor, ...]]] = {}
 
             # Define input layers for the current visible time prediction.
             current_inputs = inputs  # Train mode -> only one input state

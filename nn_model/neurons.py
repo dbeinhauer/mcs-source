@@ -119,7 +119,6 @@ class DNNNeuron(SharedNeuronBase):
             layers.append(nn.LayerNorm(layer_size))
             layers.append(nn.Linear(layer_size, layer_size))
             layers.append(nn.ReLU())  # Non-linear activation after each layer.
-            # layers.append(nn.Dropout(0.2)) # TODO: decide whether we want to include dropout
 
         # Final output layer: output size is 1
         layers.append(nn.Linear(layer_size, 1))
@@ -149,16 +148,13 @@ class DNNNeuron(SharedNeuronBase):
         # Apply module final non-linearity function.
         out = self.custom_activation(out)
 
-        # Return
-        return out, torch.zeros(0)
+        return out, tuple(torch.zeros(0))
 
 
 class LSTMNeuron(SharedNeuronBase):
     """
     Memory-enabled neuron module using an LSTM cell for processing scalar inputs.
     """
-
-    # TODO: Look deeply at the LSTM module definition (num_layers)
 
     def __init__(
         self,
@@ -181,33 +177,17 @@ class LSTMNeuron(SharedNeuronBase):
         self.layer_size = layer_size
         self.num_layers = num_layers  # Number of hidden time steps
 
+        # Model initialization: input layer, LSTM cell (with multiple time steps), output layer
         self.input_layer = nn.Linear(self.input_size, layer_size)
         self.lstm_cell = nn.LSTMCell(layer_size, layer_size)
-        # LSTM cells for memory processing
-        # self.lstm_cells = nn.ModuleList(
-        #     # [
-        #     #     nn.LSTMCell(self.input_size if i == 0 else layer_size, layer_size)
-        #     #     for i in range(num_layers)
-        #     # ]
-        #     [
-        #         # nn.LSTMCell(self.input_size, layer_size),
-        #         nn.LSTMCell(layer_size, layer_size),
-        #     ]
-        # )
-
         # Scalar output layer
         self.output_layer = nn.Linear(layer_size, 1)
-
-        # Custom activation function
-        # self.custom_activation = SigmoidTanh()
 
     def forward(
         self,
         inputs: torch.Tensor,
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
-
-        # TODO: WHole definition is strange somehow (we have layers but we work with only the one of them as time step layer).
         """
         Forward pass of the memory neuron.
 
@@ -226,13 +206,12 @@ class LSTMNeuron(SharedNeuronBase):
 
         current_input = self.input_layer(inputs)
         h, c = hidden
-        for i in range(self.num_layers):
+        for _ in range(self.num_layers):
+            # Apply multiple time steps of the LSTM cell (same cell for all time steps).
             h, c = self.lstm_cell(current_input, (h, c))
             current_input = (
                 h  # The output of the current cell is the input to the next cell
             )
-
-        h, c = self.lstm_cell(current_input, (h, c))
 
         # Apply the output layer to the last hidden state
         output = self.output_layer(h)

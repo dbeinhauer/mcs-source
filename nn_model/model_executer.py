@@ -371,12 +371,10 @@ class ModelExecuter:
         ] = {
             layer: {
                 input_layer: None
-                for input_layer, _ in PrimaryVisualCortexModel.layers_input_parameters[
-                    layer
-                ]
+                for input_layer, _ in layer_inputs
                 + [(layer, "")]  # Add the self-recurrent connection.
             }
-            for layer in PrimaryVisualCortexModel.layers_input_parameters
+            for layer, layer_inputs in PrimaryVisualCortexModel.layers_input_parameters.items()
         }
 
         return neuron_hidden, synaptic_adaptation_hidden
@@ -407,8 +405,8 @@ class ModelExecuter:
                     prediction_type == PredictionTypes.FULL_PREDICTION.value
                     or save_recurrent_state
                 ):
-                    # In case we are doing full prediction or we specified we want RNN linearity values
-                    # (of layers) -> store them.
+                    # In case we are doing full prediction or we specified we want RNN linearity
+                    # values (of layers) -> store them.
                     if prediction_type == PredictionTypes.RNN_PREDICTION.value:
                         # TODO: currently skipping this step as it does not work correctly.
                         continue
@@ -894,6 +892,7 @@ class ModelExecuter:
                 }
             )
 
+            # Initialize hidden states of the neuron and synaptic adaptation modules.
             neuron_hidden, synaptic_adaptation_hidden = (
                 ModelExecuter._init_modules_hidden_states()
             )

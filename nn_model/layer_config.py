@@ -4,7 +4,7 @@ of the model layer. The class is used to determine the weight constraints of the
 serves to apply synaptic adaptation to the input tensor.
 """
 
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 import torch
 
@@ -40,7 +40,8 @@ class LayerConfig:
         The parameters are in form of tuple with first value its name from `LayerType`
         and second value its time step name from `TimeStepVariant`.
         :param neuron_model: shared complexity model(s), if none then `None`.
-        :param synaptic_activation_models: synaptic adaptation models for the layer, if none then `None`.
+        :param synaptic_activation_models: synaptic adaptation models for the layer,
+        if none then `None`.
         """
         self.size: int = size
         self.layer_type: str = layer_type
@@ -123,8 +124,8 @@ class LayerConfig:
         self,
         input_layer: str,
         input_tensor: torch.Tensor,
-        hidden_states: Tuple[torch.Tensor, ...],
-    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        hidden_states: Optional[Tuple[torch.Tensor, ...]],
+    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, ...]]]:
         """
         Applies proper synaptic adaptation model based on input layer to the input tensor.
 
@@ -133,7 +134,6 @@ class LayerConfig:
         :param hidden_states: Hidden states of the synaptic adaptation model.
         :return: Returns output of the synaptic adaptation model.
         """
-
         # Reshape the layer output to [batch_size * hidden_size, neuron_model_input_size]
         # for batch processing (parallel application of the neuron module for all
         # the layer output values).
