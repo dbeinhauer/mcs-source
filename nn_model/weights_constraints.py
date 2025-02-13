@@ -5,7 +5,7 @@ are typically used for determination of excitatory/inhibitory layer.
 
 import torch
 
-from nn_model.type_variants import WeightTypes, LayerConstraintFields
+from nn_model.type_variants import WeightTypes
 
 
 class WeightConstraint:
@@ -89,7 +89,7 @@ class ExcitatoryWeightConstraint(WeightConstraint):
         :param input_parameters: input parameters for the parent
         `WeightConstraint` class.
         """
-        super().__init__(input_parameters)
+        super(ExcitatoryWeightConstraint, self).__init__(input_parameters)
 
     def apply(self, module):
         """
@@ -116,7 +116,7 @@ class InhibitoryWeightConstraint(WeightConstraint):
         :param input_parameters: input parameters for the parent
         `WeightConstraint` class.
         """
-        super().__init__(input_parameters)
+        super(InhibitoryWeightConstraint, self).__init__(input_parameters)
 
     def apply(self, module):
         """

@@ -3,6 +3,7 @@ This source code contains definition of all global variables that
 are used across multiple source files. Typically information
 about the layer and model parameters.
 """
+
 from pathlib import Path
 
 from nn_model.type_variants import (

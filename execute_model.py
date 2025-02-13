@@ -25,7 +25,7 @@ hostname = socket.gethostname()
 
 # Select the GPU to use in case we are working in CGG server.
 if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -53,6 +53,9 @@ def init_wandb(arguments):
         "gradient_clip": arguments.gradient_clip,
         "optimizer_type": arguments.optimizer_type,
         "weight_initialization": arguments.weight_initialization,
+        "synaptic_adaptation": not arguments.not_synaptic_adaptation,
+        "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
+        "synaptic_adaptation_time_steps": arguments.synaptic_adaptation_time_steps,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -71,22 +74,7 @@ def init_model_path(arguments) -> str:
     """
     Initializes path where to store the best model parameters.
 
-    By default (if not specified other version in `arguments`) the path is in format:
-        ```
-        arguments.model_dir/ +
-            model_ +
-            [train-subset-{train_subset_size}] +
-            lr-{learning_rate} +
-            _{model_type} +
-            _residual-{True/False} +
-            _neuron_layers-{num_neuron_layers} +
-            _neuron-size-{size_neuron_layer} +
-            _num-hidden-time-steps-{num_hidden_time_steps} +
-            .pth
-        ```
-        or in case `arguments.model_filename` is defined:
-        `arguments.model_dir/arguments.model_filename`
-
+    By default the format of the filename is exhaustive list of all model parameters.
 
     :param arguments: command line arguments
     :return: Returns the path where the best model parameters should be stored.
@@ -104,14 +92,19 @@ def init_model_path(arguments) -> str:
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
-                f"_residual-{not arguments.neuron_not_residual}",
-                f"_neuron-layers-{arguments.neuron_num_layers}",
-                f"_neuron-size-{arguments.neuron_layer_size}",
-                f"_neuron-activation-{arguments.neuron_activation_function}",
-                f"_num-hidden-time-steps-{arguments.num_hidden_time_steps}",
-                f"_gradient-clip-{arguments.gradient_clip}",
-                f"_optimizer-type-{arguments.optimizer_type}",
-                f"_weight-initialization-{arguments.weight_initialization}",
+                "_neuron",
+                f"-layers-{arguments.neuron_num_layers}",
+                f"-size-{arguments.neuron_layer_size}",
+                f"-activation-{arguments.neuron_activation_function}",
+                f"-res-{not arguments.neuron_not_residual}",
+                f"_hid-time-{arguments.num_hidden_time_steps}",
+                f"_grad-clip-{arguments.gradient_clip}",
+                f"_optim-{arguments.optimizer_type}",
+                f"_weight-init-{arguments.weight_initialization}",
+                "_synaptic",
+                f"-{not arguments.not_synaptic_adaptation}",
+                f"-size-{arguments.synaptic_adaptation_size}",
+                f"-time-{arguments.synaptic_adaptation_time_steps}",
                 ".pth",
             ]
         )
@@ -173,7 +166,7 @@ def main(arguments):
         )
 
     if not arguments.best_model_evaluation and not arguments.neuron_model_responses:
-        # Train the model used the given parameters.
+        # Train the model using the given parameters.
         model_executer.train(
             continuous_evaluation_kwargs={
                 "epoch_offset": 1,
@@ -317,7 +310,7 @@ if __name__ == "__main__":
         type=str,
         default=ModelTypes.RNN_SEPARATE.value,
         choices=[model_type.value for model_type in ModelTypes],
-        help="Model variant that we want to use.",
+        help="Neuron model variant that we want to use.",
     )
     parser.add_argument(
         "--num_epochs",
@@ -328,20 +321,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=5,
-        help="Number of hidden layers we want to use in the model of a neuron.",
+        default=1,
+        help="Number of hidden layers we want to use in the model of the feed-forward neuron (recommended is 5) or number of hidden time steps we want to use in case of the RNN neuron variants (recommended is 1).",
     )
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
         default=10,
-        help="Size of the layers we want to use in the model of a neuron.",
+        help="Size of the layers of the neuron model.",
     )
     parser.set_defaults(neuron_not_residual=False)
     parser.add_argument(
         "--neuron_not_residual",
         action="store_true",
-        help="Whether we want to use residual connections in the model of a neuron.",
+        help="Whether we want to use residual connections in the model of a neuron (and in the synaptic adaptation module).",
     )
     parser.add_argument(
         "--neuron_activation_function",
@@ -355,6 +348,24 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Number of hidden time steps in RNN of the whole model (in case it is set to 1 the the model would just predict the following visible time step (without additional hidden steps in between)).",
+    )
+    parser.set_defaults(not_synaptic_adaptation=True)
+    parser.add_argument(
+        "--not_synaptic_adaptation",
+        action="store_true",
+        help="Whether we want to use synaptic adaptation LSTM module.",
+    )
+    parser.add_argument(
+        "--synaptic_adaptation_size",
+        type=int,
+        default=10,
+        help="Size of the layer in the synaptic adaptation LSTM module.",
+    )
+    parser.add_argument(
+        "--synaptic_adaptation_time_steps",
+        type=int,
+        default=1,
+        help="Number of (hidden) time steps in the synaptic adaptation LSTM module.",
     )
     # Dataset analysis:
     parser.add_argument(
