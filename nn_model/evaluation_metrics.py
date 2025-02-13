@@ -28,10 +28,10 @@ class NormalizedCrossCorrelation:
         """
         Initialized the shared variables needed for loss calculation.
         """
-        self.batch_size: int = 0
-        self.num_trials: int = 0
-        self.time_duration: int = 0
-        self.num_neurons: int = 0
+        self.batch_size = 0
+        self.num_trials = 0
+        self.time_duration = 0
+        self.num_neurons = 0
 
     def _merge_neuron_time_dim(self, data_tensor: torch.Tensor) -> torch.Tensor:
         """

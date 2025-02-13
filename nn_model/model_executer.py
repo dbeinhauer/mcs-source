@@ -17,6 +17,7 @@ from nn_model.type_variants import (
     ModelTypes,
     PredictionTypes,
     OptimizerTypes,
+    ModelModulesFields,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -71,92 +72,43 @@ class ModelExecuter:
         # Logger of the object.
         self.logger = LoggerModel()
 
-    def _init_datasets(
-        self, arguments
-    ) -> Tuple[SparseSpikeDataset, SparseSpikeDataset]:
-        """
-        Initializes train and test dataset.
-
-        :param arguments: command line arguments.
-        :return: Returns tuple of initialized train and test dataset.
-        """
-        input_layers, output_layers = DictionaryHandler.split_input_output_layers(
-            self.layer_sizes
-        )
-
-        train_dataset = SparseSpikeDataset(
-            arguments.train_dir,
-            input_layers,
-            output_layers,
-            is_test=False,
-            model_subset_path=arguments.subset_dir,
-            dataset_subset_ratio=arguments.train_subset,  # Subset of train dataset in case of model analysis
-        )
-        test_dataset = SparseSpikeDataset(
-            arguments.test_dir,
-            input_layers,
-            output_layers,
-            is_test=True,
-            model_subset_path=arguments.subset_dir,
-            experiment_selection_path=arguments.experiment_selection_path,
-        )
-
-        return train_dataset, test_dataset
-
-    def _init_data_loaders(self) -> Tuple[DataLoader, DataLoader]:
-        """
-        Initialized train and test `DataLoader` objects.
-
-        :return: Returns initialized train and test `Dataloader` classes.
-        """
-        train_loader = DataLoader(
-            self.train_dataset,
-            batch_size=nn_model.globals.TRAIN_BATCH_SIZE,
-            shuffle=True,  # Shuffle the training dataset
-            collate_fn=different_times_collate_fn,
-        )
-        test_loader = DataLoader(
-            self.test_dataset,
-            batch_size=nn_model.globals.TEST_BATCH_SIZE,
-            shuffle=False,  # Load the test dataset always in the same order
-            collate_fn=different_times_collate_fn,
-        )
-
-        return train_loader, test_loader
+    @staticmethod
+    def _create_shared_module_kwargs(
+        module_type: str, model_type: str, arguments
+    ) -> Dict:
+        return {
+            module_type: {
+                "model_type": model_type,
+                "num_layers": arguments.neuron_num_layers,
+                "layer_size": arguments.neuron_layer_size,
+                "residual": not arguments.neuron_not_residual,
+                "activation_function": arguments.neuron_activation_function,
+            }
+        }
 
     @staticmethod
-    def _get_neuron_model_kwargs(arguments) -> Dict:
+    def _get_neuron_model_kwargs(arguments) -> Dict[str, Optional[Dict]]:
         """
         Retrieve kwargs of the neuronal model based on the specified model.
 
-        :param arguments: command line arguments.
-        :return: Returns dictionary of kwargs for the neuronal model based on the specified model.
+        :param arguments: Command line arguments.
+        :return: Returns dictionary with one item with key `"neuron_model"` and
+        value is dictionary of kwargs for the neuronal model based on the
+        specified model, `None` value if we do not want to use this module.
         """
         if arguments.model == ModelTypes.SIMPLE.value:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
-            return {}
+            return {ModelModulesFields.NEURON_MODULE.value: None}
         elif arguments.model in nn_model.globals.DNN_MODELS:
-            # Model with neuron that consist of small NN.
-            # of th same layer sizes in each layer.
-            return {
-                arguments.model: {
-                    "model_type": arguments.model,
-                    "num_layers": arguments.neuron_num_layers,
-                    "layer_size": arguments.neuron_layer_size,
-                    "residual": not arguments.neuron_not_residual,
-                    "activation_function": arguments.neuron_activation_function,
-                }
-            }
+            # Feed-forward DNN model arguments.
+            return ModelExecuter._create_shared_module_kwargs(
+                ModelModulesFields.NEURON_MODULE.value, arguments.model, arguments
+            )
         elif arguments.model in nn_model.globals.RNN_MODELS:
-            return {
-                arguments.model: {
-                    "model_type": arguments.model,
-                    "num_layers": arguments.neuron_num_layers,
-                    "layer_size": arguments.neuron_layer_size,
-                    "residual": not arguments.neuron_not_residual,
-                    "activation_function": arguments.neuron_activation_function,
-                }
-            }
+            # RNN model arguments (currently same as feed-forward DNNs).
+            return ModelExecuter._create_shared_module_kwargs(
+                ModelModulesFields.NEURON_MODULE.value, arguments.model, arguments
+            )
         else:
 
             class NonExistingModelTypeException(Exception):
@@ -166,90 +118,33 @@ class ModelExecuter:
 
             raise NonExistingModelTypeException("Non-existing model type selected.")
 
-    def _init_model(self, arguments) -> PrimaryVisualCortexModel:
+    @staticmethod
+    def _get_synaptic_adaptation_model_kwargs(arguments) -> Dict[str, Optional[Dict]]:
         """
-        Initializes the model based on the provided arguments.
+        Retrieves kwargs of the synaptic adaptation model.
 
-        :param arguments: command line arguments containing model setup info.
-        :return: Returns initializes model.
+        NOTE: We use `RNN_JOINT` neuron as a trick to use input size 1.
+
+        :param arguments: Command line arguments.
+        :return: Returns dictionary with one item with key `"synaptic_adaptation_model"` and
+        value is dictionary of kwargs for the synaptic adaptation model, `None` value if we
+        do not want to use this module.
         """
-        return PrimaryVisualCortexModel(
-            self.layer_sizes,
-            arguments.num_hidden_time_steps,
-            arguments.model,
-            arguments.weight_initialization,
-            neuron_model_kwargs=ModelExecuter._get_neuron_model_kwargs(arguments),
+        if (
+            arguments.model == ModelTypes.SIMPLE.value
+            or arguments.not_synaptic_adaptation
+        ):
+            # Model with simple neuron (no additional neuronal model) -> no kwargs
+            return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None}
+
+        return ModelExecuter._create_shared_module_kwargs(
+            ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value,
+            ModelTypes.RNN_JOINT.value,  # Trick, we want to use input size 1 (so we need to use joint neuron type).
+            arguments,
         )
 
-    def _init_criterion(self):
-        """
-        Initializes model criterion.
-
-        :return: Returns model criterion (loss function).
-        """
-        return torch.nn.MSELoss()
-
-    def _init_exc_inh_specific_learning_rate(self, learning_rate):
-        """
-        Splits the model parameters to two groups. One corresponding to inhibitory layer
-        values and one corresponding to excitatory layers. Inhibitory layer parameters
-        should use 4 times smaller learning rate than excitatory
-        (because of the properties of the model)
-
-        NOTE: This function is used in case we select `OptimizerTypes.EXC_INH_SPECIFIC`.
-
-        :param learning_rate: Base learning rate that should be applied for excitatory
-        layers (inhibitory should have learning rate 4 times smaller).
-        :return: Returns group of parameters for the optimizer.
-        """
-
-        # Identify inhibitory layers to apply a 4x lower learning rate on.
-        selected_params = [
-            self.model.layers.V1_Exc_L23.rnn_cell.weights_ih_inh.weight,
-            self.model.layers.V1_Inh_L23.rnn_cell.weights_ih_inh.weight,
-            self.model.layers.V1_Inh_L23.rnn_cell.weights_hh.weight,
-            self.model.layers.V1_Exc_L4.rnn_cell.weights_ih_inh.weight,
-            self.model.layers.V1_Inh_L4.rnn_cell.weights_ih_inh.weight,
-            self.model.layers.V1_Inh_L4.rnn_cell.weights_hh.weight,
-        ]
-
-        selected_param_ids = {id(p) for p in selected_params}
-
-        # Create parameter groups
-        param_groups = [
-            # Parameters with lower learning rate (inhibitory).
-            {"params": selected_params, "lr": learning_rate / 4},
-            # All other parameters (excitatory).
-            {
-                "params": [
-                    p
-                    for p in self.model.parameters()
-                    if id(p) not in selected_param_ids
-                ],
-                "lr": learning_rate,
-            },
-        ]
-
-        return param_groups
-
-    def _init_optimizer(self, optimizer_type: str, learning_rate: float):
-        """
-        Initializes model optimizer.
-
-        :param learning_rate: learning rate of the optimizer.
-        :return: Returns used model optimizer (Adam).
-        """
-        # By default same learning rate for all layers.
-        param_groups = self.model.parameters()
-
-        if optimizer_type == OptimizerTypes.EXC_INH_SPECIFIC.value:
-            # Apply exc/inh specific learning rate.
-            param_groups = self._init_exc_inh_specific_learning_rate(learning_rate)
-
-        return optim.Adam(param_groups, lr=learning_rate)
-
     @staticmethod
-    def _slice_and_covert_to_float(
+    def _slice_and_convert_to_float(
         data: Dict[str, torch.Tensor], slice_: Union[int, slice]
     ) -> Dict[str, torch.Tensor]:
         """
@@ -307,71 +202,6 @@ class ModelExecuter:
         }
 
         return inputs, targets
-
-    def _apply_model_constraints(self):
-        """
-        Applies model constraints on all model layers (excitatory/inhibitory).
-        """
-        for module in self.model.modules():
-            if isinstance(module, ModelLayer):
-                module.apply_constraints()
-
-    def _epoch_evaluation_step(
-        self,
-        epoch: int,
-        epoch_offset: int = 1,
-        evaluation_subset_size: int = 10,
-    ) -> float:
-        """
-        Runs continuous evaluation steps in selected training epochs on
-        selected subset of test examples.
-
-        :param epoch: current epoch number.
-        :param epoch_offset: after how many epochs perform evaluation. If `-1` then never run.
-        :param evaluation_subset_size: how many batches use for evaluation.
-        If `-1` then all test dataset.
-        :return: Average correlation across evaluated subset.
-        """
-        if epoch_offset != -1 and epoch % epoch_offset == 0:
-            # Do continuous evaluation after this step.
-            avg_correlation = self.evaluation(
-                subset_for_evaluation=evaluation_subset_size, final_evaluation=False
-            )
-            self.model.train()
-            return avg_correlation
-
-        return 0.0
-
-    def _update_best_model(
-        self, epoch: int, continuous_evaluation_kwargs: Optional[Dict]
-    ):
-        """
-        Runs few evaluation steps and compares the result of evaluation metric with currently
-        the best ones. In case it is better, it updates the best model parameters
-        with the current ones (saves them to given file).
-
-        :param epoch: Number of current epoch. Used in case we want to run evaluation only
-        on the specified epochs.
-        :param continuous_evaluation_kwargs: Kwargs of continuous evaluation run.
-        """
-        if continuous_evaluation_kwargs is None:
-            # In case no continuous evaluation kwargs were provided -> make them empty dictionary.
-            continuous_evaluation_kwargs = {}
-
-        # Perform few evaluation steps for training check in specified epochs.
-        current_val_metric = self._epoch_evaluation_step(
-            epoch,
-            **continuous_evaluation_kwargs,
-        )
-
-        # Check if there is an improvement -> if so, update the best model.
-        if current_val_metric > self.best_metric:
-            self.logger.print_best_model_update(self.best_metric, current_val_metric)
-            self.best_metric = current_val_metric
-            torch.save(
-                self.model.state_dict(),
-                self.evaluation_results_saver.best_model_path,
-            )
 
     @staticmethod
     def _move_data_to_cuda(
@@ -466,20 +296,352 @@ class ModelExecuter:
 
         return current_inputs, current_targets, current_hidden_states
 
-    def _detach_hidden_states(self, hidden_state):
+    @staticmethod
+    def _detach_hidden_states(
+        hidden_state: Optional[Tuple[torch.Tensor, ...]]
+    ) -> Optional[Tuple[torch.Tensor, ...]]:
         """
-        Detaches RNN neuron hidden states (LSTM cell) from the computation graph.
+        Detaches hidden states of the recurrent modules from the gradient graph.
 
-        :param hidden_state: State of the neuron hidden state to be detached.
-        :return: Returns detached hidden state.
+        :param hidden_state: Hidden states of the module to be detached. Can be `None` in case
+        we do not use hidden states (feed-forward modules).
+        :return: Returns detached hidden states.
         """
-        if self.model.neuron_type in nn_model.globals.RNN_MODELS:
-            return (
-                hidden_state[0].detach(),
-                hidden_state[1].detach(),
+        if hidden_state is None:
+            # No hidden states (feed-forward modules) -> skip
+            return None
+        elif isinstance(hidden_state, tuple):
+            # Tuple states (typically LSTM).
+            return tuple(state.detach() for state in hidden_state)
+        elif isinstance(hidden_state, torch.Tensor):
+            # Only one hidden state (typically classical RNN).
+            return hidden_state.detach()
+        else:
+            raise TypeError("Unsupported type for hidden_state")
+
+    @staticmethod
+    def _detach_all_hidden_states(
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
+    ) -> Tuple[
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
+        """
+        Detaches all hidden states of the recurrent modules using in the model.
+
+        :param neuron_hidden: Hidden states of the neuron model.
+        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
+        :return: Returns tuple of detached neuron model and synaptic adaptation hidden states.
+        """
+        neuron_hidden = {
+            layer: ModelExecuter._detach_hidden_states(hidden)
+            for layer, hidden in neuron_hidden.items()
+        }
+        synaptic_adaptation_hidden = {
+            layer: {
+                input_layer: ModelExecuter._detach_hidden_states(hidden)
+                for input_layer, hidden in input_hidden_states.items()
+            }
+            for layer, input_hidden_states in synaptic_adaptation_hidden.items()
+        }
+
+        return neuron_hidden, synaptic_adaptation_hidden
+
+    @staticmethod
+    def _init_modules_hidden_states() -> Tuple[
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
+        """
+        Initializes hidden states of the neuron and synaptic adaptation modules.
+
+        :return: Initialized hidden states of the neuron and synaptic adaptation modules
+        (all tensors are `None`).
+        """
+        # Hidden states of the neuron.
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]] = {
+            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
+        }
+
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ] = {
+            layer: {
+                input_layer: None
+                for input_layer, _ in layer_inputs
+                + [(layer, "")]  # Add the self-recurrent connection.
+            }
+            for layer, layer_inputs in PrimaryVisualCortexModel.layers_input_parameters.items()
+        }
+
+        return neuron_hidden, synaptic_adaptation_hidden
+
+    @staticmethod
+    def _add_trial_predictions_to_list_of_all_predictions(
+        trial_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+        all_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+        save_recurrent_state: bool,
+    ):
+        """
+        Sort all the predictions for the trial and split them to corresponding
+        lists of all the predictions or do not save them based on the evaluation status.
+
+        :param trial_predictions: Predictions for the trial (list of predictions for all
+        visible time steps).
+        :param all_predictions: All predictions for all the trials.
+        :param save_recurrent_state: Flag whether we want to also save predictions of the RNNs.
+        """
+        for prediction_type, layers_predictions in trial_predictions.items():
+            # Iterate all predictions types (full prediction, RNN predictions...)
+            for layer, layers_prediction in layers_predictions.items():
+                # Iterate all layers predictions.
+                current_prediction = torch.zeros(
+                    0
+                )  # RNN default (do not save predictions).
+                if (
+                    prediction_type == PredictionTypes.FULL_PREDICTION.value
+                    or save_recurrent_state
+                ):
+                    # In case we are doing full prediction or we specified we want RNN linearity
+                    # values (of layers) -> store them.
+                    if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+                        # TODO: currently skipping this step as it does not work correctly.
+                        continue
+
+                    current_prediction = torch.cat(layers_prediction, dim=1)
+
+                all_predictions[prediction_type][layer].append(current_prediction)
+
+    @staticmethod
+    def _prepare_evaluation_predictions_for_return(
+        all_layers_predictions: Dict[str, List[torch.Tensor]]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Takes all the predictions of given type (full predictions, rnn predictions etc.) and
+        does proper modifications to convert them to proper output format. It stacks all the
+        trials predictions to one tensor and permutes them to shape
+        `(batch_size, num_trials, time, num_neurons)`.
+
+        :param all_layers_predictions: All predictions for all trials in form of list.
+        :return: Returns converted predictions to one big tensor of shape
+        `(batch_size, num_trials, time, num_neurons)`.
+        """
+        # Stack all trials predictions into one torch array.
+        dict_stacked_predictions = {
+            key: torch.stack(value_list, dim=0)
+            for key, value_list in all_layers_predictions.items()
+        }
+        # Reshape the prediction to shape:  `(batch_size, num_trials, time, num_neurons)`
+        return {
+            layer: predictions.permute(1, 0, 2, 3)
+            for layer, predictions in dict_stacked_predictions.items()
+        }
+
+    def _init_datasets(
+        self, arguments
+    ) -> Tuple[SparseSpikeDataset, SparseSpikeDataset]:
+        """
+        Initializes train and test dataset.
+
+        :param arguments: command line arguments.
+        :return: Returns tuple of initialized train and test dataset.
+        """
+        input_layers, output_layers = DictionaryHandler.split_input_output_layers(
+            self.layer_sizes
+        )
+
+        train_dataset = SparseSpikeDataset(
+            arguments.train_dir,
+            input_layers,
+            output_layers,
+            is_test=False,
+            model_subset_path=arguments.subset_dir,
+            dataset_subset_ratio=arguments.train_subset,  # Subset of train dataset in case of model analysis.
+        )
+        test_dataset = SparseSpikeDataset(
+            arguments.test_dir,
+            input_layers,
+            output_layers,
+            is_test=True,
+            model_subset_path=arguments.subset_dir,
+            experiment_selection_path=arguments.experiment_selection_path,
+        )
+
+        return train_dataset, test_dataset
+
+    def _init_data_loaders(self) -> Tuple[DataLoader, DataLoader]:
+        """
+        Initialized train and test `DataLoader` objects.
+
+        :return: Returns initialized train and test `Dataloader` classes.
+        """
+        train_loader = DataLoader(
+            self.train_dataset,
+            batch_size=nn_model.globals.TRAIN_BATCH_SIZE,
+            shuffle=True,  # Shuffle the training dataset.
+            collate_fn=different_times_collate_fn,
+        )
+        test_loader = DataLoader(
+            self.test_dataset,
+            batch_size=nn_model.globals.TEST_BATCH_SIZE,
+            shuffle=False,  # Load the test dataset always in the same order.
+            collate_fn=different_times_collate_fn,
+        )
+
+        return train_loader, test_loader
+
+    def _init_model(self, arguments) -> PrimaryVisualCortexModel:
+        """
+        Initializes the model based on the provided arguments.
+
+        :param arguments: command line arguments containing model setup info.
+        :return: Returns initializes model.
+        """
+        return PrimaryVisualCortexModel(
+            self.layer_sizes,
+            arguments.num_hidden_time_steps,
+            arguments.model,
+            arguments.weight_initialization,
+            model_modules_kwargs={
+                **ModelExecuter._get_neuron_model_kwargs(arguments),
+                **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
+            },  # Pass kwargs to generate neuron and synaptic adaptation modules.
+        )
+
+    def _init_criterion(self):
+        """
+        Initializes model criterion.
+
+        :return: Returns model criterion (loss function).
+        """
+        return torch.nn.MSELoss()
+
+    def _init_exc_inh_specific_learning_rate(self, learning_rate):
+        """
+        Splits the model parameters to two groups. One corresponding to inhibitory layer
+        values and one corresponding to excitatory layers. Inhibitory layer parameters
+        should use 4 times smaller learning rate than excitatory
+        (because of the properties of the model)
+
+        NOTE: This function is used in case we select `OptimizerTypes.EXC_INH_SPECIFIC`.
+
+        :param learning_rate: Base learning rate that should be applied for excitatory
+        layers (inhibitory should have learning rate 4 times smaller).
+        :return: Returns group of parameters for the optimizer.
+        """
+
+        # Identify inhibitory layers to apply a 4x lower learning rate on.
+        selected_params = [
+            self.model.layers.V1_Exc_L23.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L23.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L23.rnn_cell.weights_hh.weight,
+            self.model.layers.V1_Exc_L4.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L4.rnn_cell.weights_ih_inh.weight,
+            self.model.layers.V1_Inh_L4.rnn_cell.weights_hh.weight,
+        ]
+
+        selected_param_ids = {id(p) for p in selected_params}
+
+        # Create parameter groups
+        param_groups = [
+            # Parameters with lower learning rate (inhibitory).
+            {"params": selected_params, "lr": learning_rate / 4},
+            # All other parameters (excitatory).
+            {
+                "params": [
+                    p
+                    for p in self.model.parameters()
+                    if id(p) not in selected_param_ids
+                ],
+                "lr": learning_rate,
+            },
+        ]
+
+        return param_groups
+
+    def _init_optimizer(self, optimizer_type: str, learning_rate: float):
+        """
+        Initializes model optimizer.
+
+        :param learning_rate: learning rate of the optimizer.
+        :return: Returns used model optimizer (Adam).
+        """
+        # By default same learning rate for all layers.
+        param_groups = self.model.parameters()
+
+        if optimizer_type == OptimizerTypes.EXC_INH_SPECIFIC.value:
+            # Apply exc/inh specific learning rate.
+            param_groups = self._init_exc_inh_specific_learning_rate(learning_rate)
+
+        return optim.Adam(param_groups, lr=learning_rate)
+
+    def _apply_model_constraints(self):
+        """
+        Applies model constraints on all model layers (excitatory/inhibitory).
+        """
+        for module in self.model.modules():
+            if isinstance(module, ModelLayer):
+                module.apply_constraints()
+
+    def _epoch_evaluation_step(
+        self,
+        epoch: int,
+        epoch_offset: int = 1,
+        evaluation_subset_size: int = 10,
+    ) -> float:
+        """
+        Runs continuous evaluation steps in selected training epochs on
+        selected subset of test examples.
+
+        :param epoch: current epoch number.
+        :param epoch_offset: after how many epochs perform evaluation. If `-1` then never run.
+        :param evaluation_subset_size: how many batches use for evaluation.
+        If `-1` then all test dataset.
+        :return: Average correlation across evaluated subset.
+        """
+        if epoch_offset != -1 and epoch % epoch_offset == 0:
+            # Do continuous evaluation after this step.
+            avg_correlation = self.evaluation(
+                subset_for_evaluation=evaluation_subset_size, final_evaluation=False
             )
+            self.model.train()
+            return avg_correlation
 
-        return None
+        return 0.0
+
+    def _update_best_model(
+        self, epoch: int, continuous_evaluation_kwargs: Optional[Dict]
+    ):
+        """
+        Runs few evaluation steps and compares the result of evaluation metric with currently
+        the best ones. In case it is better, it updates the best model parameters
+        with the current ones (saves them to given file).
+
+        :param epoch: Number of current epoch. Used in case we want to run evaluation only
+        on the specified epochs.
+        :param continuous_evaluation_kwargs: Kwargs of continuous evaluation run.
+        """
+        if continuous_evaluation_kwargs is None:
+            # In case no continuous evaluation kwargs were provided -> make them empty dictionary.
+            continuous_evaluation_kwargs = {}
+
+        # Perform few evaluation steps for training check in specified epochs.
+        current_val_metric = self._epoch_evaluation_step(
+            epoch,
+            **continuous_evaluation_kwargs,
+        )
+
+        # Check if there is an improvement -> if so, update the best model.
+        if current_val_metric > self.best_metric:
+            self.logger.print_best_model_update(self.best_metric, current_val_metric)
+            self.best_metric = current_val_metric
+            torch.save(
+                self.model.state_dict(),
+                self.evaluation_results_saver.best_model_path,
+            )
 
     def _optimizer_step(
         self,
@@ -487,7 +649,14 @@ class ModelExecuter:
         hidden_states: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
-    ) -> Tuple[float, Dict[str, Optional[Tuple[torch.Tensor, ...]]]]:
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
+    ) -> Tuple[
+        float,
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
         """
         Performs time step prediction and optimizer step.
 
@@ -499,17 +668,21 @@ class ModelExecuter:
         :param inputs: Current time values from input layers (LGN).
         :param hidden_states: Current hidden states (typically targets from previous time step).
         :param targets: Targets of the next visible time step.
-        :return: Returns sum of losses for all layers.
+        :param neuron_hidden: Hidden states of the neuron model.
+        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
+        :return: Returns tuple of sum of losses for all layers, updated neuron module hidden states
+        and synaptic adaptation module hidden states.
         """
         # We want to zero optimizer gradient before each training step.
         self.optimizer.zero_grad()
 
-        all_predictions, _, neuron_hidden = self.model(
+        all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
             # Time step is assigned based on model architecture during the forward function call.
             hidden_states,
             neuron_hidden,
+            synaptic_adaptation_hidden,
         )
 
         # Take last time step predictions (those are the visible time steps predictions).
@@ -520,7 +693,7 @@ class ModelExecuter:
             {layer: predictions[-1] for layer, predictions in all_predictions.items()},
         )  # Take the last time step prediction (target prediction).
 
-        # Loss calculation
+        # Loss calculation.
         total_loss = torch.zeros(1)
         for layer in predictions:
             total_loss += self.criterion(
@@ -528,23 +701,26 @@ class ModelExecuter:
                 targets[layer],
             )
 
-        # Backward and optimizer steps for the sum of losses.
+        # Backward step.
         total_loss.backward()
 
-        neuron_hidden = {
-            layer: self._detach_hidden_states(hidden)
-            for layer, hidden in neuron_hidden.items()
-        }
+        # Detach hidden states from the gradient graph.
+        neuron_hidden, synaptic_adaptation_hidden = (
+            ModelExecuter._detach_all_hidden_states(
+                neuron_hidden, synaptic_adaptation_hidden
+            )
+        )
 
         # Gradient clipping to prevent exploding gradients.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
 
+        # Optimizer step
         self.optimizer.step()
 
         del all_predictions
         torch.cuda.empty_cache()
 
-        return total_loss.item(), neuron_hidden
+        return total_loss.item(), neuron_hidden, synaptic_adaptation_hidden
 
     def _train_perform_visible_time_step(
         self,
@@ -567,19 +743,27 @@ class ModelExecuter:
         time_loss_sum = 0.0
 
         # Hidden states of the neuron.
-        neuron_hidden = {
-            layer: None for layer in PrimaryVisualCortexModel.layers_input_parameters
-        }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+        neuron_hidden, synaptic_adaptation_hidden = (
+            ModelExecuter._init_modules_hidden_states()
+        )
 
         for visible_time in range(
             1, time_length
         ):  # We skip the first time step because we do not have initial hidden values for them.
+            # Get data for the current time step.
             inputs, targets, hidden_states = ModelExecuter._get_train_current_time_data(
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            current_loss, neuron_hidden = self._optimizer_step(
-                inputs, hidden_states, targets, neuron_hidden
+            # Perform the model training step and optimizer step for the time step.
+            current_loss, neuron_hidden, synaptic_adaptation_hidden = (
+                self._optimizer_step(
+                    inputs,
+                    hidden_states,
+                    targets,
+                    neuron_hidden,
+                    synaptic_adaptation_hidden,
+                )
             )
 
             time_loss_sum += current_loss
@@ -615,6 +799,10 @@ class ModelExecuter:
                 - in the training step it makes sense (we want to learn only the next step)
                 - it is possibility to have hidden time steps (we do not have targets for them)
                     - we learn "hidden" dynamics of the model
+                - we do not reset hidden states of the shared modules (neuron, synaptic adaptation)
+                as we do not know their real values (we want the model to learn them)
+                    - we detach these states from the gradient graph after optimizer step
+                        - we want to learn only based on the last time step
             3. Prediction of the model is the following (current) hidden state (output layer).
 
         :param continuous_evaluation_kwargs: kwargs for continuous evaluation setup
@@ -641,12 +829,14 @@ class ModelExecuter:
                     input_batch, target_batch
                 )
 
+                # Perform optimizer steps for all visible time steps.
                 avg_time_loss = self._train_perform_visible_time_step(
                     input_batch, target_batch
                 )
                 wandb.log({"batch_loss": avg_time_loss})
                 epoch_loss_sum += avg_time_loss
 
+            # Compute average loss for the whole epoch.
             avg_epoch_loss = epoch_loss_sum / len(self.train_loader)
             self.logger.print_epoch_loss(epoch + 1, self.num_epochs, avg_epoch_loss)
             self._update_best_model(epoch, continuous_evaluation_kwargs)
@@ -661,42 +851,6 @@ class ModelExecuter:
             torch.load(self.evaluation_results_saver.best_model_path, weights_only=True)
         )
         self.logger.print_best_model_evaluation(self.best_metric)
-
-    @staticmethod
-    def _add_trial_predictions_to_list_of_all_predictions(
-        trial_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
-        all_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
-        save_recurrent_state: bool,
-    ):
-        """
-        Sort all the predictions for the trial and split them to corresponding
-        lists of all the predictions or do not save them based on the evaluation status.
-
-        :param trial_predictions: Predictions for the trial (list of predictions for all
-        visible time steps).
-        :param all_predictions: All predictions for all the trials.
-        :param save_recurrent_state: Flag whether we want to also save predictions of the RNNs.
-        """
-        for prediction_type, layers_predictions in trial_predictions.items():
-            # Iterate all predictions types (full prediction, RNN predictions...)
-            for layer, layers_prediction in layers_predictions.items():
-                # Iterate all layers predictions.
-                current_prediction = torch.zeros(
-                    0
-                )  # RNN default (do not save predictions).
-                if (
-                    prediction_type == PredictionTypes.FULL_PREDICTION.value
-                    or save_recurrent_state
-                ):
-                    # In case we are doing full prediction or we specified we want RNN linearity values
-                    # (of layers) -> store them.
-                    if prediction_type == PredictionTypes.RNN_PREDICTION.value:
-                        # TODO: currently skipping this step as it does not work correctly.
-                        continue
-
-                    current_prediction = torch.cat(layers_prediction, dim=1)
-
-                all_predictions[prediction_type][layer].append(current_prediction)
 
     def _get_all_trials_predictions(
         self,
@@ -738,17 +892,17 @@ class ModelExecuter:
                 }
             )
 
-            # Hidden states of the neuron.
-            neuron_hidden = {
-                layer: None
-                for layer in PrimaryVisualCortexModel.layers_input_parameters
-            }  # TODO: Check validity (maybe we want to initialize neuron hidden states outside the forward function).
+            # Initialize hidden states of the neuron and synaptic adaptation modules.
+            neuron_hidden, synaptic_adaptation_hidden = (
+                ModelExecuter._init_modules_hidden_states()
+            )
 
             # Get all visible time steps predictions of the model.
-            trial_predictions, trial_rnn_predictions, _ = self.model(
+            trial_predictions, trial_rnn_predictions, _, _ = self.model(
                 trial_inputs,
                 trial_hidden,
                 neuron_hidden,
+                synaptic_adaptation_hidden,
             )
 
             # Accumulate all trials predictions.
@@ -762,31 +916,6 @@ class ModelExecuter:
             )
 
         return all_predictions
-
-    @staticmethod
-    def _prepare_evaluation_predictions_for_return(
-        all_layers_predictions: Dict[str, List[torch.Tensor]]
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Takes all the predictions of given type (full predictions, rnn predictions etc.) and
-        does proper modifications to convert them to proper output format. It stacks all the
-        trials predictions to one tensor and permutes them to shape
-        `(batch_size, num_trials, time, num_neurons)`.
-
-        :param all_layers_predictions: All predictions for all trials in form of list.
-        :return: Returns converted predictions to one big tensor of shape
-        `(batch_size, num_trials, time, num_neurons)`.
-        """
-        # Stack all trials predictions into one torch array.
-        dict_stacked_predictions = {
-            key: torch.stack(value_list, dim=0)
-            for key, value_list in all_layers_predictions.items()
-        }
-        # Reshape the prediction to shape:  `(batch_size, num_trials, time, num_neurons)`
-        return {
-            layer: predictions.permute(1, 0, 2, 3)
-            for layer, predictions in dict_stacked_predictions.items()
-        }
 
     def _predict_for_evaluation(
         self,
@@ -894,9 +1023,11 @@ class ModelExecuter:
         :return: Average cross correlation along all tried examples.
         """
         if final_evaluation:
+            # We are doing final evaluation (we want to use the best model).
             self._load_best_model()
 
         if save_predictions:
+            # We want to save the predictions for further analysis.
             self.model.switch_to_return_recurrent_state()
 
         self.model.eval()
@@ -931,17 +1062,18 @@ class ModelExecuter:
                 cc_norm_sum += cc_norm
                 cc_abs_sum += cc_abs
 
+                # Logging of the evaluation results.
                 self.logger.wandb_batch_evaluation_logs(cc_norm, cc_abs)
                 if i % print_each_step == 0:
                     self.logger.print_current_evaluation_status(
                         i + 1, cc_norm_sum, cc_abs_sum
                     )
 
+        # Decide what was the total number of examples during evaluation.
         num_examples = subset_for_evaluation + 1
         if subset_for_evaluation == -1:
             num_examples = len(self.test_loader)
 
-        # TODO: better structure for multiple evaluation metrics.
         # Average evaluation metrics calculation
         avg_cc_norm = cc_norm_sum / num_examples
         avg_cc_abs = cc_abs_sum / num_examples

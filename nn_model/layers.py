@@ -13,8 +13,6 @@ import nn_model.globals
 from nn_model.type_variants import ModelTypes, LayerType
 from nn_model.custom_rnn import CustomRNNCell
 from nn_model.neurons import SharedNeuronBase
-
-# from nn_model.models import PrimaryVisualCortexModel
 from nn_model.weights_constraints import WeightConstraint
 
 
@@ -101,25 +99,50 @@ class ModelLayer(nn.Module):
         """
         self.constraint.apply(self.rnn_cell)
 
+    def _input_preprocessing(
+        self,
+        complexity_input: Tuple[torch.Tensor, ...],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Preprocesses the input for the neuron model and defines the output shape.
+
+        In case the input is one tensor (joint models) -> just assign the values from the input.
+        In case the input is separate excitatory and inhibitory tuple of tensors
+        (separate models) -> stack their values to one tensor. And define final shape as the
+        shape of the single tensor.
+
+        :param complexity_input: Input tensor(s) for the neuron model (result of RNN linearity).
+        :return: Returns tuple of the input tensor for the neuron model and the tensor of final
+        shape of the output.
+        """
+        if isinstance(complexity_input, torch.Tensor):
+            # In case we work with one tensor (joint models)
+            # -> just assign the values from the input.
+            return complexity_input, complexity_input
+
+        # In case we work with separate excitatory and inhibitory inputs (separate models).
+        # -> stack their values to one tensor. And define final shape as
+        # only one tensor of them.
+        neuron_model_input = torch.stack(complexity_input, dim=2)
+        viewing_shape = complexity_input[0]
+
+        return neuron_model_input, viewing_shape
+
     def apply_complexity(
         self,
-        rnn_output: Tuple[torch.Tensor, ...],
+        complexity_input: Tuple[torch.Tensor, ...],
         neuron_hidden: Tuple[torch.Tensor, ...],
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
         Applies complexity layer (shared DNN of neuron) on RNN linearity output.
 
-        :param rnn_output: Linearity output of RNN layer to apply complexity on.
+        :param complexity_input: Linearity output of RNN layer to apply complexity on.
         :param neuron_hidden: Tuple of hidden states of the neurons (needed for RNN models).
         :return: Returns tuple of output after shared complexity is applied (first value)
         and tuple of all updated hidden states of the neuron model (if RNN neuron model is used).
         """
-
-        neuron_model_input: torch.Tensor = rnn_output
-        if len(rnn_output) == 2:
-            # In case we work with separate excitatory and inhibitory inputs
-            # -> stack their values to one tensor.
-            neuron_model_input = torch.stack(rnn_output, dim=2)
+        # Prepare the input for the neuron model and define the output shape.
+        neuron_model_input, viewing_shape = self._input_preprocessing(complexity_input)
 
         # If shared complexity is defined (model is complex) -> apply complexity.
         if self.neuron_model:
@@ -134,14 +157,6 @@ class ModelLayer(nn.Module):
             complexity_result, neuron_hidden = self.neuron_model(
                 complexity_result, neuron_hidden
             )
-
-            # Define the output shape.
-            viewing_shape: torch.Tensor = rnn_output
-            if self.model_type in nn_model.globals.SEPARATE_MODELS:
-                # In case we use separate models we want the output shape to be same as
-                # one of the input tensors (we do not want two output values
-                # (for exc/inh layer) anymore).
-                viewing_shape = rnn_output[0]
 
             # Reshape back to [batch_size, hidden_size]
             complexity_result = complexity_result.view_as(viewing_shape)
@@ -174,7 +189,6 @@ class ModelLayer(nn.Module):
 
         # Apply non-linearity (either function or DNN model of neuron).
         complexity_result, neuron_hidden = self.apply_complexity(rnn_out, neuron_hidden)
-        # complexity_result = self.apply_complexity(hidden_exc, hidden_inh)
 
         if not self.return_recurrent_state:
             # In case we do not want ot return RNN results -> return None
