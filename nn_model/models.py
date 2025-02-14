@@ -326,9 +326,9 @@ class PrimaryVisualCortexModel(nn.Module):
 
         # Simple neuron (no additional complexity).
         return self._init_simple_neuron_model()
-    
-    def _init_synaptic_adaptation_models(self):
-        adaptation_model = LSTMNeuron(self.)
+
+    # def _init_synaptic_adaptation_models(self):
+    #     adaptation_model = LSTMNeuron(self.)
 
     def _init_layer_configs(
         self,
