@@ -161,6 +161,7 @@ class CustomRNNCell(nn.Module):
             std=std * std_multiplier,
         )
 
+    @torch.no_grad()
     def _flip_weights_signs(self, constraint_multiplier: int):
         """
         Flips weights of the model based on the layer it belongs to either
@@ -169,10 +170,10 @@ class CustomRNNCell(nn.Module):
         :param constraint_multiplier: Multiplier used on self-recurrent weights
         (either `-1` if inhibitory or `1` if excitatory).
         """
-        self.weights_ih_exc.weight.data = torch.abs(self.weights_ih_exc.weight.data)
-        self.weights_ih_inh.weight.data = -torch.abs(self.weights_ih_inh.weight.data)
-        self.weights_hh.weight.data = constraint_multiplier * torch.abs(
-            self.weights_hh.weight.data
+        self.weights_ih_exc.weight.abs_() # in-place
+        self.weights_ih_inh.weight.copy_(-self.weights_ih_inh.weight.abs())
+        self.weights_hh.weight.copy_(
+            constraint_multiplier * self.weights_hh.weight.abs()
         )
 
     def _init_weights(self, weight_initialization_type: str):
