@@ -22,7 +22,7 @@ def _clamp_weight_attr(module: nn.Module, module_name: str, **kwargs):
     """
     if not _check_weight_attr(module, module_name):
         return
-    module.weights_hh.weight.clamp_(**kwargs) # in-place version of clamp
+    getattr(module, module_name).weight.clamp_(**kwargs) # in-place version of clamp
 
 class WeightConstraint:
     """
