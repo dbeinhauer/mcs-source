@@ -374,6 +374,15 @@ if __name__ == "__main__":
         default=1.0,
         help="Number of batches to select as train subset (for modeling training performance on different dataset size).",
     )
+    parser.add_argument(
+        "--num_data_workers",
+        type=int,
+        default=0,
+        help="Number of CPU threads to use as workers for DataLoader. "
+             "This can help if the GPU utilization is unstable (jumping between 0 and 100%), "
+             "because it's waiting for data.",
+    )
+
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
     parser.add_argument(

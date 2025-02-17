@@ -46,6 +46,7 @@ class ModelExecuter:
         self.layer_sizes = nn_model.globals.MODEL_SIZES
 
         # Dataset initialization.
+        self.num_data_workers = arguments.num_data_workers
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
         self.train_loader, self.test_loader = self._init_data_loaders()
 
@@ -478,17 +479,25 @@ class ModelExecuter:
 
         :return: Returns initialized train and test `Dataloader` classes.
         """
+        workers_enabled = self.num_data_workers > 0
+        kwargs = {
+            'collate_fn': different_times_collate_fn,
+            'num_workers': self.num_data_workers, # number of workers which will supply data to GPU
+            'pin_memory': workers_enabled, # speed up data transfer to GPU
+            'prefetch_factor': 4 if workers_enabled else None, # try to always have 4 samples ready for the GPU
+            'persistent_workers': workers_enabled, # keep the worker threads alive
+        }
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=nn_model.globals.TRAIN_BATCH_SIZE,
             shuffle=True,  # Shuffle the training dataset.
-            collate_fn=different_times_collate_fn,
+            **kwargs,
         )
         test_loader = DataLoader(
             self.test_dataset,
             batch_size=nn_model.globals.TEST_BATCH_SIZE,
             shuffle=False,  # Load the test dataset always in the same order.
-            collate_fn=different_times_collate_fn,
+            **kwargs,
         )
 
         return train_loader, test_loader
