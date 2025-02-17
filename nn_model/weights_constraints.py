@@ -4,8 +4,16 @@ are typically used for determination of excitatory/inhibitory layer.
 """
 
 import torch
+from torch import nn
 
 from nn_model.type_variants import WeightTypes
+
+
+def _check_weight_attr(module: nn.Module, module_name: str) -> bool:
+    """
+    Returns True if the module has a weight which can be initialized, False otherwise.
+    """
+    return hasattr(module, module_name) and hasattr(module.weights_hh, "weight") and isinstance(module.weights_hh.weight, torch.Tensor)
 
 
 class WeightConstraint:
@@ -55,7 +63,7 @@ class WeightConstraint:
             WeightTypes.EXCITATORY.value,
             WeightTypes.INHIBITORY.value,
         ]
-        if hasattr(module, "weights_hh"):
+        if _check_weight_attr(module, 'weights_hh'):
             module.weights_hh.weight.data = torch.clamp(
                 module.weights_hh.weight.data, **kwargs
             )
@@ -67,12 +75,12 @@ class WeightConstraint:
 
         :param module: Module to apply the weight on.
         """
-        if hasattr(module, "weights_ih_exc"):
+        if _check_weight_attr(module, "weights_ih_exc"):
             module.weights_ih_exc.weight.data = torch.clamp(
                 module.weights_ih_exc.weight.data,
                 **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
             )
-        if hasattr(module, "weights_ih_inh"):
+        if _check_weight_attr(module, "weights_ih_inh"):
             module.weights_ih_inh.weight.data = torch.clamp(
                 module.weights_ih_inh.weight.data,
                 **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
