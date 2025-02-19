@@ -8,21 +8,24 @@ from torch import nn
 
 from nn_model.type_variants import WeightTypes
 
-
-def _check_weight_attr(module: nn.Module, module_name: str) -> bool:
-    """
-    Returns True if the module has a weight which can be initialized, False otherwise.
-    """
-    return hasattr(module, module_name) and hasattr(module.weights_hh, "weight") and isinstance(module.weights_hh.weight, torch.Tensor)
-
 @torch.no_grad()
-def _clamp_weight_attr(module: nn.Module, module_name: str, **kwargs):
+def _clamp_weight_attr(module: nn.Module, linear_module_name: str, **kwargs):
     """
     Clamps weights based on kwargs if possible.
+
+    :param module: parent nn.Module object
+    :param linear_module_name: name of the linear module (attribute of ``module``)
+    :param kwargs: keyword arguments passed to ``torch.nn.Linear``
     """
-    if not _check_weight_attr(module, module_name):
+    # get attribute of module with name linear_module_name
+    linear_module = getattr(module, linear_module_name, None)
+    if linear_module is None:
         return
-    getattr(module, module_name).weight.clamp_(**kwargs) # in-place version of clamp
+    # the attribute should be an instance of nn.Linear
+    if not isinstance(linear_module, nn.Linear):
+        return
+
+    linear_module.weight.clamp_(**kwargs) # in-place version of clamp
 
 class WeightConstraint:
     """
