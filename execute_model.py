@@ -40,7 +40,7 @@ def init_wandb(arguments):
     config = {
         "learning_rate": arguments.learning_rate,
         "epochs": arguments.num_epochs,
-        "batch_size": nn_model.globals.TRAIN_BATCH_SIZE,
+        "batch_size": arguments.train_batch_size,
         "model": arguments.model,
         "neuron_model_num_layers": arguments.neuron_num_layers,
         "neuron_model_layer_size": arguments.neuron_layer_size,
@@ -381,6 +381,12 @@ if __name__ == "__main__":
         help="Number of CPU threads to use as workers for DataLoader. "
              "This can help if the GPU utilization is unstable (jumping between 0 and 100%), "
              "because it's waiting for data.",
+    )
+    parser.add_argument(
+        "--train_batch_size",
+        type=int,
+        default=nn_model.globals.TRAIN_BATCH_SIZE,
+        help="Batch size for training.",
     )
 
     # Evaluation options:
