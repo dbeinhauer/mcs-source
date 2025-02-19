@@ -1,29 +1,38 @@
 #!/bin/bash
 #PBS -N VISUAL_CORTEX_MODEL
-#PBS -l walltime=10:0:0
-#PBS -l select=1:ncpus=1:ngpus=1:gpu_mem=39gb:mem=100gb:scratch_local=100gb
-#PBS -m abe
+#PBS -l walltime=15:0:0
+#PBS -l select=1:ncpus=8:ngpus=1:gpu_mem=40gb:mem=100gb:scratch_local=100gb:spec=8.0:gpu_cap=compute_86:osfamily=debian
+
+#PBS -m ae
 #PBS -j oe
 
-# This script should be run from the your home directory on a frontend server
-# Fill these variables in order for the script to work
-PROJECT_NAME="mcs-source"
-SERVER_LOCATION="praha1"
-WANDB_API_KEY="redacted"
+set -e
 
-########################################################################################################################
+# Ensure clean_scratch runs on exit, even on error
+cleanup() {
+    echo "Running clean_scratch at $(date)"
+    clean_scratch
+}
+trap cleanup EXIT
+
+nvidia-smi
+
 echo "Task started at $(date)"
 
+PROJECT_NAME="mcs-source"
+SERVER_LOCATION="praha1"
 DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
 export TMPDIR=$SCRATCHDIR
 
+
 test -n "$SCRATCHDIR" || { echo >&2 "SCRATCHDIR is not set!"; exit 1; }
 
-echo "Copying data to $SCRATCHDIR at $(date)"
-cp -r "$DATADIR" "$SCRATCHDIR" || { echo >&2 "Error copying data to scratch"; exit 1; }
-echo "Data copied at $(date)"
+# echo "Copying data to $SCRATCHDIR at $(date)"
+# cp -r "$DATADIR" "$SCRATCHDIR" || { echo >&2 "Error copying data to scratch"; exit 1; }
+# echo "Data copied at $(date)"
 
-cd "$SCRATCHDIR/$PROJECT_NAME" || { echo >&2 "Failed to enter scratch directory"; exit 1; }
+# cd "$SCRATCHDIR/$PROJECT_NAME" || { echo >&2 "Failed to enter scratch directory"; exit 1; }
+cd "$DATADIR" || { echo >&2 "Failed to enter DATADIR"; exit 1; }
 
 module load mambaforge
 
@@ -32,14 +41,17 @@ mamba env create -p "$SCRATCHDIR/tmp_env" -f environment.yaml || { echo >&2 "Fai
 source activate "$SCRATCHDIR/tmp_env" || { echo >&2 "Failed to activate Conda environment"; exit 1; }
 echo "Environment created at $(date)"
 
-wandb login $WANDB_API_KEY || { echo >&2 "Failed to log into wandb"; exit 1; }
+wandb login "<your_api_key>" || { echo >&2 "Failed to log into wandb"; exit 1; }
 
 echo "Logged in wandb at $(date)"
 
 echo "Starting model execution at $(date)"
 
-python execute_model.py --subset_dir="" --train_dir="testing_dataset/train/size_20" --test_dir="testing_dataset/test/size_20" --debug --num_epochs=1 || { echo >&2 "Python script failed"; exit 1; }
+python execute_model.py --model="dnn_separate" --num_epochs=10 --neuron_num_layers=5 --num_data_workers=8  \
+      	|| { echo >&2 "Python script failed"; exit 1; }
 
 # TODO copy results
 
 echo "Task finished at $(date)"
+
+clean_scratch
