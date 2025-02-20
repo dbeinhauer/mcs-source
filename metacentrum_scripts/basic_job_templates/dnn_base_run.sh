@@ -13,13 +13,12 @@ NGPUS=1
 GPU_MEM="5gb"
 MEM="1000gb"
 SCRATCH_LOCAL="100gb"
-# Optional machine arguments.
-# For example: ":spec=8.0:gpu_cap=compute_86:osfamily=debian"
-OPT_MACHINE_ARGS=""
+# Optional machine arguments. For example:
+# OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
 
 # Model parameters:
 MODEL_PARAMS="--learning_rate=0.00001 \\
---num_epochs=10 
+--num_epochs=10 \\
 --model=dnn_separate \\
 --neuron_num_layers=5 \\
 --neuron_layer_size=10 \\
@@ -39,5 +38,6 @@ python metacentrum_scripts/generate_script.py \
     --gpu_mem $GPU_MEM \
     --mem $MEM \
     --scratch_local $SCRATCH_LOCAL \
-    --opt_machine_args $OPT_MACHINE_ARGS \
     --model_params "$MODEL_PARAMS"
+# --use_opt_arguments \
+# --opt_machine_args $OPT_MACHINE_ARGS \

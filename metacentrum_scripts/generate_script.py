@@ -71,6 +71,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    if not args.use_opt_arguments:
+        args.opt_machine_args = ""
+
     # Generate the job script from template
     script_content = generate_job_script(
         args.template,
