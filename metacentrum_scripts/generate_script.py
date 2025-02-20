@@ -26,9 +26,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate and submit a PBS job script."
     )
-    # parser.add_argument(
-    #     "--wandb_api_key", type=str, required=True, help="Your wandb API key"
-    # )
     # Input output arguments:
     parser.add_argument(
         "--template", default="job_template.pbs", help="Path to the job script template"
@@ -83,7 +80,6 @@ if __name__ == "__main__":
         gpu_mem=args.gpu_mem,
         mem=args.mem,
         scratch_local=args.scratch_local,
-        # wandb_api_key=args.wandb_api_key,
         opt_machine_args=args.opt_machine_args,
         model_params=args.model_params,
     )
