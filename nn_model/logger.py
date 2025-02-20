@@ -34,15 +34,23 @@ class LoggerModel:
                     "---------------------------------",
                     "Running with parameters:",
                     f"Model size: {nn_model.globals.SIZE_MULTIPLIER}",
-                    f"Model variant: {arguments.model}",
-                    f"Neuron number of layers: {arguments.neuron_num_layers}",
-                    f"Neurons layer sizes: {arguments.neuron_layer_size}",
-                    f"Neuron use residual connection: {not arguments.neuron_not_residual}",
-                    f"Number of hidden time steps: {arguments.num_hidden_time_steps}",
+                    f"Train subset size: {arguments.train_subset}",
                     f"Batch size: {nn_model.globals.TRAIN_BATCH_SIZE}",
                     f"Learning rate: {arguments.learning_rate}",
                     f"Num epochs: {arguments.num_epochs}",
-                    f"Train subset size: {arguments.train_subset}",
+                    f"Model variant: {arguments.model}",
+                    f"Number of hidden time steps: {arguments.num_hidden_time_steps}",
+                    f"Neuron number of layers: {arguments.neuron_num_layers}",
+                    f"Neurons layer sizes: {arguments.neuron_layer_size}",
+                    f"Neuron activation function: {arguments.neuron_activation_function}",
+                    f"Neuron use residual connection: {arguments.neuron_residual}",
+                    f"Gradient clipping: {arguments.gradient_clip}",
+                    f"Optimizer type: {arguments.optimizer_type}",
+                    f"Weight initialization: {arguments.weight_initialization}",
+                    f"Use synaptic adaptation: {arguments.synaptic_adaptation}",
+                    f"Synaptic adaptation layer size: {arguments.synaptic_adaptation_size}",
+                    "Synaptic adaptation hidden time steps: "
+                    + str(arguments.synaptic_adaptation_time_steps),
                 ]
             )
         )
@@ -99,7 +107,7 @@ class LoggerModel:
         """
         Prints logger info while loading the model with best evaluation score.
 
-        :param best_metric: _description_
+        :param best_metric: Value of the best metric to be printed.
         """
         self.logger.info(
             f"Running final evaluation on model with best CC_NORM value: {best_metric:.4f}"

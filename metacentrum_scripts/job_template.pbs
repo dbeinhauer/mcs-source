@@ -1,0 +1,69 @@
+#!/bin/bash
+#PBS -N VISUAL_CORTEX_MODEL
+#PBS -l walltime={walltime}
+#PBS -l select=1:ncpus={ncpus}:ngpus={ngpus}:gpu_mem={gpu_mem}:mem={mem}:scratch_local={scratch_local}{opt_machine_args}
+
+#PBS -m ae
+#PBS -j oe
+
+set -e
+
+# Ensure clean_scratch runs on exit, even on error
+cleanup() {{
+echo "Running clean_scratch at $(date)"
+clean_scratch
+}}
+trap cleanup EXIT
+
+nvidia-smi
+
+echo "Task started at $(date)"
+
+PROJECT_NAME="mcs-source"
+SERVER_LOCATION="praha1"
+DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
+export TMPDIR=$SCRATCHDIR
+
+test -n "$SCRATCHDIR" || {{
+echo >&2 "SCRATCHDIR is not set!"
+exit 1
+}}
+
+cd "$DATADIR" || {{
+echo >&2 "Failed to enter DATADIR"
+exit 1
+}}
+
+module load mambaforge
+
+echo "Creating conda environment at $(date)"
+mamba env create -p "$SCRATCHDIR/tmp_env" -f environment.yaml || {{
+echo >&2 "Failed to create Conda environment"
+exit 1
+}}
+source activate "$SCRATCHDIR/tmp_env" || {{
+echo >&2 "Failed to activate Conda environment"
+exit 1
+}}
+echo "Environment created at $(date)"
+
+WANDB_API_KEY=$(cat .wandb_api_key)
+
+wandb login "$WANDB_API_KEY" || {{
+echo >&2 "Failed to log into wandb"
+exit 1
+}}
+
+echo "Logged in wandb at $(date)"
+
+echo "Starting model execution at $(date)"
+
+python execute_model.py {model_params} ||
+    {{
+echo >&2 "Python script failed"
+exit 1
+}}
+
+echo "Task finished at $(date)"
+
+clean_scratch
