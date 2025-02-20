@@ -45,10 +45,6 @@ if __name__ == "__main__":
     parser.add_argument("--gpu_mem", default="40gb", help="GPU memory")
     parser.add_argument("--mem", default="100gb", help="Total system memory")
     parser.add_argument("--scratch_local", default="100gb", help="Local scratch space")
-    parser.add_argument("--spec", default="8.0", help="GPU spec")
-    parser.add_argument(
-        "--gpu_cap", default="compute_86", help="GPU capability version"
-    )
     parser.set_defaults(use_opt_arguments=False)
     parser.add_argument(
         "--use_opt_arguments",
@@ -87,8 +83,6 @@ if __name__ == "__main__":
         gpu_mem=args.gpu_mem,
         mem=args.mem,
         scratch_local=args.scratch_local,
-        spec=args.spec,
-        gpu_cap=args.gpu_cap,
         # wandb_api_key=args.wandb_api_key,
         opt_machine_args=args.opt_machine_args,
         model_params=args.model_params,
