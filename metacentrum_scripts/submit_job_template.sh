@@ -33,5 +33,5 @@ python metacentrum_scripts/generate_script.py \
     --mem $MEM \
     --scratch_local $SCRATCH_LOCAL \
     --opt_machine_args $OPT_MACHINE_ARGS \
-    --model_params "$MODEL_PARAMS" \
+    --model_params "$MODEL_PARAMS"
 # --submit_job

@@ -26,7 +26,7 @@ MODEL_PARAMS="--learning_rate=0.00001 \\
 --synaptic_adaptation \\
 --synaptic_adaptation_size=10 \\
 --synaptic_adaptation_time_steps=1 \\
---num_data_workers=8 \\"
+--num_data_workers=8"
 
 # Run the generate_script.py with the specified parameters and submit the job
 python metacentrum_scripts/generate_script.py \
