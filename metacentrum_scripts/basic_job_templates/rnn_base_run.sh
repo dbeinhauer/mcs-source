@@ -11,7 +11,7 @@ WALLTIME="36:00:00"
 NCPUS=8
 NGPUS=1
 GPU_MEM="5gb"
-MEM="1000gb"
+MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
 # OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
