@@ -40,7 +40,7 @@ def init_wandb(arguments):
     config = {
         "learning_rate": arguments.learning_rate,
         "epochs": arguments.num_epochs,
-        "batch_size": nn_model.globals.TRAIN_BATCH_SIZE,
+        "batch_size": arguments.train_batch_size,
         "model": arguments.model,
         "neuron_model_num_layers": arguments.neuron_num_layers,
         "neuron_model_layer_size": arguments.neuron_layer_size,
@@ -260,13 +260,15 @@ if __name__ == "__main__":
         default=nn_model.globals.DEFAULT_PATHS[
             PathDefaultFields.FULL_EVALUATION_DIR.value
         ],
-        help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
+        help="Directory where the results of the evaluation should be saved in case of saving "
+        "all evaluation predictions.",
     )
     parser.add_argument(
         "--best_model_dir",
         type=str,
         default="",
-        help="Directory where the results of the evaluation should be saved in case of saving all evaluation predictions.",
+        help="Directory where the results of the evaluation should be saved in case of saving "
+        "all evaluation predictions.",
     )
     parser.add_argument(
         "--neuron_model_responses_dir",
@@ -274,7 +276,8 @@ if __name__ == "__main__":
         default=nn_model.globals.DEFAULT_PATHS[
             PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value
         ],
-        help="Directory where the results of neuron DNN model on testing range should be stored (filename is best model name).",
+        help="Directory where the results of neuron DNN model on testing range should be stored "
+        "(filename is best model name).",
     )
     # Training parameters
     parser.add_argument(
@@ -322,19 +325,22 @@ if __name__ == "__main__":
         "--neuron_num_layers",
         type=int,
         default=1,
-        help="Number of hidden layers we want to use in the model of the feed-forward neuron (recommended is 5) or number of hidden time steps we want to use in case of the RNN neuron variants (recommended is 1).",
+        help="Number of hidden layers we want to use in the model of the feed-forward neuron "
+        "(recommended is 5) or number of hidden time steps we want to use in case of the RNN "
+        "neuron variants (recommended is 1).",
     )
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
-        default=10,
+        default=20,
         help="Size of the layers of the neuron model.",
     )
     parser.set_defaults(neuron_not_residual=False)
     parser.add_argument(
         "--neuron_not_residual",
         action="store_true",
-        help="Whether we want to use residual connections in the model of a neuron (and in the synaptic adaptation module).",
+        help="Whether we want to use residual connections in the model of a neuron "
+        "(and in the synaptic adaptation module).",
     )
     parser.add_argument(
         "--neuron_activation_function",
@@ -347,7 +353,9 @@ if __name__ == "__main__":
         "--num_hidden_time_steps",
         type=int,
         default=1,
-        help="Number of hidden time steps in RNN of the whole model (in case it is set to 1 the the model would just predict the following visible time step (without additional hidden steps in between)).",
+        help="Number of hidden time steps in RNN of the whole model "
+        "(in case it is set to 1 the the model would just predict the following visible "
+        "time step (without additional hidden steps in between)).",
     )
     parser.set_defaults(not_synaptic_adaptation=True)
     parser.add_argument(
@@ -372,8 +380,24 @@ if __name__ == "__main__":
         "--train_subset",
         type=float,
         default=1.0,
-        help="Number of batches to select as train subset (for modeling training performance on different dataset size).",
+        help="Number of batches to select as train subset "
+        "(for modeling training performance on different dataset size).",
     )
+    parser.add_argument(
+        "--num_data_workers",
+        type=int,
+        default=0,
+        help="Number of CPU threads to use as workers for DataLoader. "
+        "This can help if the GPU utilization is unstable (jumping between 0 and 100), "
+        "because it's waiting for data.",
+    )
+    parser.add_argument(
+        "--train_batch_size",
+        type=int,
+        default=nn_model.globals.TRAIN_BATCH_SIZE,
+        help="Batch size for training.",
+    )
+
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
     parser.add_argument(

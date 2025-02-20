@@ -4,9 +4,28 @@ are typically used for determination of excitatory/inhibitory layer.
 """
 
 import torch
+from torch import nn
 
 from nn_model.type_variants import WeightTypes
 
+@torch.no_grad()
+def _clamp_weight_attr(module: nn.Module, linear_module_name: str, **kwargs):
+    """
+    Clamps weights based on kwargs if possible.
+
+    :param module: parent nn.Module object
+    :param linear_module_name: name of the linear module (attribute of ``module``)
+    :param kwargs: keyword arguments passed to ``torch.nn.Linear``
+    """
+    # get attribute of module with name linear_module_name
+    linear_module = getattr(module, linear_module_name, None)
+    if linear_module is None:
+        return
+    # the attribute should be an instance of nn.Linear
+    if not isinstance(linear_module, nn.Linear):
+        return
+
+    linear_module.weight.clamp_(**kwargs) # in-place version of clamp
 
 class WeightConstraint:
     """
@@ -41,7 +60,7 @@ class WeightConstraint:
         # List of dictionaries of each input layer of this layer information.
         self.input_parameters = input_parameters
 
-    def hidden_constraint(self, module, layer_type, kwargs):
+    def hidden_constraint(self, module: nn.Module, layer_type: str, kwargs):
         """
         Applies constraints on the `weight_hh` (self-recurrent) parameters
         of the provided layer. Applying excitatory/inhibitory constraint.
@@ -55,28 +74,18 @@ class WeightConstraint:
             WeightTypes.EXCITATORY.value,
             WeightTypes.INHIBITORY.value,
         ]
-        if hasattr(module, "weights_hh"):
-            module.weights_hh.weight.data = torch.clamp(
-                module.weights_hh.weight.data, **kwargs
-            )
+        _clamp_weight_attr(module, 'weights_hh', **kwargs)
 
-    def input_constraint(self, module):
+
+    def input_constraint(self, module: nn.Module):
         """
         Applies constraints on the input weights of the provided layer.
         Differentiates between excitatory/inhibitory layers.
 
         :param module: Module to apply the weight on.
         """
-        if hasattr(module, "weights_ih_exc"):
-            module.weights_ih_exc.weight.data = torch.clamp(
-                module.weights_ih_exc.weight.data,
-                **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
-            )
-        if hasattr(module, "weights_ih_inh"):
-            module.weights_ih_inh.weight.data = torch.clamp(
-                module.weights_ih_inh.weight.data,
-                **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
-            )
+        _clamp_weight_attr(module, 'weights_ih_exc',  **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value])
+        _clamp_weight_attr(module, "weights_ih_inh", **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value])
 
 
 class ExcitatoryWeightConstraint(WeightConstraint):

@@ -101,7 +101,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Process only the given sheet (otherwise all sheets).
-    if args.sheet != None and args.sheet in SUBDIRECTORIES:
+    if args.sheet is not None and args.sheet in SUBDIRECTORIES:
         SUBDIRECTORIES = [args.sheet]
 
     for subdirectory in SUBDIRECTORIES:

@@ -1,0 +1,9 @@
+name: time_merger_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - pip:
+      - scipy
+      - tqdm
