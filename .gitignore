@@ -11,5 +11,4 @@ evaluation_tools/evaluation_results_old/*
 wandb/*
 .wandb_api_key.sh
 .wandb_api_key
-metacentrum_scripts/job_script.sh
 metacentrum_scripts/prepared_jobs/*
