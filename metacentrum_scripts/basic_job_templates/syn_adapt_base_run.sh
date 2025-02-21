@@ -1,14 +1,11 @@
 #!/bin/bash
 
-# Read the API key from the .wandb_api_key file
-# WANDB_API_KEY=$(cat .wandb_api_key)
-
 # Input/output files:
 TEMPLATE="metacentrum_scripts/job_template.pbs"
 FILENAME="metacentrum_scripts/prepared_jobs/base_syn_adapt_job.sh"
 # Machine setup:
 WALLTIME="48:00:00"
-NCPUS=8
+NCPUS=4
 NGPUS=1
 GPU_MEM="7gb"
 MEM="100gb"

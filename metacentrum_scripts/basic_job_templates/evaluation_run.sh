@@ -2,9 +2,9 @@
 
 # Input/output files:
 TEMPLATE="metacentrum_scripts/job_template.pbs"
-FILENAME="metacentrum_scripts/prepared_jobs/base_dnn_job.sh"
+FILENAME="metacentrum_scripts/prepared_jobs/evaluation_job.sh"
 # Machine setup:
-WALLTIME="24:00:00"
+WALLTIME="1:00:00"
 NCPUS=4
 NGPUS=1
 GPU_MEM="5gb"
@@ -22,7 +22,9 @@ MODEL_PARAMS="--learning_rate=0.00001 \\
 --neuron_residual \\
 --synaptic_adaptation_size=10 \\
 --synaptic_adaptation_time_steps=1 \\
---num_data_workers=8"
+--num_data_workers=8 \\
+--best_model_evaluation \\
+--save_all_predictions \\"
 # --synaptic_adaptation"
 
 # Run the generate_script.py with the specified parameters and submit the job

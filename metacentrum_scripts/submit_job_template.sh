@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Read the API key from the .wandb_api_key file
-# WANDB_API_KEY=$(cat .wandb_api_key)
-
 # Input/output files:
 TEMPLATE="metacentrum_scripts/job_template.pbs"
 FILENAME="metacentrum_scripts/prepared_jobs/job_script.sh"
