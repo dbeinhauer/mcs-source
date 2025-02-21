@@ -137,3 +137,20 @@ In case you are interested in dataset processing including the
 description of the dataset structure please see documentation in 
 directory `dataset_processor/`. For all kinds of evaluation tools 
 please inspect the `evaluation_tools/` directory.
+
+## Running evaluation predictions
+To plot the evaluation results you need to first run the full
+evaluation and store its predictions for future analysis. 
+It can be done by running the model with the appropriate 
+arguments and two additional switches:
+
+```bash
+--best_model_evaluation
+--save_all_predictions
+```
+
+To plot the results you can inspect the implementation of the
+current version in the `evaluation_tools/` directory. To
+have a notion of the usage of these tools please have a look 
+at `evaluation_tools/response_analysis.ipynb` Jupyter notebook,
+where a few examples are located.

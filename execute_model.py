@@ -44,7 +44,7 @@ def init_wandb(arguments):
         "model": arguments.model,
         "neuron_model_num_layers": arguments.neuron_num_layers,
         "neuron_model_layer_size": arguments.neuron_layer_size,
-        "neuron_model_is_residual": not arguments.neuron_not_residual,
+        "neuron_model_is_residual": arguments.neuron_residual,
         "neuron_activation_function": arguments.neuron_activation_function,
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
@@ -53,7 +53,7 @@ def init_wandb(arguments):
         "gradient_clip": arguments.gradient_clip,
         "optimizer_type": arguments.optimizer_type,
         "weight_initialization": arguments.weight_initialization,
-        "synaptic_adaptation": not arguments.not_synaptic_adaptation,
+        "synaptic_adaptation": arguments.synaptic_adaptation,
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
         "synaptic_adaptation_time_steps": arguments.synaptic_adaptation_time_steps,
     }
@@ -96,13 +96,13 @@ def init_model_path(arguments) -> str:
                 f"-layers-{arguments.neuron_num_layers}",
                 f"-size-{arguments.neuron_layer_size}",
                 f"-activation-{arguments.neuron_activation_function}",
-                f"-res-{not arguments.neuron_not_residual}",
+                f"-res-{arguments.neuron_residual}",
                 f"_hid-time-{arguments.num_hidden_time_steps}",
                 f"_grad-clip-{arguments.gradient_clip}",
                 f"_optim-{arguments.optimizer_type}",
                 f"_weight-init-{arguments.weight_initialization}",
                 "_synaptic",
-                f"-{not arguments.not_synaptic_adaptation}",
+                f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
                 f"-time-{arguments.synaptic_adaptation_time_steps}",
                 ".pth",
@@ -279,6 +279,21 @@ if __name__ == "__main__":
         help="Directory where the results of neuron DNN model on testing range should be stored "
         "(filename is best model name).",
     )
+    # Technical setup:
+    parser.add_argument(
+        "--num_data_workers",
+        type=int,
+        default=0,
+        help="Number of CPU threads to use as workers for DataLoader. "
+        "This can help if the GPU utilization is unstable (jumping between 0 and 100), "
+        "because it's waiting for data.",
+    )
+    parser.add_argument(
+        "--train_batch_size",
+        type=int,
+        default=nn_model.globals.TRAIN_BATCH_SIZE,
+        help="Batch size for training.",
+    )
     # Training parameters
     parser.add_argument(
         "--learning_rate",
@@ -286,7 +301,6 @@ if __name__ == "__main__":
         default=0.00001,
         help="Learning rate to use in model training.",
     )
-    # Training parameters
     parser.add_argument(
         "--optimizer_type",
         type=str,
@@ -335,9 +349,9 @@ if __name__ == "__main__":
         default=20,
         help="Size of the layers of the neuron model.",
     )
-    parser.set_defaults(neuron_not_residual=False)
+    parser.set_defaults(neuron_residual=False)
     parser.add_argument(
-        "--neuron_not_residual",
+        "--neuron_residual",
         action="store_true",
         help="Whether we want to use residual connections in the model of a neuron "
         "(and in the synaptic adaptation module).",
@@ -357,9 +371,9 @@ if __name__ == "__main__":
         "(in case it is set to 1 the the model would just predict the following visible "
         "time step (without additional hidden steps in between)).",
     )
-    parser.set_defaults(not_synaptic_adaptation=True)
+    parser.set_defaults(synaptic_adaptation=False)
     parser.add_argument(
-        "--not_synaptic_adaptation",
+        "--synaptic_adaptation",
         action="store_true",
         help="Whether we want to use synaptic adaptation LSTM module.",
     )
@@ -383,21 +397,6 @@ if __name__ == "__main__":
         help="Number of batches to select as train subset "
         "(for modeling training performance on different dataset size).",
     )
-    parser.add_argument(
-        "--num_data_workers",
-        type=int,
-        default=0,
-        help="Number of CPU threads to use as workers for DataLoader. "
-        "This can help if the GPU utilization is unstable (jumping between 0 and 100), "
-        "because it's waiting for data.",
-    )
-    parser.add_argument(
-        "--train_batch_size",
-        type=int,
-        default=nn_model.globals.TRAIN_BATCH_SIZE,
-        help="Batch size for training.",
-    )
-
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
     parser.add_argument(

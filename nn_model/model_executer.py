@@ -82,7 +82,7 @@ class ModelExecuter:
                 "model_type": model_type,
                 "num_layers": arguments.neuron_num_layers,
                 "layer_size": arguments.neuron_layer_size,
-                "residual": not arguments.neuron_not_residual,
+                "residual": arguments.neuron_residual,
                 "activation_function": arguments.neuron_activation_function,
             }
         }
@@ -133,7 +133,7 @@ class ModelExecuter:
         """
         if (
             arguments.model == ModelTypes.SIMPLE.value
-            or arguments.not_synaptic_adaptation
+            or not arguments.synaptic_adaptation
         ):
             # Model with simple neuron (no additional neuronal model) -> no kwargs
             return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None}
@@ -481,11 +481,13 @@ class ModelExecuter:
         """
         workers_enabled = self.num_data_workers > 0
         kwargs = {
-            'collate_fn': different_times_collate_fn,
-            'num_workers': self.num_data_workers, # number of workers which will supply data to GPU
-            'pin_memory': workers_enabled, # speed up data transfer to GPU
-            'prefetch_factor': 4 if workers_enabled else None, # try to always have 4 samples ready for the GPU
-            'persistent_workers': workers_enabled, # keep the worker threads alive
+            "collate_fn": different_times_collate_fn,
+            "num_workers": self.num_data_workers,  # number of workers which will supply data to GPU
+            "pin_memory": workers_enabled,  # speed up data transfer to GPU
+            "prefetch_factor": (
+                4 if workers_enabled else None
+            ),  # try to always have 4 samples ready for the GPU
+            "persistent_workers": workers_enabled,  # keep the worker threads alive
         }
         train_loader = DataLoader(
             self.train_dataset,
