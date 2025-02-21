@@ -4,7 +4,9 @@ __pycache__
 
 dataset/
 output_dir/
-evaluation_tools/evaluation_results/*
+evaluation_tools/evaluation_results/best_models/*.pth
+evaluation_tools/evaluation_results/full_evaluation_results/*/*
+evaluation_tools/evaluation_results/neuron_model_responses/*.pth
 evaluation_tools/evaluation_results_old/*
 wandb/*
 .wandb_api_key.sh
