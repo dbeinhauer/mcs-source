@@ -155,6 +155,10 @@ def main(arguments):
     logger.print_experiment_info(arguments)
     model_executer = ModelExecuter(arguments)
 
+    # Log number of trainable parameters
+    parameter_count = sum(p.numel() for p in model_executer.model.parameters() if p.requires_grad)
+    wandb.config.update({"parameter_count": parameter_count})
+
     # Set parameters for the execution.
     execution_setup = set_model_execution_parameters()
     if arguments.debug:
