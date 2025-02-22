@@ -25,7 +25,7 @@ hostname = socket.gethostname()
 
 # Select the GPU to use in case we are working in CGG server.
 if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
