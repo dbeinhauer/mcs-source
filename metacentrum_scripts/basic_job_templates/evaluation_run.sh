@@ -7,7 +7,7 @@ FILENAME="metacentrum_scripts/prepared_jobs/evaluation_job.sh"
 WALLTIME="1:00:00"
 NCPUS=4
 NGPUS=1
-GPU_MEM="5gb"
+GPU_MEM="10gb"
 MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
@@ -21,7 +21,7 @@ MODEL_PARAMS="--learning_rate=0.00001 \\
 --neuron_layer_size=10 \\
 --neuron_residual \\
 --synaptic_adaptation_size=10 \\
---synaptic_adaptation_time_steps=1 \\
+--synaptic_adaptation_num_layers=1 \\
 --num_data_workers=8 \\
 --best_model_evaluation \\
 --save_all_predictions \\"

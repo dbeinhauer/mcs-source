@@ -56,7 +56,7 @@ def init_wandb(arguments):
         "weight_initialization": arguments.weight_initialization,
         "synaptic_adaptation": arguments.synaptic_adaptation,
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
-        "synaptic_adaptation_time_steps": arguments.synaptic_adaptation_time_steps,
+        "synaptic_adaptation_num_layers": arguments.synaptic_adaptation_num_layers,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -106,7 +106,7 @@ def init_model_path(arguments) -> str:
                 "_synaptic",
                 f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
-                f"-time-{arguments.synaptic_adaptation_time_steps}",
+                f"-layers-{arguments.synaptic_adaptation_num_layers}",
                 ".pth",
             ]
         )
@@ -358,9 +358,7 @@ if __name__ == "__main__":
         "--neuron_num_layers",
         type=int,
         default=5,
-        help="Number of hidden layers we want to use in the model of the feed-forward neuron "
-        "(recommended is 5) or number of hidden time steps we want to use in case of the RNN "
-        "neuron variants (recommended is 1).",
+        help="Number of hidden layers we want to use in the model of the neuron.",
     )
     parser.add_argument(
         "--neuron_layer_size",
@@ -395,10 +393,10 @@ if __name__ == "__main__":
         help="Size of the layer in the synaptic adaptation LSTM module.",
     )
     parser.add_argument(
-        "--synaptic_adaptation_time_steps",
+        "--synaptic_adaptation_num_layers",
         type=int,
         default=1,
-        help="Number of (hidden) time steps in the synaptic adaptation LSTM module.",
+        help="Number of layers in the synaptic adaptation LSTM module.",
     )
     # Dataset analysis:
     parser.add_argument(

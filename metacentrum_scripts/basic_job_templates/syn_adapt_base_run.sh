@@ -4,10 +4,10 @@
 TEMPLATE="metacentrum_scripts/job_template.pbs"
 FILENAME="metacentrum_scripts/prepared_jobs/base_syn_adapt_job.sh"
 # Machine setup:
-WALLTIME="48:00:00"
+WALLTIME="24:00:00"
 NCPUS=4
 NGPUS=1
-GPU_MEM="7gb"
+GPU_MEM="40gb"
 MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
@@ -15,15 +15,17 @@ SCRATCH_LOCAL="100gb"
 
 # Model parameters:
 MODEL_PARAMS="--learning_rate=0.00001 \\
---num_epochs=20 \\
+--num_epochs=30 \\
 --model=rnn_separate \\
 --neuron_num_layers=1 \\
 --neuron_layer_size=10 \\
 --neuron_residual \\
 --synaptic_adaptation \\
 --synaptic_adaptation_size=10 \\
---synaptic_adaptation_time_steps=1 \\
---num_data_workers=8"
+--synaptic_adaptation_num_layers=1 \\
+--num_data_workers=8 \\
+--num_backpropagation_time_steps=5 \\
+--save_all_predictions"
 
 # Run the generate_script.py with the specified parameters and submit the job
 python metacentrum_scripts/generate_script.py \

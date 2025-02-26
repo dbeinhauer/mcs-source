@@ -7,7 +7,7 @@ FILENAME="metacentrum_scripts/prepared_jobs/base_dnn_job.sh"
 WALLTIME="24:00:00"
 NCPUS=4
 NGPUS=1
-GPU_MEM="5gb"
+GPU_MEM="40gb"
 MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
@@ -21,8 +21,9 @@ MODEL_PARAMS="--learning_rate=0.00001 \\
 --neuron_layer_size=10 \\
 --neuron_residual \\
 --synaptic_adaptation_size=10 \\
---synaptic_adaptation_time_steps=1 \\
---num_data_workers=8"
+--synaptic_adaptation_num_layers=1 \\
+--num_data_workers=8 \\
+--save_all_predictions"
 # --synaptic_adaptation"
 
 # Run the generate_script.py with the specified parameters and submit the job

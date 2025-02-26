@@ -49,8 +49,8 @@ class LoggerModel:
                     f"Weight initialization: {arguments.weight_initialization}",
                     f"Use synaptic adaptation: {arguments.synaptic_adaptation}",
                     f"Synaptic adaptation layer size: {arguments.synaptic_adaptation_size}",
-                    "Synaptic adaptation hidden time steps: "
-                    + str(arguments.synaptic_adaptation_time_steps),
+                    "Synaptic adaptation number of layers: "
+                    + str(arguments.synaptic_adaptation_num_layers),
                 ]
             )
         )

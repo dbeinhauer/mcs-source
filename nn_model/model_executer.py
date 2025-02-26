@@ -81,11 +81,27 @@ class ModelExecuter:
     def _create_shared_module_kwargs(
         module_type: str, model_type: str, arguments
     ) -> Dict:
+        """
+        Based on the given parameter prepares kwargs for either a neuron or
+        a synaptic adaptation model creation.
+
+        :param module_type: Type of the module to create (either neuron or synaptic adaptation).
+        :param model_type: Type of the model.
+        :param arguments: Command line arguments containing wanted kwargs.
+        :return: Returns dictionary containing kwargs for the selected module.
+        """
+        # By default initialize the kwargs for the neuron module.
+        layer_size = arguments.neuron_num_layers
+        num_layers = arguments.neuron_layer_size
+        if module_type == ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value:
+            # Initialize kwargs for the synaptic adaptation module.
+            layer_size = arguments.synaptic_adaptation_size
+            num_layers = arguments.synaptic_adaptation_num_layers
         return {
             module_type: {
                 "model_type": model_type,
-                "num_layers": arguments.neuron_num_layers,
-                "layer_size": arguments.neuron_layer_size,
+                "num_layers": num_layers,
+                "layer_size": layer_size,
                 "residual": arguments.neuron_residual,
                 "activation_function": arguments.neuron_activation_function,
             }
