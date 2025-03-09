@@ -11,8 +11,9 @@ import torch
 import nn_model.globals
 from nn_model.type_variants import LayerConstraintFields, WeightTypes
 from nn_model.weights_constraints import (
-    ExcitatoryWeightConstraint,
-    InhibitoryWeightConstraint,
+    ExcitatoryConstraint,
+    InhibitoryConstraint,
+    ConstraintRegistrar,
 )
 
 
@@ -53,7 +54,7 @@ class LayerConfig:
         self.input_constraints = (
             self._determine_input_constraints()
         )  # Constraints setup (for determining inh/excitatory in the architecture).
-        self.constraint = self._determine_constraint(layer_type, self.input_constraints)
+        self.constraint = self._determine_constraint(layer_type)
 
     def _determine_input_constraints(self) -> List[Dict]:
         """
@@ -100,7 +101,7 @@ class LayerConfig:
             f"Wrong layer type. The type {layer_type} does not exist."
         )
 
-    def _determine_constraint(self, layer_type: str, input_constraints: List[Dict]):
+    def _determine_constraint(self, layer_type: str) -> Optional[ConstraintRegistrar]:
         """
         Determines weight constraints of the layer.
 
@@ -111,13 +112,9 @@ class LayerConfig:
         or `None` if we do not want to use the weight constraint.
         """
         if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            # Excitatory neurons.
-            return ExcitatoryWeightConstraint(input_constraints)
+            return ExcitatoryConstraint()
         if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            # Inhibitory neurons.
-            return InhibitoryWeightConstraint(input_constraints)
-
-        # Apply no constraint.
+            return InhibitoryConstraint()
         return None
 
     def apply_synaptic_adaptation(

@@ -13,7 +13,7 @@ import nn_model.globals
 from nn_model.type_variants import ModelTypes, LayerType
 from nn_model.custom_rnn import CustomRNNCell
 from nn_model.neurons import SharedNeuronBase
-from nn_model.weights_constraints import WeightConstraint
+from nn_model.weights_constraints import ConstraintRegistrar
 
 
 class ModelLayer(nn.Module):
@@ -27,7 +27,7 @@ class ModelLayer(nn.Module):
         input_size: int,
         hidden_size: int,
         layer_name: str,
-        weight_constraint: WeightConstraint,
+        weight_constraint: ConstraintRegistrar,
         input_constraints: List[Dict],
         weight_initialization_type: str,
         neuron_model: Optional[SharedNeuronBase] = None,
@@ -75,8 +75,9 @@ class ModelLayer(nn.Module):
             self.model_type,
             weight_initialization_type,
         )
-        # Weights constraint object.
+        # Register weight constraints
         self.constraint = weight_constraint
+        self.constraint.register(self.rnn_cell)
 
         # Shared neuron model.
         self.neuron_model = neuron_model
@@ -84,6 +85,7 @@ class ModelLayer(nn.Module):
         # Flag whether we want to return also linear outputs (before non-linearity
         # function calling) of the layer (for model analysis).
         self.return_recurrent_state = False
+
 
     def switch_to_return_recurrent_state(self):
         """
@@ -93,11 +95,6 @@ class ModelLayer(nn.Module):
         """
         self.return_recurrent_state = True
 
-    def apply_constraints(self):
-        """
-        Applies the layer constraint on the weights.
-        """
-        self.constraint.apply(self.rnn_cell)
 
     def _input_preprocessing(
         self,
