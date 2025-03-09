@@ -580,6 +580,13 @@ class PrimaryVisualCortexModel(nn.Module):
                     layer
                 ],  # Hidden steps of the neuron models (needed for RNN neuron models).
             )
+            
+            # current_time_outputs[layer] = current_time_outputs[layer].clone()
+            # if recurrent_outputs[layer] is not None:
+            #     recurrent_outputs[layer] = tuple(h.clone() for h in recurrent_outputs[layer])
+            # if neuron_hidden[layer] is not None:
+            #     neuron_hidden[layer] = tuple(h.clone() for h in neuron_hidden[layer])
+
 
             del layers_input, recurrent_input
             torch.cuda.empty_cache()

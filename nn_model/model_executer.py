@@ -3,6 +3,7 @@ This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
+import re
 from typing import Tuple, Dict, List, Optional, Union
 
 import torch.nn
@@ -56,6 +57,30 @@ class ModelExecuter:
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
+        # self.inner_optimizer = self._init_optimizer(
+        #     arguments.optimizer_type, arguments.learning_rate
+        # )
+        
+        # Get all parameters in the model
+        all_params = dict(self.model.named_parameters())
+
+        # Extract parameters for the outer RNN (those matching 'layers.[layer_name].rnn_cell')
+        outer_rnn_params = {
+            name: param for name, param in all_params.items()
+            if re.match(r'layers\.\w+\.rnn_cell', name)
+        }
+
+        # Extract parameters for the inner RNN (all except the ones in outer_rnn_params)
+        inner_rnn_params = {
+            name: param for name, param in all_params.items()
+            if name not in outer_rnn_params
+}
+        
+        # self.optimizer = optim.Adam(outer_rnn_params.values(), lr=arguments.learning_rate)
+        # # self.inner_optimizer = None
+        # self.optimizer_inner = None
+        # if inner_rnn_params:
+        #     self.optimizer_inner = optim.Adam(inner_rnn_params.values(), lr=arguments.learning_rate)
 
         # Gradient clipping upper bound.
         self.gradient_clip = arguments.gradient_clip
@@ -319,7 +344,7 @@ class ModelExecuter:
 
     @staticmethod
     def _detach_hidden_states(
-        hidden_state: Optional[Tuple[torch.Tensor, ...]]
+        hidden_state: Optional[Tuple[torch.Tensor, ...]],
     ) -> Optional[Tuple[torch.Tensor, ...]]:
         """
         Detaches hidden states of the recurrent modules from the gradient graph.
@@ -700,7 +725,7 @@ class ModelExecuter:
 
         return predictions, neuron_hidden, synaptic_adaptation_hidden
 
-    def _perform_optimizer_step(
+    def _calculate_loss(
         self,
         all_predictions,
         all_targets,
@@ -712,22 +737,6 @@ class ModelExecuter:
                     predictions[layer],
                     targets[layer],
                 )
-
-        # Backward step.
-        total_loss.backward()
-
-        # # Detach hidden states from the gradient graph.
-        # neuron_hidden, synaptic_adaptation_hidden = (
-        #     ModelExecuter._detach_all_hidden_states(
-        #         neuron_hidden, synaptic_adaptation_hidden
-        #     )
-        # )
-
-        # Gradient clipping to prevent exploding gradients.
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
-
-        # Optimizer step
-        self.optimizer.step()
 
         return total_loss
 
@@ -835,15 +844,12 @@ class ModelExecuter:
             ModelExecuter._init_modules_hidden_states()
         )
 
-        self.optimizer.zero_grad()
-
-        all_predictions = []
-        all_targets = []
-
         for visible_time in range(
             1, time_length
         ):  # We skip the first time step because we do not have initial hidden values for them.
             # Get data for the current time step.
+            self.optimizer.zero_grad()
+
             inputs, targets, hidden_states = ModelExecuter._get_train_current_time_data(
                 visible_time, input_batch, target_batch, all_hidden_states
             )
@@ -853,17 +859,21 @@ class ModelExecuter:
                     inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
+            
+            current_loss = self._calculate_loss(
+                    [predictions], [targets]
+                )
+            
+            current_loss.backward(retain_graph=True)
 
-            all_predictions.append(predictions)
-            all_targets.append(targets)
+            time_loss_sum += current_loss.item()
 
             if (
                 visible_time % self.num_backpropagation_time_steps == 0
                 or visible_time == time_length - 1
             ):
-                current_loss = self._perform_optimizer_step(
-                    all_predictions, all_targets
-                )
+                self.optimizer.step()
+                self.optimizer.zero_grad()
 
                 # Detach hidden states from the gradient graph.
                 neuron_hidden, synaptic_adaptation_hidden = (
@@ -872,38 +882,10 @@ class ModelExecuter:
                     )
                 )
 
-                # neuron_hidden, synaptic_adaptation_hidden = (
-                #     ModelExecuter._init_modules_hidden_states()
-                # )
-
-                # # Perform the model training step and optimizer step for the time step.
-                # current_loss, neuron_hidden, synaptic_adaptation_hidden = (
-                #     self._optimizer_step(
-                #         inputs,
-                #         hidden_states,
-                #         targets,
-                #         neuron_hidden,
-                #         synaptic_adaptation_hidden,
-                #     )
-                # )
-
-                time_loss_sum += current_loss.item()
-
-                all_predictions = []
-                all_targets = []
-
-                # # Save CUDA memory. Delete not needed variables.
-                # del (
-                #     inputs,
-                #     targets,
-                #     hidden_states,
-                # )
                 torch.cuda.empty_cache()
 
                 # Apply weight constrains (excitatory/inhibitory) for all the layers.
                 self._apply_model_constraints()
-
-                self.optimizer.zero_grad()
 
         del all_hidden_states
         torch.cuda.empty_cache()
