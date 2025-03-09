@@ -589,13 +589,6 @@ class ModelExecuter:
 
         return optim.Adam(param_groups, lr=learning_rate)
 
-    def _apply_model_constraints(self):
-        """
-        Applies model constraints on all model layers (excitatory/inhibitory).
-        """
-        for module in self.model.modules():
-            if isinstance(module, ModelLayer):
-                module.apply_constraints()
 
     def _epoch_evaluation_step(
         self,
@@ -787,8 +780,6 @@ class ModelExecuter:
             )
             torch.cuda.empty_cache()
 
-            # Apply weight constrains (excitatory/inhibitory) for all the layers.
-            self._apply_model_constraints()
 
         del all_hidden_states
         torch.cuda.empty_cache()
