@@ -18,7 +18,7 @@ from nn_model.type_variants import (
 from nn_model.layers import (
     ModelLayer,
 )
-from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase
+from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase, GRUNeuron
 from nn_model.layer_config import LayerConfig
 
 
@@ -197,7 +197,8 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.neuron_type in nn_model.globals.DNN_MODELS:
             neuron_model = DNNNeuron
         elif self.neuron_type in nn_model.globals.RNN_MODELS:
-            neuron_model = LSTMNeuron
+            # neuron_model = LSTMNeuron
+            neuron_model = GRUNeuron
 
         if neuron_model is None:
 
@@ -242,7 +243,10 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.synaptic_adaptation_kwargs is not None:
             return {
                 layer: {
-                    input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs).to(
+                    # input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs).to(
+                    #     nn_model.globals.DEVICE
+                    # )
+                    input_layer: GRUNeuron(**self.synaptic_adaptation_kwargs).to(
                         nn_model.globals.DEVICE
                     )
                     for (
