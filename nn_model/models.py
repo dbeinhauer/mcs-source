@@ -18,7 +18,7 @@ from nn_model.type_variants import (
 from nn_model.layers import (
     ModelLayer,
 )
-from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase, GRUNeuron
+from nn_model.neurons import DNNNeuron, SharedNeuronBase, RNNNeuron
 from nn_model.layer_config import LayerConfig
 
 
@@ -197,8 +197,7 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.neuron_type in nn_model.globals.DNN_MODELS:
             neuron_model = DNNNeuron
         elif self.neuron_type in nn_model.globals.RNN_MODELS:
-            # neuron_model = LSTMNeuron
-            neuron_model = GRUNeuron
+            neuron_model = RNNNeuron
 
         if neuron_model is None:
 
@@ -233,7 +232,7 @@ class PrimaryVisualCortexModel(nn.Module):
 
     def _init_synaptic_adaptation_models(
         self,
-    ) -> Dict[str, Optional[Dict[str, LSTMNeuron]]]:
+    ) -> Dict[str, Optional[Dict[str, RNNNeuron]]]:
         """
         Initializes synaptic adaptation model.
 
@@ -243,10 +242,7 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.synaptic_adaptation_kwargs is not None:
             return {
                 layer: {
-                    # input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs).to(
-                    #     nn_model.globals.DEVICE
-                    # )
-                    input_layer: GRUNeuron(**self.synaptic_adaptation_kwargs).to(
+                    input_layer: RNNNeuron(**self.synaptic_adaptation_kwargs).to(
                         nn_model.globals.DEVICE
                     )
                     for (
@@ -267,7 +263,7 @@ class PrimaryVisualCortexModel(nn.Module):
         self,
         layer_sizes: Dict[str, int],
         neuron_models: Dict[str, Optional[SharedNeuronBase]],
-        synaptic_adaptation_models: Dict[str, Optional[Dict[str, LSTMNeuron]]],
+        synaptic_adaptation_models: Dict[str, Optional[Dict[str, RNNNeuron]]],
     ) -> Dict[str, LayerConfig]:
         """
         Initializes `LayerConfig` objects for all layers of the model.
@@ -584,13 +580,6 @@ class PrimaryVisualCortexModel(nn.Module):
                     layer
                 ],  # Hidden steps of the neuron models (needed for RNN neuron models).
             )
-            
-            # current_time_outputs[layer] = current_time_outputs[layer].clone()
-            # if recurrent_outputs[layer] is not None:
-            #     recurrent_outputs[layer] = tuple(h.clone() for h in recurrent_outputs[layer])
-            # if neuron_hidden[layer] is not None:
-            #     neuron_hidden[layer] = tuple(h.clone() for h in neuron_hidden[layer])
-
 
             del layers_input, recurrent_input
             torch.cuda.empty_cache()

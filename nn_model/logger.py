@@ -42,6 +42,7 @@ class LoggerModel:
                     f"Number of hidden time steps: {arguments.num_hidden_time_steps}",
                     f"Neuron number of layers: {arguments.neuron_num_layers}",
                     f"Neurons layer sizes: {arguments.neuron_layer_size}",
+                    f"Neuron rnn model variant: {arguments.neuron_rnn_variant}",
                     f"Neuron activation function: {arguments.neuron_activation_function}",
                     f"Neuron use residual connection: {arguments.neuron_residual}",
                     f"Gradient clipping: {arguments.gradient_clip}",

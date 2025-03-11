@@ -17,6 +17,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     WeightsInitializationTypes,
     NeuronActivationTypes,
+    RNNTypes
 )
 
 from nn_model.logger import LoggerModel
@@ -25,7 +26,7 @@ hostname = socket.gethostname()
 
 # Select the GPU to use in case we are working in CGG server.
 if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -46,6 +47,7 @@ def init_wandb(arguments):
         "neuron_model_layer_size": arguments.neuron_layer_size,
         "neuron_model_is_residual": arguments.neuron_residual,
         "neuron_activation_function": arguments.neuron_activation_function,
+        "neuron_rnn_variant": arguments.neuron_rnn_variant,
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
@@ -374,6 +376,12 @@ if __name__ == "__main__":
         "(and in the synaptic adaptation module).",
     )
     parser.add_argument(
+        "--neuron_rnn_variant",
+        type=str,
+        default=RNNTypes.GRU.value,
+        help="Variant of the RNN model we use in the neuron and synaptic adaption model.",
+    )
+    parser.add_argument(
         "--neuron_activation_function",
         type=str,
         default=NeuronActivationTypes.LEAKYTANH.value,
@@ -384,19 +392,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--synaptic_adaptation",
         action="store_true",
-        help="Whether we want to use synaptic adaptation LSTM module.",
+        help="Whether we want to use synaptic adaptation RNN module.",
     )
     parser.add_argument(
         "--synaptic_adaptation_size",
         type=int,
         default=10,
-        help="Size of the layer in the synaptic adaptation LSTM module.",
+        help="Size of the layer in the synaptic adaptation RNN module.",
     )
     parser.add_argument(
         "--synaptic_adaptation_num_layers",
         type=int,
         default=1,
-        help="Number of layers in the synaptic adaptation LSTM module.",
+        help="Number of layers in the synaptic adaptation RNN module.",
     )
     # Dataset analysis:
     parser.add_argument(
