@@ -26,7 +26,7 @@ hostname = socket.gethostname()
 
 # Select the GPU to use in case we are working in CGG server.
 if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -359,7 +359,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=5,
+        default=3,
         help="Number of hidden layers we want to use in the model of the neuron.",
     )
     parser.add_argument(

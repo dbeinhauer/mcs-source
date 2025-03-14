@@ -244,7 +244,7 @@ class PrimaryVisualCortexModel(nn.Module):
                 layer: {
                     input_layer: RNNNeuron(**self.synaptic_adaptation_kwargs).to(
                         nn_model.globals.DEVICE
-                    )
+                    ) if layer in {"V1_Exc_L4", "V1_Inh_L4"} else None
                     for (
                         input_layer,
                         _,
