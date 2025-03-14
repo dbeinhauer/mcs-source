@@ -59,6 +59,7 @@ def init_wandb(arguments):
         "synaptic_adaptation": arguments.synaptic_adaptation,
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
         "synaptic_adaptation_num_layers": arguments.synaptic_adaptation_num_layers,
+        "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -88,6 +89,8 @@ def init_model_path(arguments) -> str:
         if arguments.train_subset < 1.0:
             # Subset for training specified.
             train_subset_string = f"train-subset-{arguments.train_subset}"
+            
+        only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
         return "".join(
             [
                 f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
@@ -109,6 +112,7 @@ def init_model_path(arguments) -> str:
                 f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
                 f"-layers-{arguments.synaptic_adaptation_num_layers}",
+                only_lgn,
                 ".pth",
             ]
         )
@@ -405,6 +409,12 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Number of layers in the synaptic adaptation RNN module.",
+    )
+    parser.set_defaults(synaptic_adaptation_only_lgn=False)
+    parser.add_argument(
+        "--synaptic_adaptation_only_lgn",
+        action="store_true",
+        help="Whether we want to use synaptic adaptation RNN module only on LGN layer.",
     )
     # Dataset analysis:
     parser.add_argument(

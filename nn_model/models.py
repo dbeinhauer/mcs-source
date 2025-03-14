@@ -151,7 +151,7 @@ class PrimaryVisualCortexModel(nn.Module):
         self.layers_configs = self._init_layer_configs(
             layer_sizes,
             self._init_neuron_models(),
-            self._init_synaptic_adaptation_models(),
+            self._init_synaptic_adaptation_models(model_modules_kwargs["only_lgn"]),
         )
 
         # Flag whether we want to return the RNN linearity results for analysis.
@@ -232,9 +232,12 @@ class PrimaryVisualCortexModel(nn.Module):
 
     def _init_synaptic_adaptation_models(
         self,
+        only_lgn: bool = False,
     ) -> Dict[str, Optional[Dict[str, RNNNeuron]]]:
         """
         Initializes synaptic adaptation model.
+        
+        :param only_lgn: Flag whether we want to apply synaptic adaptation module only on the LGN layer.
 
         :return: Returns synaptic adaptation models for all layers (dictionary of `None`
         if we do not want to use it).
@@ -244,7 +247,7 @@ class PrimaryVisualCortexModel(nn.Module):
                 layer: {
                     input_layer: RNNNeuron(**self.synaptic_adaptation_kwargs).to(
                         nn_model.globals.DEVICE
-                    ) if layer in {"V1_Exc_L4", "V1_Inh_L4"} else None
+                    ) if input_layer in {"X_ON", "X_OFF"} or not only_lgn else None # Decide whether to use synaptic adaptation only for LGN or for all layers.
                     for (
                         input_layer,
                         _,

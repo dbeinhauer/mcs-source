@@ -160,11 +160,16 @@ class ModelExecuter:
             # Model with simple neuron (no additional neuronal model) -> no kwargs
             return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None}
 
-        return ModelExecuter._create_shared_module_kwargs(
+        synaptic_adaptation_kwargs =  ModelExecuter._create_shared_module_kwargs(
             ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value,
             ModelTypes.RNN_JOINT.value,  # Trick, we want to use input size 1 (so we need to use joint neuron type).
             arguments,
         )
+        # Add info whether we want to use synaptic adaptation module on all the layers or only on the LGN inputs.
+        # Put it outside the "model type" field to not pass it to the synaptic module init (it is outside module init.).
+        synaptic_adaptation_kwargs["only_lgn"] = arguments.synaptic_adaptation_only_lgn
+        
+        return synaptic_adaptation_kwargs
 
     @staticmethod
     def _slice_and_convert_to_float(
