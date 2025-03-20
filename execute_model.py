@@ -5,6 +5,7 @@ This script serves as the interface that is used to execute experiments and eval
 import os
 import socket
 import argparse
+from enum import Enum
 from typing import Dict
 
 import wandb
@@ -17,6 +18,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     WeightsInitializationTypes,
     NeuronActivationTypes,
+    WeightConstraint
 )
 
 from nn_model.logger import LoggerModel
@@ -105,6 +107,7 @@ def init_model_path(arguments) -> str:
                 f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
                 f"-time-{arguments.synaptic_adaptation_time_steps}",
+                f"-weight-constraint-{arguments.weight_constraint.value}",
                 ".pth",
             ]
         )
@@ -194,6 +197,32 @@ def main(arguments):
 
     wandb.finish()
 
+class EnumAction(argparse.Action):
+    """
+    Argparse action for handling Enums
+    Source: https://stackoverflow.com/a/60750535/16273760
+    """
+    def __init__(self, **kwargs):
+        # Pop off the type value
+        enum_type = kwargs.pop("type", None)
+
+        # Ensure an Enum subclass is provided
+        if enum_type is None:
+            raise ValueError("type must be assigned an Enum when using EnumAction")
+        if not issubclass(enum_type, Enum):
+            raise TypeError("type must be an Enum when using EnumAction")
+
+        # Generate choices from the Enum
+        kwargs.setdefault("choices", tuple(e.value for e in enum_type))
+
+        super(EnumAction, self).__init__(**kwargs)
+
+        self._enum = enum_type
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Convert value back into an Enum
+        value = self._enum(values)
+        setattr(namespace, self.dest, value)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -388,6 +417,13 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Number of (hidden) time steps in the synaptic adaptation LSTM module.",
+    )
+    parser.add_argument(
+        "--weight_constraint",
+        type=WeightConstraint,
+        default=WeightConstraint.SHARP,
+        action=EnumAction,
+        help="Type of constraint to apply to model weights.",
     )
     # Dataset analysis:
     parser.add_argument(

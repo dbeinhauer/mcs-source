@@ -520,6 +520,7 @@ class ModelExecuter:
                 **ModelExecuter._get_neuron_model_kwargs(arguments),
                 **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
             },  # Pass kwargs to generate neuron and synaptic adaptation modules.
+            weight_constraint=arguments.weight_constraint,
         )
 
     def _init_criterion(self):

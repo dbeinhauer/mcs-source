@@ -14,6 +14,7 @@ from nn_model.type_variants import (
     ModelTypes,
     NeuronModulePredictionFields,
     ModelModulesFields,
+    WeightConstraint,
 )
 from nn_model.layers import (
     ModelLayer,
@@ -113,6 +114,7 @@ class PrimaryVisualCortexModel(nn.Module):
         neuron_type: str,
         weight_initialization: str,
         model_modules_kwargs: Dict[str, Optional[Dict]],
+        weight_constraint: WeightConstraint,
     ):
         """
         Initializes model parameters, sets weights constraints and creates model architecture.
@@ -124,15 +126,18 @@ class PrimaryVisualCortexModel(nn.Module):
         (name from `ModelTypes`).
         :param weight_initialization: type of weight initialization that we want to use.
         :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic
+        :param weight_constraint: type of weight constraint.
         adaptation models.
         """
-        super(PrimaryVisualCortexModel, self).__init__()
+        super().__init__()
 
         # Number of hidden time steps (between individual targets) that we want to use
         # during training and evaluation (in order to learn the dynamics better).
         self.num_hidden_time_steps = num_hidden_time_steps
 
         self.weight_initialization = weight_initialization
+
+        self.weight_constraint = weight_constraint
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -279,6 +284,7 @@ class PrimaryVisualCortexModel(nn.Module):
                 layer_sizes[layer],
                 layer,
                 input_parameters,
+                self.weight_constraint,
                 neuron_models[layer],
                 synaptic_adaptation_models[layer],
             )
