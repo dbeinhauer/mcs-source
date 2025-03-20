@@ -2,141 +2,135 @@
 This script defines all classes used as weights constraints. These 
 are typically used for determination of excitatory/inhibitory layer.
 """
+from abc import ABC, abstractmethod
 
 import torch
 from torch import nn
 
-from nn_model.type_variants import WeightTypes
+from nn_model.type_variants import WeightTypes, WeightConstraint
+from torch.nn.utils.parametrize import register_parametrization
+from torch.nn.functional import relu, softplus
+from torch import Tensor
 
-@torch.no_grad()
-def _clamp_weight_attr(module: nn.Module, linear_module_name: str, **kwargs):
+
+class Constraint(nn.Module, ABC):
     """
-    Clamps weights based on kwargs if possible.
-
-    :param module: parent nn.Module object
-    :param linear_module_name: name of the linear module (attribute of ``module``)
-    :param kwargs: keyword arguments passed to ``torch.nn.Linear``
-    """
-    # get attribute of module with name linear_module_name
-    linear_module = getattr(module, linear_module_name, None)
-    if linear_module is None:
-        return
-    # the attribute should be an instance of nn.Linear
-    if not isinstance(linear_module, nn.Linear):
-        return
-
-    linear_module.weight.clamp_(**kwargs) # in-place version of clamp
-
-class WeightConstraint:
-    """
-    Parent class used for applying weight constraints for
-    excitatory/inhibitory layers.
+    This class is a PyTorch Module with methods that are required by the parametrization API.
+    When a tensor (parameter of some Module) is parametrized with this Module, PyTorch stores its original values.
+    When the constrained (parametrized) tensor is accessed during a forward pass, it's presented in its constrained state.
+    The constrained state is computed as ``constraint.forward(tensor.original)``.
+    During backprop, ``tensor.original`` gets updated.
+    See also: https://pytorch.org/tutorials/intermediate/parametrizations.html
     """
 
-    # kwargs of the excitatory/inhibitory layers.
-    layer_kwargs = {
-        WeightTypes.EXCITATORY.value: {"min": 0},
-        WeightTypes.INHIBITORY.value: {"max": 0},
+    def __init__(self, constraint_type: WeightTypes):
+        """
+        Module constructor.
+        :param constraint_type: type of constraint (excitatory or inhibitory)
+        """
+        super().__init__()
+        self.constraint_type: WeightTypes = constraint_type
+        self.sign: int = 1 if constraint_type == WeightTypes.EXCITATORY else -1 # desired sign of the constrained tensor
+
+    @abstractmethod
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Transforms tensor to desired form.
+        :param x: input tensor
+        :return: tensor transformed to constrained domain
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def right_inverse(self, x: Tensor) -> Tensor:
+        """
+        Inverse of forward transformation. The method is used upon initialization of parametrized tensor.
+        Definition: forward(right_inverse(x)) = x
+        :param x: input tensor
+        :return: right inverse of forward transformation.
+        """
+        raise NotImplementedError
+
+
+class SharpConstraint(Constraint):
+    """
+    Constraint which uses ReLU.
+
+    Layer Type | Output
+    Excitatory | forward(x) >= 0
+    Inhibitory | forward(x) <= 0
+    """
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.sign * relu(self.sign * x)
+
+    def right_inverse(self, x: Tensor) -> Tensor:
+        return x
+
+
+def inv_softplus(y: Tensor, eps: float = 1e-8) -> Tensor:
+    """
+    Inverse of softplus.
+    We use torch.expm1 for numerical stability. Eps is added so that the computation doesn't fail for y = 0.
+    Source: https://github.com/pytorch/pytorch/issues/72759#issuecomment-1236496693
+    """
+    return y + torch.log(-torch.expm1(-y) + eps)
+
+
+class SmoothConstraint(Constraint):
+    """
+    Constraint which uses softplus.
+    Unlike ReLU, this variant is smooth and not lossy.
+
+    Layer Type | Output
+    Excitatory | forward(x) > 0
+    Inhibitory | forward(x) < 0
+    """
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.sign * softplus(self.sign * x, 1, 20)
+
+    def right_inverse(self, x: Tensor) -> Tensor:
+        return self.sign * inv_softplus(self.sign * x)
+
+
+class ConstraintRegistrar:
+    """
+    Responsible for registering constraints on weights.
+    The constraint type is based on whether the weights are excitatory or inhibitory.
+    """
+    CONSTRAINT_MAPPING = {
+        WeightConstraint.SHARP: SharpConstraint,
+        WeightConstraint.SMOOTH: SmoothConstraint,
     }
 
-    def __init__(self, input_parameters):
+    def __init__(self, layer_type: WeightTypes, constraint_type: WeightConstraint):
+        assert isinstance(layer_type, WeightTypes) and isinstance(constraint_type, WeightConstraint)
+        self.constrainer_class = self.CONSTRAINT_MAPPING[constraint_type]
+        self.parametrization = self.constrainer_class(layer_type)
+
+    @staticmethod
+    def register_linear(linear: nn.Linear, parametrization: Constraint) -> nn.Module:
         """
-        Assigns information used for weight application.
-        :param input_parameters: list of dictionaries that describes the
-        input constitution of the layer based on which we can select correct
-        constraints.
-
-        The list is sorted in ascending order. It means that
-        the first item of the list defines first part of the layer
-        (the lowest indices of the layer). Then follows the next neurons in the
-        layer till it reaches the end of the input.
-
-        In the directory there should be keys `part_type` specifying which
-        type of neurons belongs to corresponding partition (excitatory/inhibitory),
-        possible values are keys from `layer_kwargs` (it means `['inh', 'exc']`),
-        and `part_size` defining number of neurons that belongs to such part.
-        The sum of `part_size` values should be equal to input size of this layer.
+        Should be called once upon construction of model, pytorch handles the subsequent constraints.
+        :param linear: instance of nn.Linear which should have its 'weight' constrained.
+        :param parametrization: nn.Module which takes weights and returns its constrained version.
+        :return: instance of constrained nn.Linear.
         """
-        # List of dictionaries of each input layer of this layer information.
-        self.input_parameters = input_parameters
+        assert isinstance(linear, nn.Linear)
+        assert isinstance(parametrization, Constraint)
+        return register_parametrization(linear, 'weight', parametrization)
 
-    def hidden_constraint(self, module: nn.Module, layer_type: str, kwargs):
+    def register(self, module: nn.Module) -> nn.Module:
         """
-        Applies constraints on the `weight_hh` (self-recurrent) parameters
-        of the provided layer. Applying excitatory/inhibitory constraint.
-
-        :param module: module (layer) to which we want to apply the constraint to.
-        :param layer_type: Identifier whether the layer is inhibitory or excitatory.
-        :param kwargs: kwargs of the `torch.clamp` function specifying the
-        operation on the weights.
+        Register constraints for module.
+        :param module: instance of nn.Module with multiple nn.Linear layers. For example: CustomRNNCell
+        :return: instance of constrained nn.Module.
         """
-        assert layer_type in [
-            WeightTypes.EXCITATORY.value,
-            WeightTypes.INHIBITORY.value,
-        ]
-        _clamp_weight_attr(module, 'weights_hh', **kwargs)
-
-
-    def input_constraint(self, module: nn.Module):
-        """
-        Applies constraints on the input weights of the provided layer.
-        Differentiates between excitatory/inhibitory layers.
-
-        :param module: Module to apply the weight on.
-        """
-        _clamp_weight_attr(module, 'weights_ih_exc',  **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value])
-        _clamp_weight_attr(module, "weights_ih_inh", **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value])
-
-
-class ExcitatoryWeightConstraint(WeightConstraint):
-    """
-    Class used for applying weight constraints for excitatory layers.
-    """
-
-    def __init__(self, input_parameters):
-        """
-        :param input_parameters: input parameters for the parent
-        `WeightConstraint` class.
-        """
-        super(ExcitatoryWeightConstraint, self).__init__(input_parameters)
-
-    def apply(self, module):
-        """
-        Applies the constraints on the given module.
-
-        :param module: module (layer) to which we want to apply the constraint to.
-        """
-        # Apply excitatory condition to all hidden neurons.
-        self.hidden_constraint(
-            module,
-            WeightTypes.EXCITATORY.value,
-            WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value],
-        )
-        self.input_constraint(module)
-
-
-class InhibitoryWeightConstraint(WeightConstraint):
-    """
-    Class used for applying weight constraints for excitatory layers.
-    """
-
-    def __init__(self, input_parameters):
-        """
-        :param input_parameters: input parameters for the parent
-        `WeightConstraint` class.
-        """
-        super(InhibitoryWeightConstraint, self).__init__(input_parameters)
-
-    def apply(self, module):
-        """
-        Applies the constraints on the given module.
-
-        :param module: module (layer) to which we want to apply the constraint to.
-        """
-        # Apply inhibitory condition to all hidden neurons.
-        self.hidden_constraint(
-            module,
-            WeightTypes.INHIBITORY.value,
-            WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value],
-        )
-        self.input_constraint(module)
+        if hasattr(module, "weights_hh") and isinstance(module.weights_hh, nn.Linear):
+            ConstraintRegistrar.register_linear(module.weights_hh, self.parametrization)
+        if hasattr(module, "weights_ih_exc") and isinstance(module.weights_ih_exc, nn.Linear):
+            ConstraintRegistrar.register_linear(module.weights_ih_exc, self.constrainer_class(WeightTypes.EXCITATORY))
+        if hasattr(module, "weights_ih_inh") and isinstance(module.weights_ih_inh, nn.Linear):
+            ConstraintRegistrar.register_linear(module.weights_ih_inh, self.constrainer_class(WeightTypes.EXCITATORY))
+        return module

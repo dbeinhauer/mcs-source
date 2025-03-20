@@ -48,7 +48,7 @@ class ModelExecuter:
         # Dataset initialization.
         self.num_data_workers = arguments.num_data_workers
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
-        self.train_loader, self.test_loader = self._init_data_loaders()
+        self.train_loader, self.test_loader = self._init_data_loaders(arguments)
 
         # Model initialization.
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
@@ -473,7 +473,7 @@ class ModelExecuter:
 
         return train_dataset, test_dataset
 
-    def _init_data_loaders(self) -> Tuple[DataLoader, DataLoader]:
+    def _init_data_loaders(self, arguments) -> Tuple[DataLoader, DataLoader]:
         """
         Initialized train and test `DataLoader` objects.
 
@@ -491,7 +491,7 @@ class ModelExecuter:
         }
         train_loader = DataLoader(
             self.train_dataset,
-            batch_size=nn_model.globals.TRAIN_BATCH_SIZE,
+            batch_size=arguments.train_batch_size,
             shuffle=True,  # Shuffle the training dataset.
             **kwargs,
         )
@@ -520,6 +520,7 @@ class ModelExecuter:
                 **ModelExecuter._get_neuron_model_kwargs(arguments),
                 **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
             },  # Pass kwargs to generate neuron and synaptic adaptation modules.
+            weight_constraint=arguments.weight_constraint,
         )
 
     def _init_criterion(self):
@@ -589,13 +590,6 @@ class ModelExecuter:
 
         return optim.Adam(param_groups, lr=learning_rate)
 
-    def _apply_model_constraints(self):
-        """
-        Applies model constraints on all model layers (excitatory/inhibitory).
-        """
-        for module in self.model.modules():
-            if isinstance(module, ModelLayer):
-                module.apply_constraints()
 
     def _epoch_evaluation_step(
         self,
@@ -787,8 +781,6 @@ class ModelExecuter:
             )
             torch.cuda.empty_cache()
 
-            # Apply weight constrains (excitatory/inhibitory) for all the layers.
-            self._apply_model_constraints()
 
         del all_hidden_states
         torch.cuda.empty_cache()

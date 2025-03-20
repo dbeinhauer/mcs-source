@@ -117,9 +117,12 @@ class CustomRNNCell(nn.Module):
         """
         Initializes module weights using `nn.init.kaiming_uniform_` function.
         """
-        nn.init.kaiming_uniform_(self.weights_ih_exc.weight)
-        nn.init.kaiming_uniform_(self.weights_ih_inh.weight)
-        nn.init.kaiming_uniform_(self.weights_hh.weight)
+        if isinstance(self.weights_ih_exc, nn.Linear):
+            nn.init.kaiming_uniform_(self.weights_ih_exc.weight)
+        if isinstance(self.weights_ih_inh, nn.Linear):
+            nn.init.kaiming_uniform_(self.weights_ih_inh.weight)
+        if isinstance(self.weights_hh, nn.Linear):
+            nn.init.kaiming_uniform_(self.weights_hh.weight)
 
     def _init_normal_weights(self, mean: float = 0.02, std: float = 0.01):
         """
@@ -145,21 +148,24 @@ class CustomRNNCell(nn.Module):
             else 2
         )
 
-        nn.init.normal_(
-            self.weights_ih_exc.weight,
-            mean=mean * 1 * 1,
-            std=std,
-        )
-        nn.init.normal_(
-            self.weights_ih_inh.weight,
-            mean=mean * -1 * 4,
-            std=std * 2,
-        )
-        torch.nn.init.normal_(
-            self.weights_hh.weight,
-            mean=mean * recurrent_layer_multiplier * mean_multiplier,
-            std=std * std_multiplier,
-        )
+        if isinstance(self.weights_ih_exc, nn.Linear):
+            nn.init.normal_(
+                self.weights_ih_exc.weight,
+                mean=mean * 1 * 1,
+                std=std,
+            )
+        if isinstance(self.weights_ih_inh, nn.Linear):
+            nn.init.normal_(
+                self.weights_ih_inh.weight,
+                mean=mean * -1 * 4,
+                std=std * 2,
+            )
+        if isinstance(self.weights_hh, nn.Linear):
+            torch.nn.init.normal_(
+                self.weights_hh.weight,
+                mean=mean * recurrent_layer_multiplier * mean_multiplier,
+                std=std * std_multiplier,
+            )
 
     @torch.no_grad()
     def _flip_weights_signs(self, constraint_multiplier: int):
@@ -170,11 +176,14 @@ class CustomRNNCell(nn.Module):
         :param constraint_multiplier: Multiplier used on self-recurrent weights
         (either `-1` if inhibitory or `1` if excitatory).
         """
-        self.weights_ih_exc.weight.abs_() # in-place
-        self.weights_ih_inh.weight.copy_(-self.weights_ih_inh.weight.abs())
-        self.weights_hh.weight.copy_(
-            constraint_multiplier * self.weights_hh.weight.abs()
-        )
+        if isinstance(self.weights_ih_exc, nn.Linear):
+            self.weights_ih_exc.weight.abs_() # in-place
+        if isinstance(self.weights_ih_inh, nn.Linear):
+            self.weights_ih_inh.weight.copy_(-self.weights_ih_inh.weight.abs())
+        if isinstance(self.weights_hh, nn.Linear):
+            self.weights_hh.weight.copy_(
+                constraint_multiplier * self.weights_hh.weight.abs()
+            )
 
     def _init_weights(self, weight_initialization_type: str):
         """
