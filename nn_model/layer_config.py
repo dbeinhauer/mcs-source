@@ -24,6 +24,7 @@ class LayerConfig:
         size: int,
         layer_type: str,
         input_layers_parameters: List[Tuple[str, str]],
+        weight_constraint: WeightConstraint,
         neuron_model=None,
         synaptic_activation_models=None,
     ):
@@ -36,6 +37,7 @@ class LayerConfig:
         :param input_layers_parameters: ordered list of input layer parameters of the layer.
         The parameters are in form of tuple with first value its name from `LayerType`
         and second value its time step name from `TimeStepVariant`.
+        :param weight_constraint type of weight constraint
         :param neuron_model: shared complexity model(s), if none then `None`.
         :param synaptic_activation_models: synaptic adaptation models for the layer,
         if none then `None`.
@@ -50,7 +52,7 @@ class LayerConfig:
         self.input_constraints = (
             self._determine_input_constraints()
         )  # Constraints setup (for determining inh/excitatory in the architecture).
-        self.constraint = self._determine_constraint(layer_type)
+        self.constraint = self._determine_constraint(layer_type, weight_constraint)
 
     def _determine_input_constraints(self) -> List[Dict]:
         """
@@ -97,21 +99,20 @@ class LayerConfig:
             f"Wrong layer type. The type {layer_type} does not exist."
         )
 
-    def _determine_constraint(self, layer_type: str) -> Optional[ConstraintRegistrar]:
+    def _determine_constraint(self, layer_type: str, weight_constraint: WeightConstraint) -> Optional[ConstraintRegistrar]:
         """
         Determines weight constraints of the layer.
 
         :param layer_type: name of the layer. Should be value from `LayerType`,
         or different if we do not want to use the weight constraints.
-        :param input_constraints: list of constraint kwargs for input layer weight constraints.
         :return: Returns appropriate `WeightConstraint` object,
         or `None` if we do not want to use the weight constraint.
         """
 
         if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            return ConstraintRegistrar(WeightTypes.EXCITATORY, WeightConstraint.SHARP)
+            return ConstraintRegistrar(WeightTypes.EXCITATORY, weight_constraint)
         if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            return ConstraintRegistrar(WeightTypes.INHIBITORY, WeightConstraint.SHARP)
+            return ConstraintRegistrar(WeightTypes.INHIBITORY, weight_constraint)
         return None
 
     def apply_synaptic_adaptation(
