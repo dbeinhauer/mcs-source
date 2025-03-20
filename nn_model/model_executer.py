@@ -48,7 +48,7 @@ class ModelExecuter:
         # Dataset initialization.
         self.num_data_workers = arguments.num_data_workers
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
-        self.train_loader, self.test_loader = self._init_data_loaders()
+        self.train_loader, self.test_loader = self._init_data_loaders(arguments)
 
         # Model initialization.
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
@@ -473,7 +473,7 @@ class ModelExecuter:
 
         return train_dataset, test_dataset
 
-    def _init_data_loaders(self) -> Tuple[DataLoader, DataLoader]:
+    def _init_data_loaders(self, arguments) -> Tuple[DataLoader, DataLoader]:
         """
         Initialized train and test `DataLoader` objects.
 
@@ -491,7 +491,7 @@ class ModelExecuter:
         }
         train_loader = DataLoader(
             self.train_dataset,
-            batch_size=nn_model.globals.TRAIN_BATCH_SIZE,
+            batch_size=arguments.train_batch_size,
             shuffle=True,  # Shuffle the training dataset.
             **kwargs,
         )
