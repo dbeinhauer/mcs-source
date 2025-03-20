@@ -35,6 +35,13 @@ class WeightTypes(Enum):
     EXCITATORY = "exc"
     INHIBITORY = "inh"
 
+class WeightConstraint(Enum):
+    """
+    All possible weight constraints.
+    """
+
+    SHARP = "sharp"   # ReLU
+    SMOOTH = "smooth" # SoftPlus
 
 class ModelModulesFields(Enum):
     """

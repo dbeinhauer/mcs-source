@@ -9,12 +9,8 @@ from typing import List, Tuple, Dict, Optional
 import torch
 
 import nn_model.globals
-from nn_model.type_variants import LayerConstraintFields, WeightTypes
-from nn_model.weights_constraints import (
-    ExcitatoryConstraint,
-    InhibitoryConstraint,
-    ConstraintRegistrar,
-)
+from nn_model.type_variants import LayerConstraintFields, WeightTypes, WeightConstraint
+from nn_model.weights_constraints import ConstraintRegistrar
 
 
 class LayerConfig:
@@ -111,10 +107,11 @@ class LayerConfig:
         :return: Returns appropriate `WeightConstraint` object,
         or `None` if we do not want to use the weight constraint.
         """
+
         if layer_type in nn_model.globals.EXCITATORY_LAYERS:
-            return ExcitatoryConstraint()
+            return ConstraintRegistrar(WeightTypes.EXCITATORY, WeightConstraint.SHARP)
         if layer_type in nn_model.globals.INHIBITORY_LAYERS:
-            return InhibitoryConstraint()
+            return ConstraintRegistrar(WeightTypes.INHIBITORY, WeightConstraint.SHARP)
         return None
 
     def apply_synaptic_adaptation(
