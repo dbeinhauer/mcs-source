@@ -52,6 +52,7 @@ def init_wandb(arguments):
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
         "train_subset_size": arguments.train_subset,
+        "subset_variant": arguments.subset_variant,
         "gradient_clip": arguments.gradient_clip,
         "optimizer_type": arguments.optimizer_type,
         "num_backpropagation_time_steps": arguments.num_backpropagation_time_steps,
@@ -88,13 +89,16 @@ def init_model_path(arguments) -> str:
         train_subset_string = ""
         if arguments.train_subset < 1.0:
             # Subset for training specified.
-            train_subset_string = f"train-subset-{arguments.train_subset}"
+            train_subset_string = f"_train-sub-{arguments.train_subset}"
+            
+        subset_variant_string = f"_sub-var-{arguments.subset_variant}" if arguments.subset_variant != -1 else ""
             
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
         return "".join(
             [
                 f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
                 train_subset_string,
+                subset_variant_string,
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
@@ -158,6 +162,10 @@ def main(arguments):
 
     # Initialize model path (if not specified in the arguments).
     arguments.model_filename = init_model_path(arguments)
+    
+    if args.subset_variant != -1:
+        splitted_path = arguments.subset_dir.split(".")
+        arguments.subset_dir = splitted_path[0] + f"_variant_{arguments.subset_variant}." + splitted_path[-1]
 
     logger = LoggerModel()
     logger.print_experiment_info(arguments)
@@ -423,6 +431,12 @@ if __name__ == "__main__":
         default=1.0,
         help="Number of batches to select as train subset "
         "(for modeling training performance on different dataset size).",
+    )
+    parser.add_argument(
+        "--subset_variant",
+        type=int,
+        default=-1,
+        help="Variant of the subset if (-1) then it is used subset without `_variant` suffix.",
     )
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)

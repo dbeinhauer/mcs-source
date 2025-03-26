@@ -158,7 +158,7 @@ class ModelExecuter:
             or not arguments.synaptic_adaptation
         ):
             # Model with simple neuron (no additional neuronal model) -> no kwargs
-            return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None}
+            return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None, "only_lgn": False}
 
         synaptic_adaptation_kwargs =  ModelExecuter._create_shared_module_kwargs(
             ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value,

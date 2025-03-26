@@ -89,6 +89,7 @@ class DNNNeuron(SharedNeuronBase):
         num_layers: int = 5,
         layer_size: int = 10,
         residual: bool = True,
+        rnn_variant: str = RNNTypes.GRU.value,
     ):
         """
         Initializes DNN model of the neuron.

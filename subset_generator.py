@@ -52,14 +52,16 @@ def main():
     )
 
     args = parser.parse_args()
+    
+    ratio_percentage = int(args.subset_ratio * 100)
 
     if args.output_file == "":
-        args.output_file = SUBSET_DIRECTORY + f"subset_{args.subset_ratio}.pkl"
+        args.output_file = SUBSET_DIRECTORY + f"size_{ratio_percentage}.pkl"
 
     for i in range(args.num_subsets):
         if args.num_subsets > 1:
             args.output_file = (
-                SUBSET_DIRECTORY + f"subset_{args.subset_ratio}_variant_{i}.pkl"
+                SUBSET_DIRECTORY + f"size_{ratio_percentage}_variant_{i}.pkl"
             )
 
         one_subset_generation(args.subset_ratio, args.output_file)
