@@ -13,6 +13,9 @@ SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
 # OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
 
+# Parse arguments - subset variant if we work with multiple of them.
+SUBSET_VARIANT=${1:--1} # Default to -1 if no argument is provided
+
 # Model parameters:
 MODEL_PARAMS="--learning_rate=0.00001 \\
 --num_epochs=2 \\
@@ -25,6 +28,12 @@ MODEL_PARAMS="--learning_rate=0.00001 \\
 --num_data_workers=8 \\
 --debug "
 # --synaptic_adaptation"
+
+# Add --subset_variant to MODEL_PARAMS if SUBSET_VARIANT is not -1
+if [ "$SUBSET_VARIANT" -ne -1 ]; then
+    MODEL_PARAMS="$MODEL_PARAMS \\
+--subset_variant=$SUBSET_VARIANT"
+fi
 
 # Run the generate_script.py with the specified parameters and submit the job
 python metacentrum_scripts/generate_script.py \

@@ -31,7 +31,7 @@ if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
-def init_wandb(arguments):
+def init_wandb(arguments, project_name=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}"):
     """
     Initializes Weights and Biases tracking.
 
@@ -70,7 +70,8 @@ def init_wandb(arguments):
         os.environ["WANDB_DISABLED"] = "false"
 
     wandb.init(
-        project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+        # project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+        project=project_name,
         config=config,
     )
 
@@ -158,7 +159,10 @@ def main(arguments):
 
     :param arguments: command line arguments.
     """
-    init_wandb(arguments)
+    if arguments.wandb_project_name:
+        init_wandb(arguments, arguments.wandb_project_name)
+    else:
+        init_wandb(arguments)
 
     # Initialize model path (if not specified in the arguments).
     arguments.model_filename = init_model_path(arguments)
@@ -437,6 +441,12 @@ if __name__ == "__main__":
         type=int,
         default=-1,
         help="Variant of the subset if (-1) then it is used subset without `_variant` suffix.",
+    )
+    parser.add_argument(
+        "--wandb_project_name",
+        type=str,
+        default="",
+        help="Name of the Weights and Biases project (if custom).",
     )
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
