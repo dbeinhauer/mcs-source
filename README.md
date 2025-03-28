@@ -21,6 +21,23 @@ Main Components of the repository:
 - `execute_model.py` - The source code used for execution of the model (training/evaluation).
 - `requirements.txt` - Requirements file to execute the model.
 - `run_model.sh` - Script used to execute the model training as a background process on the CGG servers.
+- `metacentrum_scripts/` - directory containing useful scripts and templates for the Metacentrum experiment computing
+- `thesis_experiment_setups/` - list of experiment setups for experiments of the master thesis
+- `subset_generator.py` - script that generates model subsets variants
+- `metacentrum_run_all_subsets_job.sh` - script that runs grid search on metacentrum
+
+# Run Metacentrum Grid Search
+First, we need to have grid search settings file defined. 
+Example of such settings file can be found in 
+`metacentrum_scripts/thesis_analysis/settings_template.conf`
+
+We typically store these config files in directory:
+`thesis_experiment_setups/`
+
+To run the metacentrum grid search just run command:
+```bash
+python run_experiments_from_settings_metacentrum.py {experiment_config_file_path}
+```
 
 # Installation
 
