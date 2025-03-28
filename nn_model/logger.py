@@ -36,7 +36,7 @@ class LoggerModel:
                     f"Model size: {nn_model.globals.SIZE_MULTIPLIER}",
                     f"Train subset size: {arguments.train_subset}",
                     f"Model subset variant: {arguments.subset_variant}",
-                    f"Batch size: {nn_model.globals.TRAIN_BATCH_SIZE}",
+                    f"Batch size: {arguments.train_batch_size}",
                     f"Learning rate: {arguments.learning_rate}",
                     f"Num epochs: {arguments.num_epochs}",
                     f"Model variant: {arguments.model}",
