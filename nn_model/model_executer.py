@@ -92,8 +92,8 @@ class ModelExecuter:
         :return: Returns dictionary containing kwargs for the selected module.
         """
         # By default initialize the kwargs for the neuron module.
-        layer_size = arguments.neuron_num_layers
-        num_layers = arguments.neuron_layer_size
+        num_layers = arguments.neuron_num_layers
+        layer_size = arguments.neuron_layer_size
         if module_type == ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value:
             # Initialize kwargs for the synaptic adaptation module.
             layer_size = arguments.synaptic_adaptation_size
