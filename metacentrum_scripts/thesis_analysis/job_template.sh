@@ -150,13 +150,6 @@ if [ "$TRAIN_SUBSET" -ne -1 ]; then
 --train_subset=$TRAIN_SUBSET"
 fi
 
-# # Set Weights and Biases project name:
-# script_dir="${BASH_SOURCE[0]%/*}"  # Get script's directory
-# WANDB_NAME="${script_dir##*/}"       # Extract last directory
-
-# MODEL_PARAMS="$MODEL_PARAMS \\
-# --wandb_project_name=$WANDB_NAME"
-
 # Run the generate_script.py with the specified parameters and submit the job
 python metacentrum_scripts/generate_script.py \
     --template $TEMPLATE \
