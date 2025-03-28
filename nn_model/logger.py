@@ -35,6 +35,7 @@ class LoggerModel:
                     "Running with parameters:",
                     f"Model size: {nn_model.globals.SIZE_MULTIPLIER}",
                     f"Train subset size: {arguments.train_subset}",
+                    f"Model subset variant: {arguments.subset_variant}",
                     f"Batch size: {arguments.train_batch_size}",
                     f"Learning rate: {arguments.learning_rate}",
                     f"Num epochs: {arguments.num_epochs}",
@@ -42,6 +43,7 @@ class LoggerModel:
                     f"Number of hidden time steps: {arguments.num_hidden_time_steps}",
                     f"Neuron number of layers: {arguments.neuron_num_layers}",
                     f"Neurons layer sizes: {arguments.neuron_layer_size}",
+                    f"Neuron rnn model variant: {arguments.neuron_rnn_variant}",
                     f"Neuron activation function: {arguments.neuron_activation_function}",
                     f"Neuron use residual connection: {arguments.neuron_residual}",
                     f"Gradient clipping: {arguments.gradient_clip}",
@@ -49,8 +51,8 @@ class LoggerModel:
                     f"Weight initialization: {arguments.weight_initialization}",
                     f"Use synaptic adaptation: {arguments.synaptic_adaptation}",
                     f"Synaptic adaptation layer size: {arguments.synaptic_adaptation_size}",
-                    "Synaptic adaptation hidden time steps: "
-                    + str(arguments.synaptic_adaptation_time_steps),
+                    "Synaptic adaptation number of layers: "
+                    + str(arguments.synaptic_adaptation_num_layers),
                 ]
             )
         )

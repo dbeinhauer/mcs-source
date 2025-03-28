@@ -18,7 +18,7 @@ from nn_model.type_variants import (
 from nn_model.layers import (
     ModelLayer,
 )
-from nn_model.neurons import DNNNeuron, LSTMNeuron, SharedNeuronBase
+from nn_model.neurons import DNNNeuron, SharedNeuronBase, RNNNeuron
 from nn_model.layer_config import LayerConfig
 
 
@@ -151,7 +151,7 @@ class PrimaryVisualCortexModel(nn.Module):
         self.layers_configs = self._init_layer_configs(
             layer_sizes,
             self._init_neuron_models(),
-            self._init_synaptic_adaptation_models(),
+            self._init_synaptic_adaptation_models(model_modules_kwargs["only_lgn"]),
         )
 
         # Flag whether we want to return the RNN linearity results for analysis.
@@ -197,7 +197,7 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.neuron_type in nn_model.globals.DNN_MODELS:
             neuron_model = DNNNeuron
         elif self.neuron_type in nn_model.globals.RNN_MODELS:
-            neuron_model = LSTMNeuron
+            neuron_model = RNNNeuron
 
         if neuron_model is None:
 
@@ -232,9 +232,12 @@ class PrimaryVisualCortexModel(nn.Module):
 
     def _init_synaptic_adaptation_models(
         self,
-    ) -> Dict[str, Optional[Dict[str, LSTMNeuron]]]:
+        only_lgn: bool = False,
+    ) -> Dict[str, Optional[Dict[str, RNNNeuron]]]:
         """
         Initializes synaptic adaptation model.
+        
+        :param only_lgn: Flag whether we want to apply synaptic adaptation module only on the LGN layer.
 
         :return: Returns synaptic adaptation models for all layers (dictionary of `None`
         if we do not want to use it).
@@ -242,9 +245,9 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.synaptic_adaptation_kwargs is not None:
             return {
                 layer: {
-                    input_layer: LSTMNeuron(**self.synaptic_adaptation_kwargs).to(
+                    input_layer: RNNNeuron(**self.synaptic_adaptation_kwargs).to(
                         nn_model.globals.DEVICE
-                    )
+                    ) if input_layer in {"X_ON", "X_OFF"} or not only_lgn else None # Decide whether to use synaptic adaptation only for LGN or for all layers.
                     for (
                         input_layer,
                         _,
@@ -263,7 +266,7 @@ class PrimaryVisualCortexModel(nn.Module):
         self,
         layer_sizes: Dict[str, int],
         neuron_models: Dict[str, Optional[SharedNeuronBase]],
-        synaptic_adaptation_models: Dict[str, Optional[Dict[str, LSTMNeuron]]],
+        synaptic_adaptation_models: Dict[str, Optional[Dict[str, RNNNeuron]]],
     ) -> Dict[str, LayerConfig]:
         """
         Initializes `LayerConfig` objects for all layers of the model.
