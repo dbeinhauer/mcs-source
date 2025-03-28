@@ -17,7 +17,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     WeightsInitializationTypes,
     NeuronActivationTypes,
-    RNNTypes
+    RNNTypes,
 )
 
 from nn_model.logger import LoggerModel
@@ -31,7 +31,10 @@ if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
-def init_wandb(arguments, project_name=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}"):
+def init_wandb(
+    arguments,
+    project_name=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+):
     """
     Initializes Weights and Biases tracking.
 
@@ -91,9 +94,13 @@ def init_model_path(arguments) -> str:
         if arguments.train_subset < 1.0:
             # Subset for training specified.
             train_subset_string = f"_train-sub-{arguments.train_subset}"
-            
-        subset_variant_string = f"_sub-var-{arguments.subset_variant}" if arguments.subset_variant != -1 else ""
-            
+
+        subset_variant_string = (
+            f"_sub-var-{arguments.subset_variant}"
+            if arguments.subset_variant != -1
+            else ""
+        )
+
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
         return "".join(
             [
@@ -166,10 +173,14 @@ def main(arguments):
 
     # Initialize model path (if not specified in the arguments).
     arguments.model_filename = init_model_path(arguments)
-    
+
     if args.subset_variant != -1:
         splitted_path = arguments.subset_dir.split(".")
-        arguments.subset_dir = splitted_path[0] + f"_variant_{arguments.subset_variant}." + splitted_path[-1]
+        arguments.subset_dir = (
+            splitted_path[0]
+            + f"_variant_{arguments.subset_variant}."
+            + splitted_path[-1]
+        )
 
     logger = LoggerModel()
     logger.print_experiment_info(arguments)
