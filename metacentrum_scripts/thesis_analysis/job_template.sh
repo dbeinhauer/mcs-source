@@ -123,7 +123,7 @@ fi
 
 
 # Model parameters:
-MODEL_PARAMS="--num_data_workers=8 \\
+MODEL_PARAMS="--num_data_workers=4 \\
 --learning_rate=$LEARNING_RATE \\
 --model=$MODEL \\
 --num_epochs=$NUM_EPOCHS \\
