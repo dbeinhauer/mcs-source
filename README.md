@@ -24,7 +24,7 @@ Main Components of the repository:
 - `metacentrum_scripts/` - directory containing useful scripts and templates for the Metacentrum experiment computing
 - `thesis_experiment_setups/` - list of experiment setups for experiments of the master thesis
 - `subset_generator.py` - script that generates model subsets variants
-- `metacentrum_run_all_subsets_job.sh` - script that runs grid search on metacentrum
+- `run_experiments_from_settings_metacentrum.sh` - script that runs grid search on metacentrum
 
 # Run Metacentrum Grid Search
 First, we need to have grid search settings file defined. 
