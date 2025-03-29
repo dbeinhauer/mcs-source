@@ -11,7 +11,7 @@ GPU_MEM="40gb"
 MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
-OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
+# OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
 
 
 # Default values for model parameters
@@ -123,7 +123,7 @@ fi
 
 
 # Model parameters:
-MODEL_PARAMS="--num_data_workers=4 \\
+MODEL_PARAMS="--num_data_workers=8 \\
 --learning_rate=$LEARNING_RATE \\
 --model=$MODEL \\
 --num_epochs=$NUM_EPOCHS \\
