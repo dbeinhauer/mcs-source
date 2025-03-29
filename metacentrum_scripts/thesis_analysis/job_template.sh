@@ -11,7 +11,7 @@ GPU_MEM="40gb"
 MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
-# OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
+OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
 
 
 # Default values for model parameters
@@ -95,8 +95,16 @@ while [[ $# -gt 0 ]]; do
             WANDB_NAME="$2"
             shift 2
             ;;
+        --walltime)
+            WALLTIME="$2"
+            shift 2
+            ;;
+        --gpu_mem)
+            GPU_MEM="$2"
+            shift 2
+            ;;
         --help)
-            echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value]"
+            echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value]"
             exit 0
             ;;
         *)
