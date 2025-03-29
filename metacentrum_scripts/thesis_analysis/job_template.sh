@@ -5,7 +5,7 @@ TEMPLATE="metacentrum_scripts/job_template.pbs"
 FILENAME="metacentrum_scripts/prepared_jobs/base_job.sh"
 # Machine setup:
 WALLTIME="24:00:00"
-NCPUS=4
+NCPUS=8
 NGPUS=1
 GPU_MEM="40gb"
 MEM="100gb"
