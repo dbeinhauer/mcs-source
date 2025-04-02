@@ -22,6 +22,8 @@ echo "Task started at $(date)"
 PROJECT_NAME="mcs-source"
 SERVER_LOCATION="praha1"
 DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
+SIF_IMAGE="/storage/$SERVER_LOCATION/home/$USER/visual_cortex.sif"  # or .sandbox
+
 export TMPDIR=$SCRATCHDIR
 
 test -n "$SCRATCHDIR" || {{
@@ -34,20 +36,16 @@ echo >&2 "Failed to enter DATADIR"
 exit 1
 }}
 
-module load mambaforge
+cd "$SCRATCHDIR"
 
-echo "Creating conda environment at $(date)"
-mamba env create -p "$SCRATCHDIR/tmp_env" -f environment.yaml || {{
-echo >&2 "Failed to create Conda environment"
-exit 1
-}}
-source activate "$SCRATCHDIR/tmp_env" || {{
-echo >&2 "Failed to activate Conda environment"
-exit 1
-}}
-echo "Environment created at $(date)"
+# Create the runner script for inside container
+cat << 'EOF' > run_inside.sh
+#!/bin/bash
+export PATH=/opt/conda/bin:$PATH
+source /opt/conda/etc/profile.d/conda.sh
+conda activate metacentrum_env
 
-WANDB_API_KEY=$(cat .wandb_api_key)
+WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
 
 wandb login "$WANDB_API_KEY" || {{
 echo >&2 "Failed to log into wandb"
@@ -58,10 +56,21 @@ echo "Logged in wandb at $(date)"
 
 echo "Starting model execution at $(date)"
 
-python execute_model.py {model_params} ||
+python /mnt/execute_model.py {model_params} ||
     {{
 echo >&2 "Python script failed"
 exit 1
+}}
+EOF
+
+chmod +x run_inside.sh
+
+echo "Running inside Singularity at $(date)"
+
+# Bind your project directory as /mnt inside container
+singularity exec --nv -B "$DATADIR":/mnt "$SIF_IMAGE" bash run_inside.sh || {{
+    echo >&2 "Python script failed"
+    exit 1
 }}
 
 echo "Task finished at $(date)"

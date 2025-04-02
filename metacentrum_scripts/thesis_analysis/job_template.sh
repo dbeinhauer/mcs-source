@@ -13,7 +13,7 @@ SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
 OPT_MACHINE_ARGS=""
 # OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
-OPT_MACHINE_ARGS=":cluster=^bee"
+# OPT_MACHINE_ARGS=":cluster=^bee"
 
 
 # Default values for model parameters
@@ -171,6 +171,6 @@ python metacentrum_scripts/generate_script.py \
     --mem $MEM \
     --scratch_local $SCRATCH_LOCAL \
     --model_params "$MODEL_PARAMS" \
-    --opt_machine_args $OPT_MACHINE_ARGS \
-    --use_opt_arguments \
     --submit_job
+    # --opt_machine_args $OPT_MACHINE_ARGS \
+    # --use_opt_arguments \
