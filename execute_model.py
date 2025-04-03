@@ -378,7 +378,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_backpropagation_time_steps",
         type=int,
-        default=5,
+        default=1,
         help="Number of time steps for the backpropagation through time. It specifies"
         "how many time steps we want to perform till the next optimizer step.",
     )
@@ -386,7 +386,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neuron_num_layers",
         type=int,
-        default=3,
+        default=5,
         help="Number of hidden layers we want to use in the model of the neuron.",
     )
     parser.add_argument(
