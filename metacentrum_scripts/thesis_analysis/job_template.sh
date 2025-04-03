@@ -11,10 +11,9 @@ GPU_MEM="40gb"
 MEM="100gb"
 SCRATCH_LOCAL="100gb"
 # Optional machine arguments. For example:
-OPT_MACHINE_ARGS=""
+# OPT_MACHINE_ARGS=""
 # OPT_MACHINE_ARGS=":spec=8.0:gpu_cap=compute_86:osfamily=debian"
-# OPT_MACHINE_ARGS=":cluster=^bee"
-
+OPT_MACHINE_ARGS=":cluster=^bee"
 
 # Default values for model parameters
 LEARNING_RATE=0.00001
@@ -33,86 +32,85 @@ SYN_ADAPT_LGN=false
 TRAIN_SUBSET=-1
 WANDB_NAME=""
 
-
 # Parse long options
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --learning_rate)
-            LEARNING_RATE="$2"
-            shift 2
-            ;;
-        --model)
-            MODEL="$2"
-            shift 2
-            ;;
-        --num_epochs)
-            NUM_EPOCHS="$2"
-            shift 2
-            ;;
-        --subset_variant)
-            SUBSET_VARIANT="$2"
-            shift 2
-            ;;
-        --num_backprop_steps)
-            NUM_BACKPROP_STEPS="$2"
-            shift 2
-            ;;
-        --neuron_num_layers)
-            NEURON_NUM_LAYERS="$2"
-            shift 2
-            ;;
-        --neuron_layer_size)
-            NEURON_LAYER_SIZE="$2"
-            shift 2
-            ;;
-        --neuron_residual)
-            NEURON_RESIDUAL=true  # Boolean flag
-            shift 1
-            ;;
-        --neuron_rnn_variant)
-            NEURON_RNN_VARIANT="$2"
-            shift 2
-            ;;
-        --syn_adapt_use)
-            SYN_ADAPT_USE=true  # Boolean flag
-            shift 1
-            ;;
-        --syn_adapt_num_layers)
-            SYN_ADAPT_NUM_LAYERS="$2"
-            shift 2
-            ;;
-        --syn_adapt_size)
-            SYN_ADAPT_SIZE="$2"
-            shift 2
-            ;;
-        --syn_adapt_lgn)
-            SYN_ADAPT_LGN=true  # Boolean flag
-            shift 1
-            ;;
-        --train_subset)
-            TRAIN_SUBSET="$2"
-            shift 2
-            ;;
-        --wandb_name)
-            WANDB_NAME="$2"
-            shift 2
-            ;;
-        --walltime)
-            WALLTIME="$2"
-            shift 2
-            ;;
-        --gpu_mem)
-            GPU_MEM="$2"
-            shift 2
-            ;;
-        --help)
-            echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value]"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            exit 1
-            ;;
+    --learning_rate)
+        LEARNING_RATE="$2"
+        shift 2
+        ;;
+    --model)
+        MODEL="$2"
+        shift 2
+        ;;
+    --num_epochs)
+        NUM_EPOCHS="$2"
+        shift 2
+        ;;
+    --subset_variant)
+        SUBSET_VARIANT="$2"
+        shift 2
+        ;;
+    --num_backprop_steps)
+        NUM_BACKPROP_STEPS="$2"
+        shift 2
+        ;;
+    --neuron_num_layers)
+        NEURON_NUM_LAYERS="$2"
+        shift 2
+        ;;
+    --neuron_layer_size)
+        NEURON_LAYER_SIZE="$2"
+        shift 2
+        ;;
+    --neuron_residual)
+        NEURON_RESIDUAL=true # Boolean flag
+        shift 1
+        ;;
+    --neuron_rnn_variant)
+        NEURON_RNN_VARIANT="$2"
+        shift 2
+        ;;
+    --syn_adapt_use)
+        SYN_ADAPT_USE=true # Boolean flag
+        shift 1
+        ;;
+    --syn_adapt_num_layers)
+        SYN_ADAPT_NUM_LAYERS="$2"
+        shift 2
+        ;;
+    --syn_adapt_size)
+        SYN_ADAPT_SIZE="$2"
+        shift 2
+        ;;
+    --syn_adapt_lgn)
+        SYN_ADAPT_LGN=true # Boolean flag
+        shift 1
+        ;;
+    --train_subset)
+        TRAIN_SUBSET="$2"
+        shift 2
+        ;;
+    --wandb_name)
+        WANDB_NAME="$2"
+        shift 2
+        ;;
+    --walltime)
+        WALLTIME="$2"
+        shift 2
+        ;;
+    --gpu_mem)
+        GPU_MEM="$2"
+        shift 2
+        ;;
+    --help)
+        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value]"
+        exit 0
+        ;;
+    *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
     esac
 done
 
@@ -121,8 +119,6 @@ if [ -z "$WANDB_NAME" ]; then
     echo "Error: --wandb_name is required."
     exit 1
 fi
-
-
 
 # Model parameters:
 MODEL_PARAMS="--num_data_workers=8 \\
@@ -171,6 +167,6 @@ python metacentrum_scripts/generate_script.py \
     --mem $MEM \
     --scratch_local $SCRATCH_LOCAL \
     --model_params "$MODEL_PARAMS" \
-    --submit_job
-    # --opt_machine_args $OPT_MACHINE_ARGS \
-    # --use_opt_arguments \
+    --submit_job \
+    --opt_machine_args $OPT_MACHINE_ARGS \
+    --use_opt_arguments
