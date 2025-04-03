@@ -5,11 +5,10 @@ set -e
 # === CONFIGURATION ===
 SANDBOX_NAME="debian12_conda.sandbox"
 SIF_NAME="metacentrum_env.sif"
-CONDA_ENV_NAME="metacentrum_env"
+CONDA_ENV_NAME="    "
 PROJECT_NAME="mcs-source"
 SERVER_LOCATION="praha1"
 ENV_YAML_HOST_PATH="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME/environment.yaml"
-# ENV_YAML_HOST_PATH="/home/dbeinhauer/environment.yaml"  # <-- On the host
 ENV_YAML_CONTAINER_PATH="/mnt/environment.yaml"          # <-- Will appear inside the container
 BASE_IMAGE="docker://debian:12"
 
