@@ -138,6 +138,10 @@ class LayerConfig:
         # for batch processing (parallel application of the neuron module for all
         # the layer output values).
         synaptic_activation_model = self.synaptic_activation_models[input_layer]
+        if synaptic_activation_model is None:
+            # Synaptic adaptation is not defined for this connection.
+            return input_tensor, hidden_states
+        
         complexity_result = input_tensor.reshape(
             -1, synaptic_activation_model.input_size
         )

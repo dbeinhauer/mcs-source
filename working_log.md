@@ -599,3 +599,11 @@ Notes after meetings:
 # 12.2.2025
 - LSTM neuron without hidden time steps and learning rate 0.00001 seems to be the best variant till now
     - it reaches the CC_NORM=0.935
+
+# 14.2.2025
+- added backpropagation through time for the multiple time steps in RNN variants
+    - does not work well though
+
+# 28.3.2025
+- there has been bug in number of layers and layer size 
+    - these values has been inter
