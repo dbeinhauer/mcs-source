@@ -1,6 +1,6 @@
 """
 This source code defines multiple variants of complex neurons
-that can be used in the model. Neuron here is represented by 
+that can be used in the model. Neuron here is represented by
 some small model.
 """
 
@@ -150,10 +150,11 @@ class DNNNeuron(SharedNeuronBase):
         out = self.custom_activation(out)
 
         return out, tuple(torch.zeros(0))
-    
+
+
 class RNNNeuron(SharedNeuronBase):
     """
-    Memory-enabled neuron module using an LSTM cell for processing scalar inputs.
+    Memory-enabled neuron module using an LSTM or GRU cell for processing scalar inputs.
     """
 
     def __init__(
@@ -177,11 +178,14 @@ class RNNNeuron(SharedNeuronBase):
         super(RNNNeuron, self).__init__(model_type, activation_function, residual)
         self.layer_size = layer_size
         self.num_layers = num_layers  # Number of hidden time steps
-        
-        assert rnn_variant in [RNNTypes.GRU.value, RNNTypes.LSTM.value], "Invalid RNN cell variant"
-        
+
+        assert rnn_variant in [
+            RNNTypes.GRU.value,
+            RNNTypes.LSTM.value,
+        ], "Invalid RNN cell variant"
+
         self.rnn_variant = rnn_variant
-        
+
         rnn_model = nn.LSTM if rnn_variant == RNNTypes.LSTM.value else nn.GRU
 
         # Model initialization: input layer, RNN layers, output layer
@@ -190,7 +194,7 @@ class RNNNeuron(SharedNeuronBase):
             layer_size,
             self.num_layers,
         )
-        
+
         # Scalar output layer
         self.output_layer = nn.Linear(layer_size, 1)
 
@@ -223,8 +227,8 @@ class RNNNeuron(SharedNeuronBase):
                 )
             else:
                 hidden = torch.randn(self.num_layers, batch_size, self.layer_size).to(
-                        inputs.device
-                    )
+                    inputs.device
+                )
 
         # h, c = hidden
         output, hidden = self.rnn_network(inputs, hidden)
@@ -244,4 +248,3 @@ class RNNNeuron(SharedNeuronBase):
         output = self.custom_activation(output)
 
         return output, hidden
-    

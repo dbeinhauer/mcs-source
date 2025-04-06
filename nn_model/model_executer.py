@@ -1,5 +1,5 @@
 """
-This script defines manipulation with the models and is used to execute 
+This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
@@ -57,7 +57,7 @@ class ModelExecuter:
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
-        
+
         # Gradient clipping upper bound.
         self.gradient_clip = arguments.gradient_clip
 
@@ -158,9 +158,12 @@ class ModelExecuter:
             or not arguments.synaptic_adaptation
         ):
             # Model with simple neuron (no additional neuronal model) -> no kwargs
-            return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None, "only_lgn": False}
+            return {
+                ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None,
+                "only_lgn": False,
+            }
 
-        synaptic_adaptation_kwargs =  ModelExecuter._create_shared_module_kwargs(
+        synaptic_adaptation_kwargs = ModelExecuter._create_shared_module_kwargs(
             ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value,
             ModelTypes.RNN_JOINT.value,  # Trick, we want to use input size 1 (so we need to use joint neuron type).
             arguments,
@@ -168,7 +171,7 @@ class ModelExecuter:
         # Add info whether we want to use synaptic adaptation module on all the layers or only on the LGN inputs.
         # Put it outside the "model type" field to not pass it to the synaptic module init (it is outside module init.).
         synaptic_adaptation_kwargs["only_lgn"] = arguments.synaptic_adaptation_only_lgn
-        
+
         return synaptic_adaptation_kwargs
 
     @staticmethod
@@ -233,7 +236,7 @@ class ModelExecuter:
 
     @staticmethod
     def _move_data_to_cuda(
-        data_dict: Dict[str, torch.Tensor]
+        data_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
         """
         Moves given data for all layers to CUDA.
@@ -445,7 +448,7 @@ class ModelExecuter:
 
     @staticmethod
     def _prepare_evaluation_predictions_for_return(
-        all_layers_predictions: Dict[str, List[torch.Tensor]]
+        all_layers_predictions: Dict[str, List[torch.Tensor]],
     ) -> Dict[str, torch.Tensor]:
         """
         Takes all the predictions of given type (full predictions, rnn predictions etc.) and
@@ -683,11 +686,17 @@ class ModelExecuter:
 
     def _model_forward_step(
         self,
-        inputs,
-        hidden_states,
-        neuron_hidden,
-        synaptic_adaptation_hidden,
-    ):
+        inputs: Dict[str, torch.Tensor],
+        hidden_states: Dict[str, torch.Tensor],
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
+    ) -> Tuple[
+        Dict[str, torch.Tensor],
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
         all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
@@ -709,8 +718,8 @@ class ModelExecuter:
 
     def _calculate_loss(
         self,
-        predictions,
-        targets,
+        predictions: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
     ):
         total_loss = torch.zeros(1)
         for layer in predictions:
@@ -726,14 +735,16 @@ class ModelExecuter:
         neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
         synaptic_adaptation_hidden: Dict[
             str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
-        ]) -> Tuple[Dict[str, Optional[Tuple[torch.Tensor, ...]]], 
-                    Dict[
-            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]]]:
+        ],
+    ) -> Tuple[
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
         """
         Performs optimizer step and all necessary operations, gradient clipping,
-        detaches neuron and synaptic adaptation hidden steps and applies model 
+        detaches neuron and synaptic adaptation hidden steps and applies model
         weight constraints.
-        
+
         :param neuron_hidden: Hidden states of the neuron model.
         :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
         :return: Returns tuple of updated and detached neuron module hidden states
@@ -748,14 +759,13 @@ class ModelExecuter:
                 neuron_hidden, synaptic_adaptation_hidden
             )
         )
-        
+
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
-        
+
         # Apply weight constrains (excitatory/inhibitory) for all the layers.
         self._apply_model_constraints()
-        
-        return neuron_hidden, synaptic_adaptation_hidden
 
+        return neuron_hidden, synaptic_adaptation_hidden
 
     def _train_perform_visible_time_step(
         self,
@@ -797,31 +807,31 @@ class ModelExecuter:
                     inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
-            
+
             # Calculate time step loss.
-            accumulated_loss += self._calculate_loss(
-                    predictions, targets
-                )
-            
+            accumulated_loss += self._calculate_loss(predictions, targets)
+
             if (
                 visible_time % self.num_backpropagation_time_steps == 0
                 or visible_time == time_length - 1
-            ):  
+            ):
                 # Perform truncated backpropagation through time.
                 # Perform optimizer step only after given number of time steps.
 
                 # Backward step:
                 accumulated_loss.backward()
-                
+
                 # Optimizer step:
-                neuron_hidden, synaptic_adaptation_hidden = self._optimizer_step(neuron_hidden, synaptic_adaptation_hidden)
-                
+                neuron_hidden, synaptic_adaptation_hidden = self._optimizer_step(
+                    neuron_hidden, synaptic_adaptation_hidden
+                )
+
                 # Save loss for logs and reset counter.
                 time_loss_sum += accumulated_loss.item()
                 accumulated_loss = 0
 
                 torch.cuda.empty_cache()
-                    
+
         del all_hidden_states
         torch.cuda.empty_cache()
 
