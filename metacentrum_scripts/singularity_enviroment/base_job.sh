@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N VISUAL_CORTEX_MODEL
-#PBS -l walltime={walltime}
-#PBS -l select=1:ncpus={ncpus}:ngpus={ngpus}:gpu_mem={gpu_mem}:mem={mem}:scratch_local={scratch_local}{opt_machine_args}
+#PBS -l walltime=00:10:00
+#PBS -l select=1:ncpus=8:ngpus=1
 
 #PBS -m ae
 #PBS -j oe
@@ -9,10 +9,10 @@
 set -e
 
 # Ensure clean_scratch runs on exit, even on error
-cleanup() {{
-echo "Running clean_scratch at $(date)"
-clean_scratch
-}}
+cleanup() {
+    echo "Running clean_scratch at $(date)"
+    clean_scratch
+}
 trap cleanup EXIT
 
 nvidia-smi
@@ -26,16 +26,20 @@ SIF_IMAGE="/storage/$SERVER_LOCATION/home/$USER/visual_cortex.sif"  # or .sandbo
 
 export TMPDIR=$SCRATCHDIR
 
-test -n "$SCRATCHDIR" || {{
-echo >&2 "SCRATCHDIR is not set!"
-exit 1
-}}
+test -n "$SCRATCHDIR" || {
+    echo >&2 "SCRATCHDIR is not set!"
+    exit 1
+}
 
-cd "$DATADIR" || {{
-echo >&2 "Failed to enter DATADIR"
-exit 1
-}}
+cd "$DATADIR" || {
+    echo >&2 "Failed to enter DATADIR"
+    exit 1
+}
 
+# Module (optional if singularity already in path)
+# module load singularity
+
+# Copy image to scratch (optional, improves performance)
 cd "$SCRATCHDIR"
 
 # Create the runner script for inside container
@@ -46,21 +50,9 @@ source /opt/conda/etc/profile.d/conda.sh
 conda activate metacentrum_env
 
 WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
+wandb login "$WANDB_API_KEY"
 
-wandb login "$WANDB_API_KEY" || {{
-echo >&2 "Failed to log into wandb"
-exit 1
-}}
-
-echo "Logged in wandb at $(date)"
-
-echo "Starting model execution at $(date)"
-
-python /mnt/execute_model.py {model_params} ||
-    {{
-echo >&2 "Python script failed"
-exit 1
-}}
+python /mnt/execute_model.py --debug
 EOF
 
 chmod +x run_inside.sh
@@ -68,11 +60,11 @@ chmod +x run_inside.sh
 echo "Running inside Singularity at $(date)"
 
 # Bind your project directory as /mnt inside container
-singularity exec --nv -B "$DATADIR":/mnt "$SIF_IMAGE" bash run_inside.sh || {{
+singularity exec -nv -B "$DATADIR":/mnt "$SIF_IMAGE" bash run_inside.sh || {
     echo >&2 "Python script failed"
     exit 1
-}}
-
-echo "Task finished at $(date)"
+}
 
 clean_scratch
+
+echo "Task finished at $(date)"

@@ -1,8 +1,9 @@
 """
-This script defines manipulation with the models and is used to execute 
+This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
+import re
 from typing import Tuple, Dict, List, Optional, Union
 
 import torch.nn
@@ -60,6 +61,10 @@ class ModelExecuter:
         # Gradient clipping upper bound.
         self.gradient_clip = arguments.gradient_clip
 
+        # Number of time steps to run till next optimizer step
+        # (truncated backpropagation through time).
+        self.num_backpropagation_time_steps = arguments.num_backpropagation_time_steps
+
         # Evaluation metric.
         self.evaluation_metrics = NormalizedCrossCorrelation()
 
@@ -77,13 +82,30 @@ class ModelExecuter:
     def _create_shared_module_kwargs(
         module_type: str, model_type: str, arguments
     ) -> Dict:
+        """
+        Based on the given parameter prepares kwargs for either a neuron or
+        a synaptic adaptation model creation.
+
+        :param module_type: Type of the module to create (either neuron or synaptic adaptation).
+        :param model_type: Type of the model.
+        :param arguments: Command line arguments containing wanted kwargs.
+        :return: Returns dictionary containing kwargs for the selected module.
+        """
+        # By default initialize the kwargs for the neuron module.
+        num_layers = arguments.neuron_num_layers
+        layer_size = arguments.neuron_layer_size
+        if module_type == ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value:
+            # Initialize kwargs for the synaptic adaptation module.
+            layer_size = arguments.synaptic_adaptation_size
+            num_layers = arguments.synaptic_adaptation_num_layers
         return {
             module_type: {
                 "model_type": model_type,
-                "num_layers": arguments.neuron_num_layers,
-                "layer_size": arguments.neuron_layer_size,
+                "num_layers": num_layers,
+                "layer_size": layer_size,
                 "residual": arguments.neuron_residual,
                 "activation_function": arguments.neuron_activation_function,
+                "rnn_variant": arguments.neuron_rnn_variant,
             }
         }
 
@@ -136,13 +158,21 @@ class ModelExecuter:
             or not arguments.synaptic_adaptation
         ):
             # Model with simple neuron (no additional neuronal model) -> no kwargs
-            return {ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None}
+            return {
+                ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value: None,
+                "only_lgn": False,
+            }
 
-        return ModelExecuter._create_shared_module_kwargs(
+        synaptic_adaptation_kwargs = ModelExecuter._create_shared_module_kwargs(
             ModelModulesFields.SYNAPTIC_ADAPTION_MODULE.value,
             ModelTypes.RNN_JOINT.value,  # Trick, we want to use input size 1 (so we need to use joint neuron type).
             arguments,
         )
+        # Add info whether we want to use synaptic adaptation module on all the layers or only on the LGN inputs.
+        # Put it outside the "model type" field to not pass it to the synaptic module init (it is outside module init.).
+        synaptic_adaptation_kwargs["only_lgn"] = arguments.synaptic_adaptation_only_lgn
+
+        return synaptic_adaptation_kwargs
 
     @staticmethod
     def _slice_and_convert_to_float(
@@ -206,7 +236,7 @@ class ModelExecuter:
 
     @staticmethod
     def _move_data_to_cuda(
-        data_dict: Dict[str, torch.Tensor]
+        data_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
         """
         Moves given data for all layers to CUDA.
@@ -299,7 +329,7 @@ class ModelExecuter:
 
     @staticmethod
     def _detach_hidden_states(
-        hidden_state: Optional[Tuple[torch.Tensor, ...]]
+        hidden_state: Optional[Tuple[torch.Tensor, ...]],
     ) -> Optional[Tuple[torch.Tensor, ...]]:
         """
         Detaches hidden states of the recurrent modules from the gradient graph.
@@ -315,7 +345,7 @@ class ModelExecuter:
             # Tuple states (typically LSTM).
             return tuple(state.detach() for state in hidden_state)
         elif isinstance(hidden_state, torch.Tensor):
-            # Only one hidden state (typically classical RNN).
+            # Only one hidden state (typically classical RNN, GRU).
             return hidden_state.detach()
         else:
             raise TypeError("Unsupported type for hidden_state")
@@ -418,7 +448,7 @@ class ModelExecuter:
 
     @staticmethod
     def _prepare_evaluation_predictions_for_return(
-        all_layers_predictions: Dict[str, List[torch.Tensor]]
+        all_layers_predictions: Dict[str, List[torch.Tensor]],
     ) -> Dict[str, torch.Tensor]:
         """
         Takes all the predictions of given type (full predictions, rnn predictions etc.) and
@@ -654,39 +684,19 @@ class ModelExecuter:
                 self.evaluation_results_saver.best_model_path,
             )
 
-    def _optimizer_step(
+    def _model_forward_step(
         self,
         inputs: Dict[str, torch.Tensor],
         hidden_states: Dict[str, torch.Tensor],
-        targets: Dict[str, torch.Tensor],
         neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
         synaptic_adaptation_hidden: Dict[
             str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
         ],
     ) -> Tuple[
-        float,
+        Dict[str, torch.Tensor],
         Dict[str, Optional[Tuple[torch.Tensor, ...]]],
         Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
     ]:
-        """
-        Performs time step prediction and optimizer step.
-
-        This function should be run to train visible time step transition.
-        First, it predicts all hidden time-steps (the last one is our prediction).
-        Then computes loss for all layers and sums the losses. Then it performs
-        backward step for the loss sum and after that it does optimizer step.
-
-        :param inputs: Current time values from input layers (LGN).
-        :param hidden_states: Current hidden states (typically targets from previous time step).
-        :param targets: Targets of the next visible time step.
-        :param neuron_hidden: Hidden states of the neuron model.
-        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
-        :return: Returns tuple of sum of losses for all layers, updated neuron module hidden states
-        and synaptic adaptation module hidden states.
-        """
-        # We want to zero optimizer gradient before each training step.
-        self.optimizer.zero_grad()
-
         all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
@@ -704,7 +714,13 @@ class ModelExecuter:
             {layer: predictions[-1] for layer, predictions in all_predictions.items()},
         )  # Take the last time step prediction (target prediction).
 
-        # Loss calculation.
+        return predictions, neuron_hidden, synaptic_adaptation_hidden
+
+    def _calculate_loss(
+        self,
+        predictions: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
+    ):
         total_loss = torch.zeros(1)
         for layer in predictions:
             total_loss += self.criterion(
@@ -712,8 +728,30 @@ class ModelExecuter:
                 targets[layer],
             )
 
-        # Backward step.
-        total_loss.backward()
+        return total_loss
+
+    def _optimizer_step(
+        self,
+        neuron_hidden: Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        synaptic_adaptation_hidden: Dict[
+            str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
+        ],
+    ) -> Tuple[
+        Dict[str, Optional[Tuple[torch.Tensor, ...]]],
+        Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
+    ]:
+        """
+        Performs optimizer step and all necessary operations, gradient clipping,
+        detaches neuron and synaptic adaptation hidden steps and applies model
+        weight constraints.
+
+        :param neuron_hidden: Hidden states of the neuron model.
+        :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
+        :return: Returns tuple of updated and detached neuron module hidden states
+        and synaptic adaptation module hidden states.
+        """
+        self.optimizer.step()
+        self.optimizer.zero_grad()
 
         # Detach hidden states from the gradient graph.
         neuron_hidden, synaptic_adaptation_hidden = (
@@ -722,16 +760,12 @@ class ModelExecuter:
             )
         )
 
-        # Gradient clipping to prevent exploding gradients.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
 
-        # Optimizer step
-        self.optimizer.step()
+        # Apply weight constrains (excitatory/inhibitory) for all the layers.
+        self._apply_model_constraints()
 
-        del all_predictions
-        torch.cuda.empty_cache()
-
-        return total_loss.item(), neuron_hidden, synaptic_adaptation_hidden
+        return neuron_hidden, synaptic_adaptation_hidden
 
     def _train_perform_visible_time_step(
         self,
@@ -757,6 +791,7 @@ class ModelExecuter:
         neuron_hidden, synaptic_adaptation_hidden = (
             ModelExecuter._init_modules_hidden_states()
         )
+        accumulated_loss = 0
 
         for visible_time in range(
             1, time_length
@@ -766,29 +801,36 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
-            # Perform the model training step and optimizer step for the time step.
-            current_loss, neuron_hidden, synaptic_adaptation_hidden = (
-                self._optimizer_step(
-                    inputs,
-                    hidden_states,
-                    targets,
-                    neuron_hidden,
-                    synaptic_adaptation_hidden,
+            # Perform model forward step.
+            predictions, neuron_hidden, synaptic_adaptation_hidden = (
+                self._model_forward_step(
+                    inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
 
-            time_loss_sum += current_loss
+            # Calculate time step loss.
+            accumulated_loss += self._calculate_loss(predictions, targets)
 
-            # Save CUDA memory. Delete not needed variables.
-            del (
-                inputs,
-                targets,
-                hidden_states,
-            )
-            torch.cuda.empty_cache()
+            if (
+                visible_time % self.num_backpropagation_time_steps == 0
+                or visible_time == time_length - 1
+            ):
+                # Perform truncated backpropagation through time.
+                # Perform optimizer step only after given number of time steps.
 
-            # Apply weight constrains (excitatory/inhibitory) for all the layers.
-            self._apply_model_constraints()
+                # Backward step:
+                accumulated_loss.backward()
+
+                # Optimizer step:
+                neuron_hidden, synaptic_adaptation_hidden = self._optimizer_step(
+                    neuron_hidden, synaptic_adaptation_hidden
+                )
+
+                # Save loss for logs and reset counter.
+                time_loss_sum += accumulated_loss.item()
+                accumulated_loss = 0
+
+                torch.cuda.empty_cache()
 
         del all_hidden_states
         torch.cuda.empty_cache()

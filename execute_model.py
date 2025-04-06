@@ -17,6 +17,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     WeightsInitializationTypes,
     NeuronActivationTypes,
+    RNNTypes,
 )
 
 from nn_model.logger import LoggerModel
@@ -30,7 +31,10 @@ if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
-def init_wandb(arguments):
+def init_wandb(
+    arguments,
+    project_name=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+):
     """
     Initializes Weights and Biases tracking.
 
@@ -46,16 +50,20 @@ def init_wandb(arguments):
         "neuron_model_layer_size": arguments.neuron_layer_size,
         "neuron_model_is_residual": arguments.neuron_residual,
         "neuron_activation_function": arguments.neuron_activation_function,
+        "neuron_rnn_variant": arguments.neuron_rnn_variant,
         "model_size": nn_model.globals.SIZE_MULTIPLIER,
         "time_step_size": nn_model.globals.TIME_STEP,
         "num_hidden_time_steps": arguments.num_hidden_time_steps,
         "train_subset_size": arguments.train_subset,
+        "subset_variant": arguments.subset_variant,
         "gradient_clip": arguments.gradient_clip,
         "optimizer_type": arguments.optimizer_type,
+        "num_backpropagation_time_steps": arguments.num_backpropagation_time_steps,
         "weight_initialization": arguments.weight_initialization,
         "synaptic_adaptation": arguments.synaptic_adaptation,
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
-        "synaptic_adaptation_time_steps": arguments.synaptic_adaptation_time_steps,
+        "synaptic_adaptation_num_layers": arguments.synaptic_adaptation_num_layers,
+        "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -65,7 +73,8 @@ def init_wandb(arguments):
         os.environ["WANDB_DISABLED"] = "false"
 
     wandb.init(
-        project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+        # project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
+        project=project_name,
         config=config,
     )
 
@@ -84,14 +93,24 @@ def init_model_path(arguments) -> str:
         train_subset_string = ""
         if arguments.train_subset < 1.0:
             # Subset for training specified.
-            train_subset_string = f"train-subset-{arguments.train_subset}"
+            train_subset_string = f"_train-sub-{arguments.train_subset}"
+
+        subset_variant_string = (
+            f"_sub-var-{arguments.subset_variant}"
+            if arguments.subset_variant != -1
+            else ""
+        )
+
+        only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
         return "".join(
             [
                 f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
                 train_subset_string,
+                subset_variant_string,
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
+                f"_optim-steps-{arguments.num_backpropagation_time_steps}",
                 "_neuron",
                 f"-layers-{arguments.neuron_num_layers}",
                 f"-size-{arguments.neuron_layer_size}",
@@ -104,7 +123,8 @@ def init_model_path(arguments) -> str:
                 "_synaptic",
                 f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
-                f"-time-{arguments.synaptic_adaptation_time_steps}",
+                f"-layers-{arguments.synaptic_adaptation_num_layers}",
+                only_lgn,
                 ".pth",
             ]
         )
@@ -146,10 +166,21 @@ def main(arguments):
 
     :param arguments: command line arguments.
     """
-    init_wandb(arguments)
+    if arguments.wandb_project_name:
+        init_wandb(arguments, arguments.wandb_project_name)
+    else:
+        init_wandb(arguments)
 
     # Initialize model path (if not specified in the arguments).
     arguments.model_filename = init_model_path(arguments)
+
+    if args.subset_variant != -1:
+        splitted_path = arguments.subset_dir.split(".")
+        arguments.subset_dir = (
+            splitted_path[0]
+            + f"_variant_{arguments.subset_variant}."
+            + splitted_path[-1]
+        )
 
     logger = LoggerModel()
     logger.print_experiment_info(arguments)
@@ -176,7 +207,8 @@ def main(arguments):
         )
 
         model_executer.evaluation(
-            subset_for_evaluation=execution_setup["final_evaluation_subset"]
+            subset_for_evaluation=execution_setup["final_evaluation_subset"],
+            save_predictions=arguments.save_all_predictions,
         )
     else:
         if arguments.neuron_model_responses:
@@ -336,17 +368,31 @@ if __name__ == "__main__":
         help="Number of epochs for training the model.",
     )
     parser.add_argument(
-        "--neuron_num_layers",
+        "--num_hidden_time_steps",
         type=int,
         default=1,
-        help="Number of hidden layers we want to use in the model of the feed-forward neuron "
-        "(recommended is 5) or number of hidden time steps we want to use in case of the RNN "
-        "neuron variants (recommended is 1).",
+        help="Number of hidden time steps in RNN of the whole model "
+        "(in case it is set to 1 the the model would just predict the following visible "
+        "time step (without additional hidden steps in between)).",
+    )
+    parser.add_argument(
+        "--num_backpropagation_time_steps",
+        type=int,
+        default=1,
+        help="Number of time steps for the backpropagation through time. It specifies"
+        "how many time steps we want to perform till the next optimizer step.",
+    )
+
+    parser.add_argument(
+        "--neuron_num_layers",
+        type=int,
+        default=5,
+        help="Number of hidden layers we want to use in the model of the neuron.",
     )
     parser.add_argument(
         "--neuron_layer_size",
         type=int,
-        default=20,
+        default=10,
         help="Size of the layers of the neuron model.",
     )
     parser.set_defaults(neuron_residual=False)
@@ -357,37 +403,41 @@ if __name__ == "__main__":
         "(and in the synaptic adaptation module).",
     )
     parser.add_argument(
+        "--neuron_rnn_variant",
+        type=str,
+        default=RNNTypes.GRU.value,
+        help="Variant of the RNN model we use in the neuron and synaptic adaption model.",
+    )
+    parser.add_argument(
         "--neuron_activation_function",
         type=str,
         default=NeuronActivationTypes.LEAKYTANH.value,
         choices=[activation_type.value for activation_type in NeuronActivationTypes],
         help="Final activation function of the neuron model.",
     )
-    parser.add_argument(
-        "--num_hidden_time_steps",
-        type=int,
-        default=1,
-        help="Number of hidden time steps in RNN of the whole model "
-        "(in case it is set to 1 the the model would just predict the following visible "
-        "time step (without additional hidden steps in between)).",
-    )
     parser.set_defaults(synaptic_adaptation=False)
     parser.add_argument(
         "--synaptic_adaptation",
         action="store_true",
-        help="Whether we want to use synaptic adaptation LSTM module.",
+        help="Whether we want to use synaptic adaptation RNN module.",
     )
     parser.add_argument(
         "--synaptic_adaptation_size",
         type=int,
         default=10,
-        help="Size of the layer in the synaptic adaptation LSTM module.",
+        help="Size of the layer in the synaptic adaptation RNN module.",
     )
     parser.add_argument(
-        "--synaptic_adaptation_time_steps",
+        "--synaptic_adaptation_num_layers",
         type=int,
         default=1,
-        help="Number of (hidden) time steps in the synaptic adaptation LSTM module.",
+        help="Number of layers in the synaptic adaptation RNN module.",
+    )
+    parser.set_defaults(synaptic_adaptation_only_lgn=False)
+    parser.add_argument(
+        "--synaptic_adaptation_only_lgn",
+        action="store_true",
+        help="Whether we want to use synaptic adaptation RNN module only on LGN layer.",
     )
     # Dataset analysis:
     parser.add_argument(
@@ -396,6 +446,18 @@ if __name__ == "__main__":
         default=1.0,
         help="Number of batches to select as train subset "
         "(for modeling training performance on different dataset size).",
+    )
+    parser.add_argument(
+        "--subset_variant",
+        type=int,
+        default=-1,
+        help="Variant of the subset if (-1) then it is used subset without `_variant` suffix.",
+    )
+    parser.add_argument(
+        "--wandb_project_name",
+        type=str,
+        default="",
+        help="Name of the Weights and Biases project (if custom).",
     )
     # Evaluation options:
     parser.set_defaults(best_model_evaluation=False)
