@@ -29,7 +29,7 @@ SYN_ADAPT_USE=false
 SYN_ADAPT_NUM_LAYERS=1
 SYN_ADAPT_SIZE=10
 SYN_ADAPT_LGN=false
-TRAIN_SUBSET=-1
+TRAIN_SUBSET=-1.0
 WANDB_NAME=""
 
 # Parse long options
@@ -150,8 +150,8 @@ if [ "$SUBSET_VARIANT" -ne -1 ]; then
 --subset_variant=$SUBSET_VARIANT"
 fi
 
-# Add --subset_variant to MODEL_PARAMS if SUBSET_VARIANT is not -1
-if [ "$TRAIN_SUBSET" -ne -1 ]; then
+# Add --train_subset to MODEL_PARAMS if TRAIN_SUBSET is not -1.0
+if (($(echo "$TRAIN_SUBSET != -1.0" | bc -l))); then # Use bc for float comparison
     MODEL_PARAMS="$MODEL_PARAMS \\
 --train_subset=$TRAIN_SUBSET"
 fi
