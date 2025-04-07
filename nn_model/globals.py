@@ -4,6 +4,7 @@ are used across multiple source files. Typically information
 about the layer and model parameters.
 """
 
+import os
 from pathlib import Path
 
 from nn_model.type_variants import (
@@ -22,16 +23,23 @@ DEVICE = "cuda"
 
 # Model Diminishing factor
 # SIZE_MULTIPLIER = 0.53
-SIZE_MULTIPLIER = 0.1
+# SIZE_MULTIPLIER = 0.1
 # SIZE_MULTIPLIER = 0.25
-# SIZE_MULTIPLIER = 0.5
+# SIZE_MULTIPLIER = 0.48
+DEFAULT_SIZE_MULTIPLIER = 0.1
+
+# Allow overriding SIZE_MULTIPLIER via an environment variable
+SIZE_MULTIPLIER = float(os.getenv("SIZE_MULTIPLIER", DEFAULT_SIZE_MULTIPLIER))
 
 # Model time step size
 # TIME_STEP = 1
 # TIME_STEP = 5
 # TIME_STEP = 10
 # TIME_STEP = 15
-TIME_STEP = 20
+# TIME_STEP = 20
+DEFAULT_TIME_STEP = 20
+
+TIME_STEP = int(os.getenv("TIME_STEP", DEFAULT_TIME_STEP))
 
 # Batch sizes:
 TRAIN_BATCH_SIZE = 50

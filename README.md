@@ -134,8 +134,8 @@ be changed directly in the source code (as it is not expected to
 change them often). Those parameters are:
 
 - `DEVICE` - On which device we would like to run the model.
-- `SIZE_MULTIPLIER` - Subset of the model in terms of ratio of the whole number of neurons from each layer we want to use. For example for value `0.1` we want to use 10% of all provided neurons. NOTE: There needs to be corresponding list of IDs of selected neurons provided to run correctly (see argument `--subset_dir`) 
-- `TIME_STEP` - Size of the time step interval used in the model in milliseconds. NOTE: There needs to be corresponding dataset generated. In case required dataset is missing it is possible to generate it using tool `dataset_processor/time_merger/` (please see additional documentation there).
+- `SIZE_MULTIPLIER` - Subset of the model in terms of ratio of the whole number of neurons from each layer we want to use. This variable is also possible to change setting environment variable `SIZE_MULTIPLIER={selected_value}`. For example for value `0.1` we want to use 10% of all provided neurons. NOTE: There needs to be corresponding list of IDs of selected neurons provided to run correctly (see argument `--subset_dir`),
+- `TIME_STEP` - Size of the time step interval used in the model in milliseconds. This variable is also possible to change setting environment variable `TIME_STEP={selected_value}`.NOTE: There needs to be corresponding dataset generated. In case required dataset is missing it is possible to generate it using tool `dataset_processor/time_merger/` (please see additional documentation there).
 - `TRAIN_BATCH_SIZE`, `TEST_BATCH_SIZE` - Batch sizes (these are hardcoded as they are optimized for a given dataset and CGG machines). There are separate train and test batch sizes as test batch size is typically larger (the test dataset contains multiple trials) and it might be challenging to use same batch size as for train dataset.
 
 For the rest of the variables from the file `nn_model/globals`, it is 
