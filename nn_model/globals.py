@@ -128,13 +128,13 @@ DEFAULT_PLOT_PATHS = {
     PathPlotDefaults.MEAN_LAYER_RESPONSES.value: f"{PROJECT_ROOT}/evaluation_tools/plot_images/mean_layer_responses_size_{int(SIZE_MULTIPLIER * 100)}.png",
 }
 
-with open(f"{PROJECT_ROOT}/testing_dataset/pos_and_ori_dictionary.pickle", 'rb') as f:
+with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", 'rb') as f:
     POS_ORI_DICT = pickle.load(f)
 
 with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], 'rb') as f:
     NEURON_SELECTION = pickle.load(f)
 
 for layer, xyo in POS_ORI_DICT.items():
-    for attr in ('x', 'y', 'ori'):
-        subset_filter = NEURON_SELECTION[layer].astype(int)
+    subset_filter = NEURON_SELECTION[layer].astype(int)
+    for attr in xyo.keys():
         POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[subset_filter].astype(float)
