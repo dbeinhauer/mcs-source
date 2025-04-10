@@ -750,6 +750,8 @@ class ModelExecuter:
         :return: Returns tuple of updated and detached neuron module hidden states
         and synaptic adaptation module hidden states.
         """
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+
         self.optimizer.step()
         self.optimizer.zero_grad()
 
@@ -759,9 +761,7 @@ class ModelExecuter:
                 neuron_hidden, synaptic_adaptation_hidden
             )
         )
-
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
-
+        
         # Apply weight constrains (excitatory/inhibitory) for all the layers.
         self._apply_model_constraints()
 
