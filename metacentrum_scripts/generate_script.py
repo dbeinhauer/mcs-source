@@ -54,6 +54,12 @@ if __name__ == "__main__":
         default=":spec=8.0:gpu_cap=compute_86:osfamily=debian",
         help="Optional machine specification arguments",
     )
+    parser.add_argument(
+        "--size_multiplier",
+        type=float,
+        default=0.1,
+        help="What model size we want to use (if not default).",
+    )
     # Model arguments:
     parser.add_argument(
         "--model_params",
@@ -84,6 +90,7 @@ if __name__ == "__main__":
         mem=args.mem,
         scratch_local=args.scratch_local,
         opt_machine_args=args.opt_machine_args,
+        size_multiplier=args.size_multiplier,
         model_params=args.model_params,
     )
 

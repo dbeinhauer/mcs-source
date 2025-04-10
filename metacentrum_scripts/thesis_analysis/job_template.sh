@@ -31,6 +31,7 @@ SYN_ADAPT_SIZE=10
 SYN_ADAPT_LGN=false
 TRAIN_SUBSET=-1.0
 WANDB_NAME=""
+SIZE_MULTIPLIER=0.1
 
 # Parse long options
 while [[ $# -gt 0 ]]; do
@@ -103,8 +104,12 @@ while [[ $# -gt 0 ]]; do
         GPU_MEM="$2"
         shift 2
         ;;
+    --size_multiplier)
+        SIZE_MULTIPLIER="$2"
+        shift 2
+        ;;
     --help)
-        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value]"
+        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value] [--size_multiplier value]"
         exit 0
         ;;
     *)
@@ -166,7 +171,8 @@ python metacentrum_scripts/generate_script.py \
     --gpu_mem $GPU_MEM \
     --mem $MEM \
     --scratch_local $SCRATCH_LOCAL \
+    --size_multiplier $SIZE_MULTIPLIER \
     --model_params "$MODEL_PARAMS" \
-    --submit_job \
     --opt_machine_args $OPT_MACHINE_ARGS \
-    --use_opt_arguments
+    --use_opt_arguments \
+    # --submit_job 
