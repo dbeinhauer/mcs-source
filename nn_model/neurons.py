@@ -1,6 +1,6 @@
 """
 This source code defines multiple variants of complex neurons
-that can be used in the model. Neuron here is represented by 
+that can be used in the model. Neuron here is represented by
 some small model.
 """
 
@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 import nn_model.globals
-from nn_model.type_variants import NeuronActivationTypes
+from nn_model.type_variants import NeuronActivationTypes, RNNTypes
 from nn_model.activation_functions import SigmoidTanh, LeakyTanh
 
 
@@ -89,6 +89,7 @@ class DNNNeuron(SharedNeuronBase):
         num_layers: int = 5,
         layer_size: int = 10,
         residual: bool = True,
+        rnn_variant: str = RNNTypes.GRU.value,
     ):
         """
         Initializes DNN model of the neuron.
@@ -151,9 +152,9 @@ class DNNNeuron(SharedNeuronBase):
         return out, tuple(torch.zeros(0))
 
 
-class LSTMNeuron(SharedNeuronBase):
+class RNNNeuron(SharedNeuronBase):
     """
-    Memory-enabled neuron module using an LSTM cell for processing scalar inputs.
+    Memory-enabled neuron module using an LSTM or GRU cell for processing scalar inputs.
     """
 
     def __init__(
@@ -163,6 +164,7 @@ class LSTMNeuron(SharedNeuronBase):
         num_layers: int = 1,
         layer_size: int = 10,
         residual: bool = True,
+        rnn_variant: str = RNNTypes.GRU.value,
     ):
         """
         Initialize the neuron module.
@@ -173,20 +175,33 @@ class LSTMNeuron(SharedNeuronBase):
         :param layer_size: Size of the hidden state in the LSTM.
         :param residual: Whether to use a residual connection.
         """
-        super(LSTMNeuron, self).__init__(model_type, activation_function, residual)
+        super(RNNNeuron, self).__init__(model_type, activation_function, residual)
         self.layer_size = layer_size
         self.num_layers = num_layers  # Number of hidden time steps
 
-        # Model initialization: input layer, LSTM cell (with multiple time steps), output layer
-        self.input_layer = nn.Linear(self.input_size, layer_size)
-        self.lstm_cell = nn.LSTMCell(layer_size, layer_size)
+        assert rnn_variant in [
+            RNNTypes.GRU.value,
+            RNNTypes.LSTM.value,
+        ], "Invalid RNN cell variant"
+
+        self.rnn_variant = rnn_variant
+
+        rnn_model = nn.LSTM if rnn_variant == RNNTypes.LSTM.value else nn.GRU
+
+        # Model initialization: input layer, RNN layers, output layer
+        self.rnn_network = rnn_model(
+            self.input_size,
+            layer_size,
+            self.num_layers,
+        )
+
         # Scalar output layer
         self.output_layer = nn.Linear(layer_size, 1)
 
     def forward(
         self,
         inputs: torch.Tensor,
-        hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        hidden: Optional[Tuple[torch.Tensor, ...]] = None,
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
         Forward pass of the memory neuron.
@@ -195,26 +210,35 @@ class LSTMNeuron(SharedNeuronBase):
         :param hidden: Optional hidden state (h_0, c_0) for the LSTM cells.
         :return: Processed output scalar and updated hidden state.
         """
-        batch_size = inputs.size(0)
+        # Add sequence length dimension (For proper working of LSTM)
+        inputs = inputs[None, :, :]
+        batch_size = inputs.size(1)
 
         if hidden is None:
-            # Initialize hidden state if not provided.
-            hidden = (
-                torch.zeros(batch_size, self.layer_size).to(inputs.device),
-                torch.zeros(batch_size, self.layer_size).to(inputs.device),
-            )
+            if self.rnn_variant == RNNTypes.LSTM.value:
+                # Initialize hidden state if not provided.
+                hidden = (
+                    torch.randn(self.num_layers, batch_size, self.layer_size).to(
+                        inputs.device
+                    ),
+                    torch.randn(self.num_layers, batch_size, self.layer_size).to(
+                        inputs.device
+                    ),
+                )
+            else:
+                hidden = torch.randn(self.num_layers, batch_size, self.layer_size).to(
+                    inputs.device
+                )
 
-        current_input = self.input_layer(inputs)
-        h, c = hidden
-        for _ in range(self.num_layers):
-            # Apply multiple time steps of the LSTM cell (same cell for all time steps).
-            h, c = self.lstm_cell(current_input, (h, c))
-            current_input = (
-                h  # The output of the current cell is the input to the next cell
-            )
+        # h, c = hidden
+        output, hidden = self.rnn_network(inputs, hidden)
+
+        # Get rid of the artificial time steps dimension
+        inputs = inputs[0, :, :]
+        output = output[0, :, :]
 
         # Apply the output layer to the last hidden state
-        output = self.output_layer(h)
+        output = self.output_layer(output)
 
         if self.residual:
             # Apply residual connection if enabled
@@ -223,4 +247,4 @@ class LSTMNeuron(SharedNeuronBase):
         # Apply module final non-linearity function
         output = self.custom_activation(output)
 
-        return output, (h, c)
+        return output, hidden

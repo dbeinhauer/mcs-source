@@ -175,7 +175,7 @@ class CustomRNNCell(nn.Module):
         self.weights_hh.weight.copy_(
             constraint_multiplier * self.weights_hh.weight.abs()
         )
-
+        
     def _init_weights(self, weight_initialization_type: str):
         """
         Initializes module weights and biases. Weights are initialized using
