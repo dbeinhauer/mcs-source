@@ -594,17 +594,20 @@ class ResponseAnalyzer:
         """
         pass
 
-    def generate_histograms(self, process_test: bool, save_path: str = ""):
+    def generate_histograms(
+        self, process_test: bool, save_path: str = "", subset: int = -1
+    ):
         """
         Generate histogram of neuronal spike rates and rates in each bin.
 
         :param process_test: Whether to generate histogram on test dataset.
         :param time_step: Size of time bins to process.
         :param save_path: Where to store the histogram data.
+        :param subset: What part to process.
         """
         loader = self.test_loader if process_test else self.train_loader
 
-        self.histogram_processor.all_histograms_processing(loader)
+        self.histogram_processor.all_histograms_processing(loader, subset=subset)
         histogram_data = self.histogram_processor.get_histogram_data
 
         if save_path:
@@ -651,7 +654,11 @@ def main(arguments):
     ]:
         # Generate histograms.
         process_test = arguments.action == AnalyzerChoices.HISTOGRAM_TEST.value
-        response_analyzer.generate_histograms(process_test, arguments.results_save_path)
+        response_analyzer.generate_histograms(
+            process_test,
+            arguments.results_save_path,
+            subset=arguments.processing_subset,
+        )
 
 
 if __name__ == "__main__":
