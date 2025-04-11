@@ -155,3 +155,7 @@ def reinitialize_time_step(time_step_size: int):
         DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value] = (
             f"{PROJECT_ROOT}/dataset/test_dataset/trimmed_spikes"
         )
+        
+def rewrite_test_batch_size(new_batch_size: int):
+    global TEST_BATCH_SIZE
+    TEST_BATCH_SIZE = new_batch_size
