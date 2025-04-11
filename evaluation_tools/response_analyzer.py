@@ -54,6 +54,7 @@ class ResponseAnalyzer:
         responses_dir: str,
         dnn_responses_path: str,
         neurons_path: str,
+        skip_dataset_load: bool = False,
     ):
         """
         Initializes tool that is used for analysis of the model responses.
@@ -74,17 +75,18 @@ class ResponseAnalyzer:
         self.batch_size = nn_model.globals.TEST_BATCH_SIZE
 
         # Raw data loaders:
-        self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
-        self.test_dataset, self.test_loader = self._init_dataloader()
+        if not skip_dataset_load:
+            self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
+            self.test_dataset, self.test_loader = self._init_dataloader()
 
-        # Selected neurons for the plotting:
-        self.selected_neurons = ResponseAnalyzer.load_selected_neurons(neurons_path)
-        # Selected image batches for plotting:
-        self.images_batches = ResponseAnalyzer.randomly_select_batches()
-        # Selected image indices for each selected batch selected for plotting.
-        self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
-            range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
-        )
+            # Selected neurons for the plotting:
+            self.selected_neurons = ResponseAnalyzer.load_selected_neurons(neurons_path)
+            # Selected image batches for plotting:
+            self.images_batches = ResponseAnalyzer.randomly_select_batches()
+            # Selected image indices for each selected batch selected for plotting.
+            self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
+                range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
+            )
 
         # Load all batch responses filenames and count its number.
         self.responses_filenames = self._load_responses_filenames()
