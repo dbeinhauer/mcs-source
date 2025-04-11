@@ -230,8 +230,7 @@ def main(arguments):
 
     wandb.finish()
 
-
-if __name__ == "__main__":
+def init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Execute model training or evaluation."
     )
@@ -297,14 +296,14 @@ if __name__ == "__main__":
             PathDefaultFields.FULL_EVALUATION_DIR.value
         ],
         help="Directory where the results of the evaluation should be saved in case of saving "
-        "all evaluation predictions.",
+             "all evaluation predictions.",
     )
     parser.add_argument(
         "--best_model_dir",
         type=str,
         default="",
         help="Directory where the results of the evaluation should be saved in case of saving "
-        "all evaluation predictions.",
+             "all evaluation predictions.",
     )
     parser.add_argument(
         "--neuron_model_responses_dir",
@@ -313,7 +312,7 @@ if __name__ == "__main__":
             PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value
         ],
         help="Directory where the results of neuron DNN model on testing range should be stored "
-        "(filename is best model name).",
+             "(filename is best model name).",
     )
     # Technical setup:
     parser.add_argument(
@@ -321,8 +320,8 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="Number of CPU threads to use as workers for DataLoader. "
-        "This can help if the GPU utilization is unstable (jumping between 0 and 100), "
-        "because it's waiting for data.",
+             "This can help if the GPU utilization is unstable (jumping between 0 and 100), "
+             "because it's waiting for data.",
     )
     parser.add_argument(
         "--train_batch_size",
@@ -376,15 +375,15 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Number of hidden time steps in RNN of the whole model "
-        "(in case it is set to 1 the the model would just predict the following visible "
-        "time step (without additional hidden steps in between)).",
+             "(in case it is set to 1 the the model would just predict the following visible "
+             "time step (without additional hidden steps in between)).",
     )
     parser.add_argument(
         "--num_backpropagation_time_steps",
         type=int,
         default=1,
         help="Number of time steps for the backpropagation through time. It specifies"
-        "how many time steps we want to perform till the next optimizer step.",
+             "how many time steps we want to perform till the next optimizer step.",
     )
 
     parser.add_argument(
@@ -404,7 +403,7 @@ if __name__ == "__main__":
         "--neuron_residual",
         action="store_true",
         help="Whether we want to use residual connections in the model of a neuron "
-        "(and in the synaptic adaptation module).",
+             "(and in the synaptic adaptation module).",
     )
     parser.add_argument(
         "--neuron_rnn_variant",
@@ -449,7 +448,7 @@ if __name__ == "__main__":
         type=float,
         default=1.0,
         help="Number of batches to select as train subset "
-        "(for modeling training performance on different dataset size).",
+             "(for modeling training performance on different dataset size).",
     )
     parser.add_argument(
         "--subset_variant",
@@ -489,6 +488,9 @@ if __name__ == "__main__":
         action="store_true",
         help="Start debugging mode.",
     )
+    return parser
 
+if __name__ == "__main__":
+    parser = init_parser()
     args = parser.parse_args()
     main(args)
