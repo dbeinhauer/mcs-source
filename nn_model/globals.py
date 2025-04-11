@@ -134,3 +134,24 @@ DEFAULT_PLOT_PATHS = {
     PathPlotDefaults.NEURON_MODULE_TOGETHER.value: f"{PROJECT_ROOT}/evaluation_tools/plot_images/dnn_module_dependencies_together.png",
     PathPlotDefaults.MEAN_LAYER_RESPONSES.value: f"{PROJECT_ROOT}/evaluation_tools/plot_images/mean_layer_responses_size_{int(SIZE_MULTIPLIER*100)}.png",
 }
+
+
+def reinitialize_time_step(time_step_size: int):
+    global TIME_STEP, NORMAL_NUM_TIME_STEPS, DEFAULT_PATHS
+    TIME_STEP = time_step_size
+    NORMAL_NUM_TIME_STEPS = (BLANK_DURATION + IMAGE_DURATION) // TIME_STEP
+    DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value] = (
+        f"{PROJECT_ROOT}/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}"
+    )
+    DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value] = (
+        f"{PROJECT_ROOT}/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}"
+    )
+
+    # Change default dataset paths in case the time step is 1 (not compressed).
+    if TIME_STEP == 1:
+        DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value] = (
+            f"{PROJECT_ROOT}/dataset/train_dataset/trimmed_spikes"
+        )
+        DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value] = (
+            f"{PROJECT_ROOT}/dataset/test_dataset/trimmed_spikes"
+        )

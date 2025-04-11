@@ -79,8 +79,12 @@ class ResponseAnalyzer:
 
         # Raw data loaders:
         if not skip_dataset_load:
-            self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
-            self.test_dataset, self.test_loader = self._init_dataloader()
+            self.train_dataset, self.train_loader = self._init_dataloader(
+                is_test=False, data_workers_kwargs=data_workers_kwargs
+            )
+            self.test_dataset, self.test_loader = self._init_dataloader(
+                data_workers_kwargs=data_workers_kwargs
+            )
 
         # Selected neurons for the plotting:
         self.selected_neurons = None
@@ -199,7 +203,7 @@ class ResponseAnalyzer:
 
         return dataset, loader
 
-    def _load_responses_filenames(self, responses_dir: str = "") -> Optional[List[str]]:
+    def _load_responses_filenames(self, responses_dir: str = "") -> List[str]:
         """
         Loads all filenames from the responses directory (batches of responses).
 
@@ -209,86 +213,169 @@ class ResponseAnalyzer:
         if responses_dir:
             return os.listdir(os.path.join(responses_dir))
 
-        return None
+        return []
 
     def create_spikes_histogram_values(
         self,
-        processed_layer: str = "",
+        layer: str = "",
         subset: int = -1,
-        num_bins: int = nn_model.globals.NORMAL_NUM_TIME_STEPS,
-        process_test: bool = True,
+        num_bins: int = nn_model.globals.BLANK_DURATION
+        + nn_model.globals.IMAGE_DURATION,
+        process_test: bool = False,
         include_input: bool = False,
         include_output: bool = True,
-    ) -> Tuple[Dict[str, np.array], np.array]:
+        mean_firing_rate: bool = False,
+    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
         """
-        Creates histogram counts and bins for the given layer data or for all layers.
-
-        The histogram should display number of neurons per total number of spikes in
-        all examples from the provided dataset.
-
-        :param processed_layer: Name of the layer to create the histogram from, if "", then process
-        all available layers.
-        :param subset: Create histogram from given number of batches of data.
-        If -1 then use all of them.
-        :param num_bins: Number of bins in the histogram. Ideally it should be maximal number
-        of spikes in the dataset of individual neuron in the dataset.
-        :param process_test: Flag whether we want to process test dataset (by default `True`).
-        :param include_input: Flag whether we want to include also input layers
-        in the histogram creation (by default `False`).
-        :param include_output: Flag whether we want to include target layers in the histogram
-        creation (by default `True`).
-        NOTE: In case neither input nor output included use output.
-        :return: Returns tuple of bin counts and bin edges of histogram.
+        GPU-accelerated histogram creation using PyTorch.
         """
-        # Initialize the histogram variables.
-        bin_edges = np.arange(0, num_bins)
-        # hist_counts = np.zeros(len(bin_edges) - 1, dtype=np.float32)
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        bin_edges = torch.arange(0, num_bins + 1, device=device, dtype=torch.float32)
 
         histogram_counts = {}
-        # Select data loader.
-        loader = self.test_loader
-        if not process_test:
-            loader = self.train_loader
+        loader = self.test_loader if process_test else self.train_loader
 
         for i, (inputs, targets) in enumerate(tqdm(loader)):
-            if i == subset:
-                # Create the histogram from the subset of data.
+            if 0 <= subset == i:
                 break
 
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            targets = {k: v.to(device) for k, v in targets.items()}
             result_dictionary = {**inputs, **targets}
-            if not processed_layer:
-                # Select layers to include in histogram (by default use only targets).
-                result_dictionary = targets
+
+            if not layer:
                 if include_input and not include_output:
-                    # Create histogram only from inputs.
                     result_dictionary = inputs
                 elif not include_input and include_output:
-                    # Include input and output layer in histogram creation.
                     result_dictionary = targets
+                elif not include_input and not include_output:
+                    result_dictionary = targets  # fallback
             else:
                 result_dictionary = {
-                    layer: value
-                    for layer, value in result_dictionary.items()
-                    if layer in processed_layer
+                    k: v for k, v in result_dictionary.items() if k == layer
                 }
-                # result_dictionary[processed_layer] = result_dictionary[processed_layer]
 
-            histogram_counts = {
-                layer: np.zeros(len(bin_edges) - 1, dtype=np.float32)
-                for layer in result_dictionary
-            }
+            for key, data in result_dictionary.items():
+                # Sum over time if requested
+                if mean_firing_rate:
+                    data = torch.sum(data, dim=2)
 
-            # Histogram creation.
-            for layer, data in result_dictionary.items():
-                summed_data = torch.sum(data, dim=2).view(-1).float().numpy()
-                batch_counts, _ = np.histogram(summed_data, bins=bin_edges)
+                flat_data = data.view(-1).float()
 
-                histogram_counts[layer] += batch_counts
+                # Initialize bin counts
+                if key not in histogram_counts:
+                    histogram_counts[key] = torch.zeros(num_bins, device=device)
 
-        self.histogram_counts = histogram_counts
-        self.bin_edges = bin_edges
+                # Compute histogram using torch.histc approximation
+                # We use a manual binning trick here:
+                bin_indices = torch.clamp((flat_data).long(), min=0, max=num_bins - 1)
+                bin_counts = torch.bincount(bin_indices, minlength=num_bins)
+                histogram_counts[key] += bin_counts[:num_bins]  # truncate if needed
 
-        return histogram_counts, bin_edges
+        # Normalize
+        for key in histogram_counts:
+            total = histogram_counts[key].sum()
+            if total > 0:
+                histogram_counts[key] /= total
+
+        self.histogram_counts = {
+            k: v.cpu().numpy() for k, v in histogram_counts.items()
+        }
+        self.bin_edges = bin_edges.cpu().numpy()
+
+        return self.histogram_counts, self.bin_edges
+
+    # def create_spikes_histogram_values(
+    #     self,
+    #     layer: str = "",
+    #     subset: int = -1,
+    #     num_bins: int = nn_model.globals.BLANK_DURATION
+    #     + nn_model.globals.IMAGE_DURATION,
+    #     process_test: bool = False,
+    #     include_input: bool = False,
+    #     include_output: bool = True,
+    #     mean_firing_rate: bool = False,
+    # ) -> Tuple:
+    #     """
+    #     Creates histogram counts and bins for the given layer data or for all layers.
+
+    #     The histogram should display number of neurons per total number of spikes in
+    #     all examples from the provided dataset.
+
+    #     :param processed_layer: Name of the layer to create the histogram from, if "", then process
+    #     all available layers.
+    #     :param subset: Create histogram from given number of batches of data.
+    #     If -1 then use all of them.
+    #     :param num_bins: Number of bins in the histogram. Ideally it should be maximal number
+    #     of spikes in the dataset of individual neuron in the dataset.
+    #     :param process_test: Flag whether we want to process test dataset (by default `False`).
+    #     :param include_input: Flag whether we want to include also input layers
+    #     in the histogram creation (by default `False`).
+    #     :param include_output: Flag whether we want to include target layers in the histogram
+    #     creation (by default `True`).
+    #     NOTE: In case neither input nor output included use output.
+    #     :return: Returns tuple of bin counts and bin edges of histogram.
+    #     """
+    #     # Initialize the histogram variables.
+    #     bin_edges = np.arange(0, num_bins)
+    #     # hist_counts = np.zeros(len(bin_edges) - 1, dtype=np.float32)
+
+    #     histogram_counts = {}
+    #     # Select data loader.
+    #     loader = self.test_loader
+    #     if not process_test:
+    #         loader = self.train_loader
+
+    #     for i, (inputs, targets) in enumerate(tqdm(loader)):
+    #         if i == subset:
+    #             # Create the histogram from the subset of data.
+    #             break
+
+    #         result_dictionary = {**inputs, **targets}
+    #         if not layer:
+    #             # Select layers to include in histogram (by default use only targets).
+    #             if include_input and not include_output:
+    #                 # Create histogram only from inputs.
+    #                 result_dictionary = inputs
+    #             elif not include_input and include_output:
+    #                 # Include input and output layer in histogram creation.
+    #                 result_dictionary = targets
+    #         else:
+    #             result_dictionary = {
+    #                 layer: value
+    #                 for layer, value in result_dictionary.items()
+    #                 if layer in layer
+    #             }
+    #             # result_dictionary[processed_layer] = result_dictionary[processed_layer]
+
+    #         histogram_counts = {
+    #             layer: np.zeros(len(bin_edges) - 1, dtype=np.float32)
+    #             for layer in result_dictionary
+    #         }
+
+    #         # Histogram creation.
+    #         for layer, data in result_dictionary.items():
+    #             # sum_neurons_over_time = torch.sum(data, dim=2)
+    #             sum_neurons_over_time = data
+    #             if mean_firing_rate:
+    #                 sum_neurons_over_time = torch.sum(data, dim=2)
+
+    #             sum_over_time_all_data = sum_neurons_over_time.view(-1).float().numpy()
+    #             batch_counts, _ = np.histogram(sum_over_time_all_data, bins=bin_edges)
+
+    #             histogram_counts[layer] += batch_counts
+
+    #     # Normalize histogram counts if requested.
+    #     for layer in histogram_counts:
+    #         total_count = np.sum(histogram_counts[layer])
+    #         if total_count > 0:  # Avoid division by zero
+    #             histogram_counts[layer] = histogram_counts[layer] / total_count
+
+    #     self.histogram_counts = histogram_counts
+    #     self.bin_edges = bin_edges
+
+    #     return histogram_counts, bin_edges
 
     @staticmethod
     def _pad_vector_to_size(vector: torch.Tensor, size: int) -> torch.Tensor:
@@ -650,9 +737,11 @@ if __name__ == "__main__":
     train_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value]
     test_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value]
 
-    model_name = "model-10_sub-var-0_step-20_lr-7.5e-06_simple_optim-steps-1_neuron-layers-5-size-10-activation-leakytanh-res-False_hid-time-1_grad-clip-10000.0_optim-default_weight-init-default_synaptic-False-size-10-layers-1"
+    model_name = "model-10_sub-var-9_step-20_lr-7.5e-06_simple_optim-steps-1_neuron-layers-5-size-10-activation-leakytanh-res-False_hid-time-1_grad-clip-10000.0_optim-default_weight-init-default_synaptic-False-size-10-layers-1"
 
-    responses_dir = f"/home/beinhaud/diplomka/mcs-source/thesis_results/full_evaluation_results/{model_name}/"
+    # responses_dir = f"/home/beinhaud/diplomka/mcs-source/thesis_results/full_evaluation_results/{model_name}/"
+
+    responses_dir = f"/home/david/source/diplomka/thesis_results/simple/full_evaluation_results/{model_name}/"
 
     dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pth"
     neurons_path = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl"
@@ -673,17 +762,19 @@ if __name__ == "__main__":
     response_analyzer = ResponseAnalyzer(
         train_dir,
         test_dir,
-        responses_dir,
-        dnn_responses_dir,
-        neurons_path,
+        responses_dir=responses_dir,
+        # dnn_responses_dir,
+        # neurons_path,
         data_workers_kwargs=data_workers_kwargs,
     )
 
-    response_analyzer.create_spikes_histogram_values(
+    resp = response_analyzer.create_spikes_histogram_values(
         "X_ON",
         subset=1,
         process_test=False,
+        num_bins=20,
     )
 
+    print(resp)
     # response_analyzer.get_mean_from_evaluated_data(subset=5)
     # print(response_analyzer.mean_neurons_responses)
