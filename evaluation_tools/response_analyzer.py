@@ -641,7 +641,7 @@ def main(arguments):
     response_analyzer = ResponseAnalyzer(
         train_dir,
         test_dir,
-        responses_dir=responses_dir,
+        # responses_dir=responses_dir,
         data_workers_kwargs=data_workers_kwargs,
     )
 
