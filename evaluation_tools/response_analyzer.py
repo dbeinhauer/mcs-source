@@ -1,5 +1,5 @@
 """
-This source code defines class used for analysis and plotting the model evaluation results 
+This source code defines class used for analysis and plotting the model evaluation results
 and dataset analysis.
 """
 
@@ -30,6 +30,8 @@ from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import EvaluationFields
 from nn_model.dictionary_handler import DictionaryHandler
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+
 
 class ResponseAnalyzer:
     """
@@ -51,10 +53,11 @@ class ResponseAnalyzer:
         self,
         train_dataset_dir: str,
         test_dataset_dir: str,
-        responses_dir: str,
-        dnn_responses_path: str,
-        neurons_path: str,
+        responses_dir: str = "",
+        dnn_responses_path: str = "",
+        neurons_path: str = "",
         skip_dataset_load: bool = False,
+        data_workers_kwargs={},
     ):
         """
         Initializes tool that is used for analysis of the model responses.
@@ -79,17 +82,20 @@ class ResponseAnalyzer:
             self.train_dataset, self.train_loader = self._init_dataloader(is_test=False)
             self.test_dataset, self.test_loader = self._init_dataloader()
 
-            # Selected neurons for the plotting:
+        # Selected neurons for the plotting:
+        self.selected_neurons = None
+        if neurons_path:
             self.selected_neurons = ResponseAnalyzer.load_selected_neurons(neurons_path)
-            # Selected image batches for plotting:
-            self.images_batches = ResponseAnalyzer.randomly_select_batches()
-            # Selected image indices for each selected batch selected for plotting.
-            self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
-                range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
-            )
+
+        # Selected image batches for plotting:
+        self.images_batches = ResponseAnalyzer.randomly_select_batches()
+        # Selected image indices for each selected batch selected for plotting.
+        self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
+            range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
+        )
 
         # Load all batch responses filenames and count its number.
-        self.responses_filenames = self._load_responses_filenames()
+        self.responses_filenames = self._load_responses_filenames(self.responses_dir)
         self.num_responses = len(self.responses_filenames)
 
         # Dictionary of layers and its mean neural responses through time
@@ -107,10 +113,8 @@ class ResponseAnalyzer:
         # Dictionary of RNN responses and its transformations from DNN neuron for each layer.
         self.rnn_to_prediction_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Histogram bins and edges:
-        self.hist_counts = np.zeros(0, dtype=np.float32)
+        self.histogram_counts = {}
         self.bin_edges = np.zeros(0, dtype=np.int32)
-
-        # self.dnn_responses = self.load_pickle_file(dnn_responses_path)
 
     @staticmethod
     def load_pickle_file(filename: str):
@@ -163,7 +167,9 @@ class ResponseAnalyzer:
         """
         return random.choices(selection_range, k=selection_size)
 
-    def _init_dataloader(self, is_test=True) -> Tuple[SparseSpikeDataset, DataLoader]:
+    def _init_dataloader(
+        self, is_test=True, data_workers_kwargs={}
+    ) -> Tuple[SparseSpikeDataset, DataLoader]:
         """
         Initializes dataset and dataloader objects.
 
@@ -187,33 +193,41 @@ class ResponseAnalyzer:
             dataset,
             batch_size=self.batch_size,
             shuffle=False,  # Load the dataset always in the same order.
-            collate_fn=different_times_collate_fn,
+            # collate_fn=different_times_collate_fn,
+            **data_workers_kwargs,
         )
 
         return dataset, loader
 
-    def _load_responses_filenames(self) -> List[str]:
+    def _load_responses_filenames(self, responses_dir: str = "") -> Optional[List[str]]:
         """
         Loads all filenames from the responses directory (batches of responses).
+
+        :param responses_dir: Path to directory containing neuronal responses.
+        :returns: Returns list of paths to neuronal responses (or `None` if not stated).
         """
-        return os.listdir(os.path.join(self.responses_dir))
+        if responses_dir:
+            return os.listdir(os.path.join(responses_dir))
+
+        return None
 
     def create_spikes_histogram_values(
         self,
         processed_layer: str = "",
         subset: int = -1,
-        num_bins: int = 144,
+        num_bins: int = nn_model.globals.NORMAL_NUM_TIME_STEPS,
         process_test: bool = True,
         include_input: bool = False,
         include_output: bool = True,
-    ) -> Tuple:
+    ) -> Tuple[Dict[str, np.array], np.array]:
         """
-        Creates histogram counts and bins for the given layer data.
+        Creates histogram counts and bins for the given layer data or for all layers.
 
         The histogram should display number of neurons per total number of spikes in
         all examples from the provided dataset.
 
-        :param processed_layer: Name of the layer to create the histogram from.
+        :param processed_layer: Name of the layer to create the histogram from, if "", then process
+        all available layers.
         :param subset: Create histogram from given number of batches of data.
         If -1 then use all of them.
         :param num_bins: Number of bins in the histogram. Ideally it should be maximal number
@@ -228,8 +242,9 @@ class ResponseAnalyzer:
         """
         # Initialize the histogram variables.
         bin_edges = np.arange(0, num_bins)
-        hist_counts = np.zeros(len(bin_edges) - 1, dtype=np.float32)
+        # hist_counts = np.zeros(len(bin_edges) - 1, dtype=np.float32)
 
+        histogram_counts = {}
         # Select data loader.
         loader = self.test_loader
         if not process_test:
@@ -240,29 +255,40 @@ class ResponseAnalyzer:
                 # Create the histogram from the subset of data.
                 break
 
-            # Select layers to include in histogram (by default use only targets).
-            result_dictionary = targets
-            if include_input:
-                # Create histogram only from inputs.
-                result_dictionary = inputs
-                if include_output:
+            result_dictionary = {**inputs, **targets}
+            if not processed_layer:
+                # Select layers to include in histogram (by default use only targets).
+                result_dictionary = targets
+                if include_input and not include_output:
+                    # Create histogram only from inputs.
+                    result_dictionary = inputs
+                elif not include_input and include_output:
                     # Include input and output layer in histogram creation.
-                    result_dictionary = {**inputs, **targets}
+                    result_dictionary = targets
+            else:
+                result_dictionary = {
+                    layer: value
+                    for layer, value in result_dictionary.items()
+                    if layer in processed_layer
+                }
+                # result_dictionary[processed_layer] = result_dictionary[processed_layer]
+
+            histogram_counts = {
+                layer: np.zeros(len(bin_edges) - 1, dtype=np.float32)
+                for layer in result_dictionary
+            }
 
             # Histogram creation.
             for layer, data in result_dictionary.items():
-                if processed_layer and processed_layer != layer:
-                    # Processing specific layer and not this -> skip layer.
-                    continue
                 summed_data = torch.sum(data, dim=2).view(-1).float().numpy()
                 batch_counts, _ = np.histogram(summed_data, bins=bin_edges)
 
-                hist_counts += batch_counts
+                histogram_counts[layer] += batch_counts
 
-        self.hist_counts = hist_counts
+        self.histogram_counts = histogram_counts
         self.bin_edges = bin_edges
 
-        return hist_counts, bin_edges
+        return histogram_counts, bin_edges
 
     @staticmethod
     def _pad_vector_to_size(vector: torch.Tensor, size: int) -> torch.Tensor:
@@ -284,7 +310,14 @@ class ResponseAnalyzer:
         )
 
     @staticmethod
-    def pad_tensors(tensor1, tensor2):
+    def pad_tensors(
+        tensor1: torch.Tensor, tensor2: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Takes two tensors determines whether their sizes differ and if so, than pads the smaller one with zeros at the end.
+
+        :return: Returns padded tensors to same shape.
+        """
 
         size1 = tensor1.size()
         size2 = tensor2.size()
@@ -295,10 +328,6 @@ class ResponseAnalyzer:
         # Calculate the padding needed for each tensor
         padding1 = [max_dim - s for s, max_dim in zip(size1, max_size)]
         padding2 = [max_dim - s for s, max_dim in zip(size2, max_size)]
-
-        # # Create padding tuples (reverse order for F.pad)
-        # padding1 = sum([[0, p] for p in padding1], [])
-        # padding2 = sum([[0, p] for p in padding2], [])
 
         # Create padding tuples (reverse order for F.pad, last dimension first)
         padding1 = [
@@ -322,8 +351,7 @@ class ResponseAnalyzer:
             0,
         )
 
-        # Sum the tensors
-        return padded_tensor1 + padded_tensor2
+        return padded_tensor1, padded_tensor2
 
     @staticmethod
     def _sum_vectors(vector1: torch.Tensor, vector2: torch.Tensor) -> torch.Tensor:
@@ -335,14 +363,9 @@ class ResponseAnalyzer:
         :param vector2: Second vector to be summed.
         :return: Returns summed vectors.
         """
-        # if vector1.shape[0] < vector2.shape[0]:
-        #     vector1 = ResponseAnalyzer._pad_vector_to_size(vector1, vector2.shape[0])
-        # else:
-        #     vector2 = ResponseAnalyzer._pad_vector_to_size(vector2, vector1.shape[0])
+        padded_1, padded_2 = ResponseAnalyzer.pad_tensors(vector1, vector2)
 
-        # return vector1 + vector2
-
-        return ResponseAnalyzer.pad_tensors(vector1, vector2)
+        return padded_1 + padded_2
 
     @staticmethod
     def _sum_over_neurons(data: torch.Tensor, dim: int = 2) -> torch.Tensor:
@@ -626,14 +649,41 @@ if __name__ == "__main__":
 
     train_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value]
     test_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value]
-    model_name = "model-10_step-20_lr-1e-05_complex_residual-False_neuron-layers-5_neuron-size-10_num-hidden-time-steps-1"
-    responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/full_evaluation_results/{model_name}/"
+
+    model_name = "model-10_sub-var-0_step-20_lr-7.5e-06_simple_optim-steps-1_neuron-layers-5-size-10-activation-leakytanh-res-False_hid-time-1_grad-clip-10000.0_optim-default_weight-init-default_synaptic-False-size-10-layers-1"
+
+    responses_dir = f"/home/beinhaud/diplomka/mcs-source/thesis_results/full_evaluation_results/{model_name}/"
+
     dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pth"
     neurons_path = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl"
 
+    num_data_workers = 2
+    workers_enabled = num_data_workers > 0
+    data_workers_kwargs = {
+        "collate_fn": different_times_collate_fn,
+        "num_workers": num_data_workers,  # number of workers which will supply data to GPU
+        "pin_memory": workers_enabled,  # speed up data transfer to GPU
+        "prefetch_factor": (
+            num_data_workers // 2 if workers_enabled else None
+        ),  # try to always have 4 samples ready for the GPU
+        "persistent_workers": workers_enabled,  # keep the worker threads alive
+    }
+    # data_workers_kwargs = {}
+
     response_analyzer = ResponseAnalyzer(
-        train_dir, test_dir, responses_dir, dnn_responses_dir, neurons_path
+        train_dir,
+        test_dir,
+        responses_dir,
+        dnn_responses_dir,
+        neurons_path,
+        data_workers_kwargs=data_workers_kwargs,
     )
 
-    response_analyzer.get_mean_from_evaluated_data(subset=5)
-    print(response_analyzer.mean_neurons_responses)
+    response_analyzer.create_spikes_histogram_values(
+        "X_ON",
+        subset=1,
+        process_test=False,
+    )
+
+    # response_analyzer.get_mean_from_evaluated_data(subset=5)
+    # print(response_analyzer.mean_neurons_responses)
