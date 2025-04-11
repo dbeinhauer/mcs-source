@@ -7,7 +7,7 @@
 
 #SBATCH --exclude=w[1-9,9-12]
 
-export TIME_STEP=10
+TIME_STEP=10
 
 VARIANT="train"
 # VARIANT="test"
@@ -19,4 +19,5 @@ FILENAME="$ACTION-$TIME_STEP.pkl"
 python3 evaluation_tools/response_analyzer.py \
     --action=$ACTION \
     --results_save_path="$RESULTS_SAVE_DIR$FILENAME" \
+    --time_step=$TIME_STEP \
     --num_data_workers=8
