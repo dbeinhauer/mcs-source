@@ -15,7 +15,7 @@ from nn_model.type_variants import (
     PathPlotDefaults,
     EvaluationFields,
 )
-from response_analyzer import ResponseAnalyzer
+from evaluation_tools.response_analyzer import ResponseAnalyzer
 
 
 class ResultsPlotter:

@@ -1,20 +1,51 @@
 # TODO:
-- probably wrong manipulation with neuron RNN model hidden states (we reset them each time step 
-    - we probably want to let them (at least in evaluation)
-    - we probably want them original in both training and evaluation
 
+## Data Aggregation from the dataset for analysis
+1. histogram neuron spike rate
+    - `num bins: 712` (highest possible spike rate)
+2. histogram time bin spike rate
+    - `num bins: 20` (highest possible spike rate)
+3. sum of spikes in each time bin
+    - shape:    `[num_time_bins]`
+        - maximal size: 712
+4. sum spikes in each trial and experiment:
+    - shape:    `[num_experiments, num_trials]`
+    - max size: 50000
+5. mean and variance of spikes per neuron in separate trials
+    - shape: `[num_experiments, num_trials]`
+    - max size: 50000
+6. for each neuron total spikes: 
+    - shape `[num_neurons]`
+    - max size: 33000
+7. Fano factor across trials (makes sense only for the test dataset)
+    - shape: `[experiment, num_neurons]`
+        - max size ~1650000000
+            - might be problem
+                - less than 8. (since only for test)
+    - need:
+        - sum across time -> `[trials, neurons]`
+            - mean and variance across trials -> fano_factors = vars / means
+8. Fano factor across time bins:
+    - shape: `[experiment, num_neurons]`
+        - max size ~1650000000
+            - might be problem
+            - it is approx 
+    - need:
+        - mean across trials -> `[time_bins, neurons]`
+            - mean and variance across time bins -> fano = vars / means
+9. Temporal Synchrony:
+    - shape: `[experiment, time_bins]`
+        - max size: 35600000
+            - might be problem
+    - needs:
+        - mean across trials -> `[time_bins, neurons]`
+            - sum across neurons -> synchrony curve
+10. Per trial Synchrony:
+    - shape: `[experiment, trials, time_bins]`
+        - max size: 35600000
+            - might be problem
+            - may overflow in test with multiple trials (probably not really)
+    - same as 9. just do not mean across trials
 
-# Questions for meeting
-
-
-# Notes from meeting
-- separate RNN time steps to propagate across all time steps
-- add signal modulation RNN after output of each neuron
-    - it should be shared across the tuples input+output layers
-    - it should be also added before LGN input is passed to the input layers
-        - and after each output of the neurons too
-    - this part should correspond to signal modulation when multiple spikes happen in short time period
-        - the neurons diminish the signal in that case (needs to regenerate)
-    - as output of the model we want to still have unmodulated signal (same as we have)
-        - we just want to adjust the input signal to the other neurons
-            - the change happens in real example in the output neuron 
+- We know that shape: `[experiment, 35, neurons]` is not suitable
+    - approx max size: ~57750000000

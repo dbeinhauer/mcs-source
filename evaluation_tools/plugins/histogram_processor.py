@@ -12,11 +12,24 @@ from tqdm import tqdm
 import nn_model.globals
 
 
+# class HistogramFields(Enum):
+#     HISTOGRAM_EXPERIMENTS_COUNTS = "histogram_experiment_counts"  # neuron firing rates
+#     BIN_EDGES_EXPERIMENT = "bin_edges_experiment"  # neuron_firing rates bins
+#     HISTOGRAM_BIN_COUNTS = "histogram_bin_counts"  # time bin firing rates
+#     BIN_EDGES_BINS = "bin_edges_bins"  # time bin firing rates bins
+
+
 class HistogramFields(Enum):
-    HISTOGRAM_EXPERIMENTS_COUNTS = "histogram_experiment_counts" # neuron firing rates
-    BIN_EDGES_EXPERIMENT = "bin_edges_experiment" # neuron_firing rates bins
-    HISTOGRAM_BIN_COUNTS = "histogram_bin_counts" # time bin firing rates
-    BIN_EDGES_BINS = "bin_edges_bins" # time bin firing rates bins
+    NEURON_SPIKE_RATES = (
+        "neuron_spike_rates"  # Neuron firing rates histogram values (bins, counts).
+    )
+    TIME_BIN_SPIKE_RATES = (
+        "time_bin_spike_rates"  # Time bin firing rates histogram values (bins, counts).
+    )
+
+
+class SummarizationFields(Enum):
+    TIME_BIN_COUNTS = "time_bin_counts"  # Total number of spikes in each time bin.
 
 
 class HistogramProcessor:
@@ -28,7 +41,7 @@ class HistogramProcessor:
         self,
     ):
         pass
-    
+
     @property
     def get_histogram_data(self) -> Dict[str, Any]:
         """
@@ -206,7 +219,7 @@ class HistogramProcessor:
                     num_spikes_per_bin,
                     histogram_experiment_counts,
                     histogram_bin_counts,
-                    device
+                    device,
                 )
             )
 

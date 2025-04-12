@@ -32,7 +32,7 @@ from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import EvaluationFields
 from nn_model.dictionary_handler import DictionaryHandler
 
-from plugins.histogram_processor import HistogramProcessor
+from evaluation_tools.plugins.histogram_processor import HistogramProcessor
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
