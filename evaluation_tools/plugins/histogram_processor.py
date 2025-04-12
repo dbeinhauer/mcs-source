@@ -3,11 +3,20 @@ Definition of a plugin that prepares histograms and does operations with them.
 """
 
 from typing import Dict, Tuple, Any
-import torch
 
+from enum import Enum
+
+import torch
 from tqdm import tqdm
 
 import nn_model.globals
+
+
+class HistogramFields(Enum):
+    HISTOGRAM_EXPERIMENTS_COUNTS = "histogram_experiment_counts" # neuron firing rates
+    BIN_EDGES_EXPERIMENT = "bin_edges_experiment" # neuron_firing rates bins
+    HISTOGRAM_BIN_COUNTS = "histogram_bin_counts" # time bin firing rates
+    BIN_EDGES_BINS = "bin_edges_bins" # time bin firing rates bins
 
 
 class HistogramProcessor:
@@ -19,6 +28,19 @@ class HistogramProcessor:
         self,
     ):
         pass
+    
+    @property
+    def get_histogram_data(self) -> Dict[str, Any]:
+        """
+        Returns all accumulated histogram data in form of a dictionary.
+        """
+        # Prepare data to save
+        return {
+            HistogramFields.HISTOGRAM_EXPERIMENTS_COUNTS.value: self.histogram_experiment_counts,
+            HistogramFields.BIN_EDGES_EXPERIMENT.value: self.bin_edges_experiment,
+            HistogramFields.HISTOGRAM_BIN_COUNTS.value: self.histogram_bin_counts,
+            HistogramFields.BIN_EDGES_BINS.value: self.bin_edges_bins,
+        }
 
     @staticmethod
     def _select_layer_data(
@@ -184,11 +206,11 @@ class HistogramProcessor:
                     num_spikes_per_bin,
                     histogram_experiment_counts,
                     histogram_bin_counts,
-                    device,
+                    device
                 )
             )
 
-        # Final histogram convesion to numpy.
+        # Final histogram conversion to numpy.
         self.histogram_experiment_counts = {
             k: v.cpu().numpy() for k, v in histogram_experiment_counts.items()
         }
@@ -202,14 +224,3 @@ class HistogramProcessor:
             self.histogram_bin_counts,
             self.bin_edges_bins,
         )
-
-    @property
-    def get_histogram_data(self) -> Dict[str, Any]:
-        """ """
-        # Prepare data to save
-        return {
-            "histogram_experiment_counts": self.histogram_experiment_counts,
-            "bin_edges_experiment": self.bin_edges_experiment,
-            "histogram_bin_counts": self.histogram_bin_counts,
-            "bin_edges_bins": self.bin_edges_bins,
-        }
