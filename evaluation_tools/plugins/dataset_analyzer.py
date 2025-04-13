@@ -15,6 +15,7 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
     StatisticsFields,
 )
 from evaluation_tools.plugins.histogram_processor import HistogramProcessor
+from evaluation_tools.plugins.time_bin_spike_counter import TimeBinSpikeCounter
 
 
 class DatasetAnalyzer:
@@ -48,14 +49,23 @@ class DatasetAnalyzer:
                 HistogramProcessor.init_histogram_variants()
             )
 
-        self.time_bin_spike_counts = {}
+        self.time_bin_spike_counts: Dict[str, torch.Tensor] = {}
 
     @property
     def get_histogram_data(self) -> Dict[AnalysisFields, Dict[HistogramFields, Any]]:
         """
-        Returns all accumulated histogram data in form of a dictionary.
+        Returns all accumulated histogram data in form of a dictionary
+        with values as numpy arrays.
         """
-        return self.histogram_variants
+        return HistogramProcessor.to_numpy(self.histogram_variants)
+
+    @property
+    def get_time_bin_spike_counts(self) -> Dict[str, Any]:
+        """
+        Returns spike counts in each time bin in from of
+        dictionary of numpy array values.
+        """
+        return TimeBinSpikeCounter.to_numpy(self.time_bin_spike_counts)
 
     @staticmethod
     def _select_layer_data(
@@ -86,8 +96,15 @@ class DatasetAnalyzer:
         # Take specified layer.
         return {k: v for k, v in result_dictionary.items() if k == layer}
 
-    def count_spikes_in_time_bin(self):
-        pass
+    def _count_spikes_in_time_bin(self, data: torch.Tensor) -> torch.Tensor:
+        """
+        Sums spike counts across all experiments, trials and neurons.
+
+        :param data: Spiking batch layer data.
+        :return: Returns tensor of spike counts for each time bin (temporal resolution).
+        Output shape is: `[num_time_steps]`
+        """
+        return data.sum(dim=(0, 1, 3))
 
     def full_analysis_run(
         self,
@@ -120,11 +137,8 @@ class DatasetAnalyzer:
                         data, layer, self.histogram_variants, device
                     )
                 if AnalysisFields.TIME_BIN_SPIKE_COUNTS in self.fields_to_analyze:
-                    self.count_spikes_in_time_bin()
-
-        # Final conversion of the histogram values to CPU and NUMPY representation.
-        self.histogram_variants = HistogramProcessor.convert_histograms_to_numpy(
-            self.histogram_variants
-        )
-
-        return self.histogram_variants
+                    self.time_bin_spike_counts = (
+                        TimeBinSpikeCounter.batch_time_bin_update(
+                            data, layer, self.time_bin_spike_counts
+                        )
+                    )

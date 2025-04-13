@@ -171,16 +171,19 @@ class HistogramProcessor:
         return histogram_variants
 
     @staticmethod
-    def convert_histograms_to_numpy(
+    def to_numpy(
         histogram_variants: Dict[AnalysisFields, Dict[HistogramFields, Any]],
     ) -> Dict[AnalysisFields, Dict[HistogramFields, Any]]:
         """
-        Converts all provided histograms to numpy and cpu representation.
+        Converts all provided histogram values to numpy and cpu representation.
 
         :param histogram_variants: Histogram variants to be converted.
         :return: Converted histograms to Numpy.
         """
         for variant, variant_values in histogram_variants.items():
+            histogram_variants[variant][HistogramFields.BINS] = (
+                histogram_variants[variant][HistogramFields.BINS].cpu().numpy()
+            )
             histogram_variants[variant][HistogramFields.COUNTS] = {
                 layer: value.cpu().numpy()
                 for layer, value in variant_values[HistogramFields.COUNTS].items()

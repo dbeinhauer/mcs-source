@@ -609,6 +609,7 @@ class ResponseAnalyzer:
 
         self.dataset_analyzer.full_analysis_run(loader, subset=subset)
         histogram_data = self.dataset_analyzer.get_histogram_data
+        spike_counts_data = self.dataset_analyzer.get_time_bin_spike_counts
 
         if save_path:
             ResponseAnalyzer.store_pickle_file(save_path, histogram_data)
