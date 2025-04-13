@@ -192,9 +192,9 @@ class HistogramProcessor:
         :return: Converted histograms to Numpy.
         """
         for variant, variant_values in histogram_variants.items():
-            histogram_variants[variant][HistogramFields.BINS] = (
-                histogram_variants[variant][HistogramFields.BINS].cpu().numpy()
-            )
+            histogram_variants[variant][HistogramFields.BINS] = histogram_variants[
+                variant
+            ][HistogramFields.BINS].numpy()
             histogram_variants[variant][HistogramFields.COUNTS] = {
                 layer: value.cpu().numpy()
                 for layer, value in variant_values[HistogramFields.COUNTS].items()

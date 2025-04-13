@@ -7,6 +7,8 @@ from typing import Dict
 
 import torch
 
+from evaluation_tools.fields.dataset_analyzer_fields import DatasetDimensions
+
 
 class TimeBinSpikeCounter:
     """
@@ -22,7 +24,13 @@ class TimeBinSpikeCounter:
         :return: Returns tensor of spike counts for each time bin (temporal resolution).
         Output shape is: `[num_time_steps]`
         """
-        return data.float().sum(dim=(0, 1, 3))
+        return data.float().sum(
+            dim=(
+                DatasetDimensions.EXPERIMENT.value,
+                DatasetDimensions.TRIAL.value,
+                DatasetDimensions.NEURON.value,
+            )
+        )
 
     @staticmethod
     def batch_time_bin_update(
@@ -39,7 +47,7 @@ class TimeBinSpikeCounter:
         """
         if layer not in time_bin_spike_counts:
             time_bin_spike_counts[layer] = torch.zeros(
-                data.shape[2], dtype=torch.float32
+                data.shape[DatasetDimensions.TIME_STEP.value], dtype=torch.float32
             )
 
         time_bin_spike_counts[layer] += TimeBinSpikeCounter._count_spikes_in_time_bin(

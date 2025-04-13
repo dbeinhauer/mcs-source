@@ -21,14 +21,8 @@ class AnalysisFields(Enum):
     SEPARATE_EXPERIMENT_ANALYSIS = "separate_experiment_analysis"
     # Total number of spikes for neuron.
     NEURON_SPIKE_COUNT = "neuron_spike_count"
-    # Fano factor across trials (only for test).
-    FANO_TRIALS = "fano_trials"
-    # Fano factor across the time bins.
-    FANO_TIME_BINS = "fano_time_bins"
-    # Temporal synchrony sum for each time bin.
-    TEMPORAL_SYNCHRONY = "temporal_synchrony"
-    # Per trial synchrony - without mean over trials.
-    PER_TRIAL_SYNCHRONY = "per_trial_synchrony"
+    # Fano factor across all trials
+    FANO_FACTOR = "fano_factor"
 
 
 HISTOGRAM_ANALYSES = [

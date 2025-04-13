@@ -614,15 +614,17 @@ class ResponseAnalyzer:
         """
         loader = self.test_loader if process_test else self.train_loader
 
-        self.dataset_analyzer.full_analysis_run(loader, subset=subset)
-        histogram_data = self.dataset_analyzer.get_histogram_data
-        spike_counts_data = self.dataset_analyzer.get_time_bin_spike_counts
-        separate_experiments_data = (
-            self.dataset_analyzer.get_separate_experiments_analysis
-        )
+        self.dataset_analyzer.full_analysis_run(loader, process_test, subset=subset)
+        # histogram_data = self.dataset_analyzer.get_histogram_data
+        # spike_counts_data = self.dataset_analyzer.get_time_bin_spike_counts
+        # separate_experiments_data = (
+        #     self.dataset_analyzer.get_separate_experiments_analysis
+        # )
+
+        all_analysis_data = self.dataset_analyzer.get_all_processing_results
 
         if save_path:
-            ResponseAnalyzer.store_pickle_file(save_path, histogram_data)
+            ResponseAnalyzer.store_pickle_file(save_path, all_analysis_data)
 
 
 def main(arguments):

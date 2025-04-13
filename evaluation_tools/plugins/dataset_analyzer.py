@@ -23,6 +23,8 @@ from evaluation_tools.plugins.time_bin_spike_counter import TimeBinSpikeCounter
 from evaluation_tools.plugins.separate_experiment_processor import (
     SeparateExperimentProcessor,
 )
+from evaluation_tools.plugins.neuron_summarizer import NeuronSummarizer
+from evaluation_tools.plugins.fano_factor_processor import FanoFactorProcessor
 
 
 class DatasetAnalyzer:
@@ -58,6 +60,24 @@ class DatasetAnalyzer:
         self.separate_experiment_statistics: Dict[
             Dict[StatisticsFields, Dict[str, List[torch.Tensor]]]
         ] = SeparateExperimentProcessor.init_analysis_fields()
+        # Sum of neuronal spikes across all experiments.
+        self.neurons_spike_counts: Dict[str, torch.Tensor] = {}
+        # All fano factors.
+        self.fano_factors: Dict[str, torch.Tensor] = {}
+
+    @property
+    def get_all_processing_results(self) -> Dict[AnalysisFields, Any]:
+        """
+        Returns all processing results in format of dictionary
+        with all tensors as numpy arrays.
+        """
+        return {
+            **self.get_histogram_data,
+            AnalysisFields.TIME_BIN_SPIKE_COUNTS: self.get_time_bin_spike_counts,
+            AnalysisFields.SEPARATE_EXPERIMENT_ANALYSIS: self.get_separate_experiments_analysis,
+            AnalysisFields.NEURON_SPIKE_COUNT: self.get_neuron_spike_counts,
+            AnalysisFields.FANO_FACTOR: self.get_fano_factors,
+        }
 
     @property
     def get_histogram_data(self) -> Dict[AnalysisFields, Dict[HistogramFields, Any]]:
@@ -88,6 +108,20 @@ class DatasetAnalyzer:
         Expected shape: `[experiments, trials]`
         """
         return SeparateExperimentProcessor.to_numpy(self.separate_experiment_statistics)
+
+    @property
+    def get_neuron_spike_counts(self) -> Dict[str, Any]:
+        """
+        Returns neuron spike counts across all experiments.
+        """
+        return NeuronSummarizer.to_numpy(self.neurons_spike_counts)
+
+    @property
+    def get_fano_factors(self) -> Dict[str, Any]:
+        """
+        Returns all fano factors as numpy arrays.
+        """
+        return FanoFactorProcessor.to_numpy(self.fano_factors)
 
     @staticmethod
     def _select_layer_data(
@@ -131,6 +165,7 @@ class DatasetAnalyzer:
     def full_analysis_run(
         self,
         loader,
+        is_test: bool,
         layer: str = "",
         subset: int = -1,
         include_input: bool = True,
@@ -174,4 +209,14 @@ class DatasetAnalyzer:
                             layer,
                             self.separate_experiment_statistics,
                         )
+                    )
+
+                if AnalysisFields.NEURON_SPIKE_COUNT in self.fields_to_analyze:
+                    self.neurons_spike_counts = NeuronSummarizer.batch_neuron_sum(
+                        data, layer, self.neurons_spike_counts
+                    )
+
+                if AnalysisFields.FANO_FACTOR in self.fields_to_analyze:
+                    self.fano_factors = FanoFactorProcessor.batch_fano_computation(
+                        data, layer, is_test, self.fano_factors
                     )
