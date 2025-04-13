@@ -1,17 +1,17 @@
 # TODO:
 
 ## Data Aggregation from the dataset for analysis
-1. histogram neuron spike rate
+1. histogram neuron spike rate - `HISTOGRAM_NEURON_SPIKE_RATES`
     - `num bins: 712` (highest possible spike rate)
-2. histogram time bin spike rate
+2. histogram time bin spike rate - `HISTOGRAM_TIME_BIN_SPIKE_RATES`
     - `num bins: 20` (highest possible spike rate)
-3. sum of spikes in each time bin
+3. sum of spikes in each time bin - `TIME_BIN_SPIKE_COUNTS`
     - shape:    `[num_time_bins]`
         - maximal size: 712
-4. sum spikes in each trial and experiment:
+4. sum spikes in each trial and experiment: - `EXPERIMENT_SPIKE_COUNTS`
     - shape:    `[num_experiments, num_trials]`
     - max size: 50000
-5. mean and variance of spikes per neuron in separate trials
+5. mean and variance of spikes per neuron in separate trials - `NEURON_MEAN_VARIANCE_EXPERIMENT`
     - shape: `[num_experiments, num_trials]`
     - max size: 50000
 6. for each neuron total spikes: 
