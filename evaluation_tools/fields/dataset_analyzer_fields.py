@@ -15,12 +15,10 @@ class AnalysisFields(Enum):
     HISTOGRAM_NEURON_SPIKE_RATES = "histogram_neuron_spike_rates"
     # Histogram of number of spikes across all time bin.
     HISTOGRAM_TIME_BIN_SPIKE_RATES = "histogram_time_bin_spike_rates"
-    # Counts of total spikes in each time bin (size as num_time_bins).
+    # Analysis of the separate time bins.
     TIME_BIN_SPIKE_COUNTS = "time_bin_spike_counts"
-    # Counts of spikes in each trial and experiment.
-    EXPERIMENT_SPIKE_COUNTS = "experiment_spike_counts"
-    # Neuron spike rate mean and variance across experiment.
-    NEURON_MEAN_VARIANCE_EXPERIMENT = "neuron_mean_variance_experiment"
+    # Analysis on the separate experiments and trials.
+    SEPARATE_EXPERIMENT_ANALYSIS = "separate_experiment_analysis"
     # Total number of spikes for neuron.
     NEURON_SPIKE_COUNT = "neuron_spike_count"
     # Fano factor across trials (only for test).
@@ -60,5 +58,26 @@ class StatisticsFields(Enum):
     TOTAL_COUNT = "total_count"
     MEAN = "mean"
     VARIANCE = "variance"
+    DENSITY = "density"
     FANO_FACTOR = "fano_factor"
     SYNCHRONY = "synchrony"
+
+
+class DatasetVariantField(Enum):
+    """
+    Differentiation between different dataset variants.
+    """
+
+    TRAIN = "train"
+    TEST = "test"
+
+
+class DatasetDimensions(Enum):
+    """
+    Differentiation of dataset dimensions and its typical dimension.
+    """
+
+    EXPERIMENT = 0
+    TRIAL = 1
+    TIME_STEP = 2
+    NEURON = 3

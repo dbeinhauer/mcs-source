@@ -34,6 +34,12 @@ from nn_model.dictionary_handler import DictionaryHandler
 
 from evaluation_tools.plugins.dataset_analyzer import DatasetAnalyzer
 
+from evaluation_tools.fields.dataset_analyzer_fields import (
+    AnalysisFields,
+    HistogramFields,
+    StatisticsFields,
+)
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
 
@@ -62,6 +68,7 @@ class ResponseAnalyzer:
         self,
         train_dataset_dir: str,
         test_dataset_dir: str,
+        process_test: bool = False,
         responses_dir: str = "",
         dnn_responses_path: str = "",
         neurons_path: str = "",
@@ -127,7 +134,7 @@ class ResponseAnalyzer:
         self.rnn_to_prediction_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Histogram bins and edges:
 
-        self.dataset_analyzer = DatasetAnalyzer()
+        self.dataset_analyzer = DatasetAnalyzer(process_test)
         # self.histogram_experiment_counts: Dict[str, torch.Tensor] = {}
         # self.bin_edges_experiment = np.zeros(0)
         # self.histogram_bin_counts: Dict[str, torch.Tensor] = {}
@@ -610,6 +617,9 @@ class ResponseAnalyzer:
         self.dataset_analyzer.full_analysis_run(loader, subset=subset)
         histogram_data = self.dataset_analyzer.get_histogram_data
         spike_counts_data = self.dataset_analyzer.get_time_bin_spike_counts
+        separate_experiments_data = (
+            self.dataset_analyzer.get_separate_experiments_analysis
+        )
 
         if save_path:
             ResponseAnalyzer.store_pickle_file(save_path, histogram_data)
@@ -642,12 +652,13 @@ def main(arguments):
         "persistent_workers": workers_enabled,  # keep the worker threads alive
     }
 
-    response_analyzer = ResponseAnalyzer(
-        train_dir,
-        test_dir,
-        # responses_dir=responses_dir,
-        data_workers_kwargs=data_workers_kwargs,
-    )
+    # response_analyzer = ResponseAnalyzer(
+    #     train_dir,
+    #     test_dir,
+    #     process_test,
+    #     # responses_dir=responses_dir,
+    #     data_workers_kwargs=data_workers_kwargs,
+    # )
 
     if arguments.action in [
         AnalyzerChoices.HISTOGRAM_TEST.value,
@@ -655,6 +666,12 @@ def main(arguments):
     ]:
         # Generate histograms.
         process_test = arguments.action == AnalyzerChoices.HISTOGRAM_TEST.value
+        response_analyzer = ResponseAnalyzer(
+            train_dir,
+            test_dir,
+            process_test=process_test,
+            data_workers_kwargs=data_workers_kwargs,
+        )
         response_analyzer.generate_histograms(
             process_test,
             arguments.results_save_path,

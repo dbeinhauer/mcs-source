@@ -3,7 +3,7 @@ This source serves for definition of the base functionality that works
 with the histogram data. It is meant to be part of the `DatasetAnalyzer` class
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import torch
 
@@ -11,6 +11,7 @@ import nn_model.globals
 from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
     HistogramFields,
+    HISTOGRAM_ANALYSES,
 )
 
 
@@ -22,6 +23,7 @@ class HistogramProcessor:
 
     @staticmethod
     def init_histogram_variants(
+        fields_to_analyze: List[AnalysisFields],
         max_neuron_spikes: int = nn_model.globals.BLANK_DURATION
         + nn_model.globals.IMAGE_DURATION,
         max_time_bin_spikes: int = 20,
@@ -29,22 +31,31 @@ class HistogramProcessor:
         """
         Initializes all histograms that will be processed during analysis (neurons and time bins).
 
+        :param field_to_analyze: All fields to analyze (there should be histogram field specified).
+        We are interested in
         :param max_neuron_spikes: Maximal number of spike count per neuron
         (time duration of experiment).
         :param max_time_bin_spikes: Maximal length of time bin (in our case 20).
         :return: Returns dictionary prepared to process all variants of histograms
         with predefined values inside.
         """
-        return {
-            AnalysisFields.HISTOGRAM_NEURON_SPIKE_RATES: {
+        histogram_variants = {}
+
+        if AnalysisFields.HISTOGRAM_NEURON_SPIKE_RATES in fields_to_analyze:
+            # Include neuron spike rates histogram.
+            histogram_variants[AnalysisFields.HISTOGRAM_NEURON_SPIKE_RATES] = {
                 HistogramFields.NUM_BINS: max_neuron_spikes,
                 HistogramFields.SUMMING_FUNCTION: HistogramProcessor._get_neuron_spike_counts_across_experiments,
-            },
-            AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES: {
+            }
+
+        if AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES in fields_to_analyze:
+            # Include time bin spike rates histogram.
+            histogram_variants[AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES] = {
                 HistogramFields.NUM_BINS: max_time_bin_spikes,
                 HistogramFields.SUMMING_FUNCTION: HistogramProcessor._get_neuron_spike_counts_across_time_bin,
-            },
-        }
+            }
+
+        return histogram_variants
 
     @staticmethod
     def init_histogram_fields(

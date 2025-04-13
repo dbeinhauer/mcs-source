@@ -22,7 +22,7 @@ class TimeBinSpikeCounter:
         :return: Returns tensor of spike counts for each time bin (temporal resolution).
         Output shape is: `[num_time_steps]`
         """
-        return data.sum(dim=(0, 1, 3))
+        return data.float().sum(dim=(0, 1, 3))
 
     @staticmethod
     def batch_time_bin_update(
@@ -38,7 +38,9 @@ class TimeBinSpikeCounter:
         :return: Returns updated total spikes counter for each time bin.
         """
         if layer not in time_bin_spike_counts:
-            time_bin_spike_counts[layer] = torch.zeros(data.shape[2])
+            time_bin_spike_counts[layer] = torch.zeros(
+                data.shape[2], dtype=torch.float32
+            )
 
         time_bin_spike_counts[layer] += TimeBinSpikeCounter._count_spikes_in_time_bin(
             data

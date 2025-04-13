@@ -5,11 +5,19 @@
     - `num bins: 712` (highest possible spike rate)
 2. histogram time bin spike rate - `HISTOGRAM_TIME_BIN_SPIKE_RATES`
     - `num bins: 20` (highest possible spike rate)
-
-    
 3. sum of spikes in each time bin - `TIME_BIN_SPIKE_COUNTS`
     - shape:    `[num_time_bins]`
         - maximal size: 712
+
+Dimension `[num_experiments, num_trials]` experiments:
+1. spike counts - `TOTAL_COUNT`
+2. mean across neurons - `MEAN`
+3. variance across neurons - `VARIANCE`
+4. spike density - `DENSITY`
+    - count non-zero time bins -> mean across time
+    - how sparse is the dataset
+5. average Per-bin synchrony - how much neurons spiked across one time bin - `SYNCHRONY`
+
 4. sum spikes in each trial and experiment: - `EXPERIMENT_SPIKE_COUNTS`
     - shape:    `[num_experiments, num_trials]`
     - max size: 50000
@@ -19,14 +27,18 @@
 6. for each neuron total spikes: 
     - shape `[num_neurons]`
     - max size: 33000
-7. Fano factor across trials (makes sense only for the test dataset)
+7. a) Fano factor across trials (makes sense only for the test dataset)
     - shape: `[experiment, num_neurons]`
         - max size ~1650000000
             - might be problem
                 - less than 8. (since only for test)
     - need:
         - sum across time -> `[trials, neurons]`
-            - mean and variance across trials -> fano_factors = vars / means
+            - mean and variance across trials -> fano_factors = vars / means (over neurons)
+7. b) Fano Factor across trials - makes sence only for test
+    - shape: `[experiment]`
+    - need:
+        - sum across spikes and time bins -> fano = vars / mean (over trials)
 8. Fano factor across time bins:
     - shape: `[experiment, num_neurons]`
         - max size ~1650000000
@@ -34,7 +46,7 @@
             - it is approx 
     - need:
         - mean across trials -> `[time_bins, neurons]`
-            - mean and variance across time bins -> fano = vars / means
+            - mean and variance across time bins -> fano = vars / means (over time)
 9. Temporal Synchrony:
     - shape: `[experiment, time_bins]`
         - max size: 35600000

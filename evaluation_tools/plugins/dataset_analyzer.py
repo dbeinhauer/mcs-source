@@ -13,9 +13,16 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
     HistogramFields,
     StatisticsFields,
+    DatasetDimensions,
+    DatasetVariantField,
+    # HISTOGRAM_ANALYSES,
+    # SEPARATE_EXPERIMENT_ANALYSES,
 )
 from evaluation_tools.plugins.histogram_processor import HistogramProcessor
 from evaluation_tools.plugins.time_bin_spike_counter import TimeBinSpikeCounter
+from evaluation_tools.plugins.separate_experiment_processor import (
+    SeparateExperimentProcessor,
+)
 
 
 class DatasetAnalyzer:
@@ -30,32 +37,36 @@ class DatasetAnalyzer:
     # Maximal number of spikes in one time bin (`20` because it is our largest studied time bin).
     max_time_bin_spikes = 20
 
-    def __init__(self, fields_to_analyze: List[AnalysisFields] = list(AnalysisFields)):
+    def __init__(
+        self,
+        is_test: bool,
+        fields_to_analyze: List[AnalysisFields] = list(AnalysisFields),
+    ):
 
+        # Flag whether we are processing test dataset.
+        self.is_test = is_test
         # What fields we want to analyze.
         self.fields_to_analyze = fields_to_analyze
 
-        # Histogram analysis setup (we analyze all histograms at once
-        # (it is enough to specify only one of it to process all of them)).
-        self.histogram_variants = {}
-        if any(
-            field in fields_to_analyze
-            for field in [
-                AnalysisFields.HISTOGRAM_NEURON_SPIKE_RATES,
-                AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES,
-            ]
-        ):
-            self.histogram_variants = HistogramProcessor.init_histogram_fields(
-                HistogramProcessor.init_histogram_variants()
-            )
-
+        # Histogram analysis fields initialization.
+        self.histogram_variants = HistogramProcessor.init_histogram_fields(
+            HistogramProcessor.init_histogram_variants(fields_to_analyze),
+        )
+        # Spike counts of each time bin.
         self.time_bin_spike_counts: Dict[str, torch.Tensor] = {}
+        # Statistics for separate experiments.
+        self.separate_experiment_statistics: Dict[
+            Dict[StatisticsFields, Dict[str, List[torch.Tensor]]]
+        ] = SeparateExperimentProcessor.init_analysis_fields()
 
     @property
     def get_histogram_data(self) -> Dict[AnalysisFields, Dict[HistogramFields, Any]]:
         """
         Returns all accumulated histogram data in form of a dictionary
         with values as numpy arrays.
+        Expected shapes:
+            For neuron counts: `[total_time_duration]`
+            For time bin counts: `[20]`
         """
         return HistogramProcessor.to_numpy(self.histogram_variants)
 
@@ -64,8 +75,19 @@ class DatasetAnalyzer:
         """
         Returns spike counts in each time bin in from of
         dictionary of numpy array values.
+        Expected shape: `[time_bins]`
         """
         return TimeBinSpikeCounter.to_numpy(self.time_bin_spike_counts)
+
+    @property
+    def get_separate_experiments_analysis(
+        self,
+    ) -> Dict[StatisticsFields, Dict[str, Any]]:
+        """
+        Returns all analysis data for separate experiments.
+        Expected shape: `[experiments, trials]`
+        """
+        return SeparateExperimentProcessor.to_numpy(self.separate_experiment_statistics)
 
     @staticmethod
     def _select_layer_data(
@@ -116,7 +138,6 @@ class DatasetAnalyzer:
     ):
         # Select GPU if available.
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
         for i, (inputs, targets) in enumerate(tqdm(loader)):
             if 0 <= subset == i:
                 # Subset -> skip the rest
@@ -131,14 +152,26 @@ class DatasetAnalyzer:
             )
 
             for layer, data in batch_data_dict.items():
-                if self.histogram_variants:
-                    # Process histograms.
-                    self.histogram_variants = HistogramProcessor.batch_histogram_update(
-                        data, layer, self.histogram_variants, device
-                    )
+                # Process histograms.
+                self.histogram_variants = HistogramProcessor.batch_histogram_update(
+                    data, layer, self.histogram_variants, device
+                )
+
                 if AnalysisFields.TIME_BIN_SPIKE_COUNTS in self.fields_to_analyze:
                     self.time_bin_spike_counts = (
                         TimeBinSpikeCounter.batch_time_bin_update(
                             data, layer, self.time_bin_spike_counts
+                        )
+                    )
+
+                if (
+                    AnalysisFields.SEPARATE_EXPERIMENT_ANALYSIS
+                    in self.fields_to_analyze
+                ):
+                    self.separate_experiment_statistics = (
+                        SeparateExperimentProcessor.batch_separate_experiments_update(
+                            data,
+                            layer,
+                            self.separate_experiment_statistics,
                         )
                     )
