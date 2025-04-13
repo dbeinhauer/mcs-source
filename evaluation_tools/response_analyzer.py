@@ -32,7 +32,7 @@ from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import EvaluationFields
 from nn_model.dictionary_handler import DictionaryHandler
 
-from evaluation_tools.plugins.dataset_analyzer import HistogramProcessor
+from evaluation_tools.plugins.dataset_analyzer import DatasetAnalyzer
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
@@ -127,7 +127,7 @@ class ResponseAnalyzer:
         self.rnn_to_prediction_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Histogram bins and edges:
 
-        self.histogram_processor = HistogramProcessor()
+        self.dataset_analyzer = DatasetAnalyzer()
         # self.histogram_experiment_counts: Dict[str, torch.Tensor] = {}
         # self.bin_edges_experiment = np.zeros(0)
         # self.histogram_bin_counts: Dict[str, torch.Tensor] = {}
@@ -607,8 +607,8 @@ class ResponseAnalyzer:
         """
         loader = self.test_loader if process_test else self.train_loader
 
-        self.histogram_processor.all_histograms_processing(loader, subset=subset)
-        histogram_data = self.histogram_processor.get_histogram_data
+        self.dataset_analyzer.full_analysis_run(loader, subset=subset)
+        histogram_data = self.dataset_analyzer.get_histogram_data
 
         if save_path:
             ResponseAnalyzer.store_pickle_file(save_path, histogram_data)

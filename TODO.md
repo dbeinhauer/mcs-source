@@ -5,6 +5,8 @@
     - `num bins: 712` (highest possible spike rate)
 2. histogram time bin spike rate - `HISTOGRAM_TIME_BIN_SPIKE_RATES`
     - `num bins: 20` (highest possible spike rate)
+
+    
 3. sum of spikes in each time bin - `TIME_BIN_SPIKE_COUNTS`
     - shape:    `[num_time_bins]`
         - maximal size: 712

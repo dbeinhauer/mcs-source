@@ -33,6 +33,12 @@ class AnalysisFields(Enum):
     PER_TRIAL_SYNCHRONY = "per_trial_synchrony"
 
 
+HISTOGRAM_ANALYSES = [
+    AnalysisFields.HISTOGRAM_NEURON_SPIKE_RATES,
+    AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES,
+]
+
+
 class HistogramFields(Enum):
     """
     Fields for the histogram objects (just counts and bins).

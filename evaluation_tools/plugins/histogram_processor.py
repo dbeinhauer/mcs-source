@@ -1,43 +1,27 @@
 """
-Definition of a plugin that prepares histograms and does operations with them.
+This source serves for definition of the base functionality that works
+with the histogram data. It is meant to be part of the `DatasetAnalyzer` class
 """
 
-from typing import Dict, Tuple, Any
-
+from typing import Any, Dict
 
 import torch
-from tqdm import tqdm
 
 import nn_model.globals
 from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
     HistogramFields,
-    StatisticsFields,
 )
 
 
-class DatasetAnalyzer:
+class HistogramProcessor:
     """
-    Class for processing and creating histograms from the dataset.
+    Class that processes histogram values. It is meant to be
+    part of `DatasetAnalyzer` class.
     """
-
-    # Maximal number of spikes per neuron in one experiment (experiment duration).
-    max_neuron_spikes = (
-        nn_model.globals.BLANK_DURATION + nn_model.globals.IMAGE_DURATION
-    )
-    # Maximal number of spikes in one time bin (`20` because it is our largest studied time bin).
-    max_time_bin_spikes = 20
-
-    def __init__(
-        self,
-    ):
-        # Initialize histogram values.
-        self.histogram_variants = DatasetAnalyzer._init_histogram_bins(
-            DatasetAnalyzer._init_histogram_variants()
-        )
 
     @staticmethod
-    def _init_histogram_variants(
+    def init_histogram_variants(
         max_neuron_spikes: int = nn_model.globals.BLANK_DURATION
         + nn_model.globals.IMAGE_DURATION,
         max_time_bin_spikes: int = 20,
@@ -54,16 +38,16 @@ class DatasetAnalyzer:
         return {
             AnalysisFields.HISTOGRAM_NEURON_SPIKE_RATES: {
                 HistogramFields.NUM_BINS: max_neuron_spikes,
-                HistogramFields.SUMMING_FUNCTION: DatasetAnalyzer._get_neuron_spike_counts_across_experiments,
+                HistogramFields.SUMMING_FUNCTION: HistogramProcessor._get_neuron_spike_counts_across_experiments,
             },
             AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES: {
                 HistogramFields.NUM_BINS: max_time_bin_spikes,
-                HistogramFields.SUMMING_FUNCTION: DatasetAnalyzer._get_neuron_spike_counts_across_time_bin,
+                HistogramFields.SUMMING_FUNCTION: HistogramProcessor._get_neuron_spike_counts_across_time_bin,
             },
         }
 
     @staticmethod
-    def _init_histogram_fields(
+    def init_histogram_fields(
         histogram_variants: Dict[AnalysisFields, Dict[HistogramFields, Any]],
     ) -> Dict[AnalysisFields, Dict[HistogramFields, Any]]:
         """
@@ -84,44 +68,6 @@ class DatasetAnalyzer:
 
         return histogram_variants
 
-    @property
-    def get_histogram_data(self) -> Dict[str, Any]:
-        """
-        Returns all accumulated histogram data in form of a dictionary.
-        """
-        # Prepare data to save
-        # TODO: rewrite
-        return {}
-
-    @staticmethod
-    def _select_layer_data(
-        inputs, targets, layer: str, include_input: bool, include_output: bool
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Selects data from batch for given layers.
-
-        :param inputs: Input layers (LGN).
-        :param targets: Output layers (V1).
-        :param layer: Layer identifier (if "" -> take all possible).
-        :param include_input: Whether to take input layers.
-        :param include_output: Whether to tak output layers.
-        :return: Returns dictionary of selected layers.
-        """
-        result_dictionary = {**inputs, **targets}
-
-        # Select layer for histogram generation.
-        if not layer:
-            # Layer not specified.
-            if include_input and not include_output:
-                return inputs
-            elif not include_input and include_output:
-                return targets
-
-            return result_dictionary
-
-        # Take specified layer.
-        return {k: v for k, v in result_dictionary.items() if k == layer}
-
     @staticmethod
     def _check_layer_field_init(
         histogram_variants: Dict[AnalysisFields, Dict[HistogramFields, Any]],
@@ -138,10 +84,7 @@ class DatasetAnalyzer:
         :return: Returns updated histogram variants with layer initialized.
         """
         for histogram_key, histogram_values in histogram_variants.items():
-            if (
-                layer
-                not in histogram_variants[histogram_key][HistogramFields.COUNTS][layer]
-            ):
+            if layer not in histogram_variants[histogram_key][HistogramFields.COUNTS]:
                 histogram_variants[histogram_key][HistogramFields.COUNTS][layer] = (
                     torch.zeros(
                         histogram_values[HistogramFields.NUM_BINS], device=device
@@ -175,7 +118,6 @@ class DatasetAnalyzer:
     @staticmethod
     def _data_histogram_update(
         data: torch.Tensor,
-        layer: str,
         num_bins: int,
         histogram_counts: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
@@ -183,19 +125,18 @@ class DatasetAnalyzer:
         Updates histogram with provided batch data.
 
         :param data: Data to create histogram bins from.
-        :param layer: Layer of the data.
         :param num_bins: Total number of bins (+1 bin for 0 value).
         :param histogram_counts: Dictionary of temporary histogram sums.
         :return: Returns updated histogram counts for the given data.
         """
         bin_indices_experiments = torch.clamp((data).long(), min=0, max=num_bins - 1)
         bin_counts = torch.bincount(bin_indices_experiments, minlength=num_bins)
-        histogram_counts[layer] += bin_counts[:num_bins]  # truncate if needed
+        histogram_counts += bin_counts[:num_bins]  # truncate if needed
 
         return histogram_counts
 
     @staticmethod
-    def _batch_histogram_update(
+    def batch_histogram_update(
         data: torch.Tensor,
         layer: str,
         histogram_variants: Dict[AnalysisFields, Dict[HistogramFields, Any]],
@@ -211,18 +152,17 @@ class DatasetAnalyzer:
         :return: Returns tuple of updated histograms of experiment and bins.
         """
         # for layer, data in batch_data_dict.items():
-        histogram_variants = DatasetAnalyzer._check_layer_field_init(
+        histogram_variants = HistogramProcessor._check_layer_field_init(
             histogram_variants, layer, device
         )
 
         for variant, variant_value in histogram_variants.items():
             # For each histogram variant update the counts in bins.
             histogram_variants[variant][HistogramFields.COUNTS][layer] = (
-                DatasetAnalyzer._data_histogram_update(
+                HistogramProcessor._data_histogram_update(
                     # Apply summing function of each histogram on data to
                     # prepare the counts values for histogram creation from.
                     variant_value[HistogramFields.SUMMING_FUNCTION](data),
-                    layer,
                     variant_value[HistogramFields.NUM_BINS],
                     histogram_variants[variant][HistogramFields.COUNTS][layer],
                 )
@@ -231,7 +171,7 @@ class DatasetAnalyzer:
         return histogram_variants
 
     @staticmethod
-    def _convert_histograms_to_numpy(
+    def convert_histograms_to_numpy(
         histogram_variants: Dict[AnalysisFields, Dict[HistogramFields, Any]],
     ) -> Dict[AnalysisFields, Dict[HistogramFields, Any]]:
         """
@@ -246,40 +186,3 @@ class DatasetAnalyzer:
                 for layer, value in variant_values[HistogramFields.COUNTS].items()
             }
         return histogram_variants
-
-    def full_analysis_run(
-        self,
-        loader,
-        layer: str = "",
-        subset: int = -1,
-        include_input: bool = True,
-        include_output: bool = True,
-    ):
-        # Select GPU if available.
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        for i, (inputs, targets) in enumerate(tqdm(loader)):
-            if 0 <= subset == i:
-                # Subset -> skip the rest
-                break
-
-            # Load the batch of data.
-            inputs = {k: v.to(device) for k, v in inputs.items()}
-            targets = {k: v.to(device) for k, v in targets.items()}
-            # Take only specified layers.
-            batch_data_dict = DatasetAnalyzer._select_layer_data(
-                inputs, targets, layer, include_input, include_output
-            )
-
-            for layer, data in batch_data_dict.items():
-                # Update histogram counts.
-                self.histogram_variants = DatasetAnalyzer._batch_histogram_update(
-                    data, layer, self.histogram_variants, device
-                )
-
-        # Final conversion of the histogram values to CPU and NUMPY representation.
-        self.histogram_variants = DatasetAnalyzer._convert_histograms_to_numpy(
-            self.histogram_variants
-        )
-
-        return self.histogram_variants
