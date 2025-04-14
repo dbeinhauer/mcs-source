@@ -27,7 +27,7 @@ from nn_model.type_variants import (
     PathDefaultFields,
     EvaluationMeanVariants,
 )
-from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
+from nn_model.dataset_loader import SparseSpikeDataset  # , different_times_collate_fn
 from nn_model.model_executer import ModelExecuter
 from nn_model.type_variants import EvaluationFields
 from nn_model.dictionary_handler import DictionaryHandler
@@ -41,6 +41,55 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
 )
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+
+
+def different_times_collate_fn(batch):
+    """
+    Function that deals with loading data in batch that differ in time
+    duration (there are fragments of dataset that are slightly different
+    in time duration (the start and end parts of the experiment run)).
+    It pads the missing time with zeros (pads missing blank stage at the end).
+
+    NOTE: Variant for evaluation.
+
+    :param batch: batch of data to pad (tuple of input and output).
+    :return: Returns tuple of padded batch of input and output data.
+    """
+    # Find the maximum size in the second (time) dimension.
+    # max_size = max([next(iter(item[0].values())).size(1) for item in batch])
+    max_size = nn_model.globals.NORMAL_NUM_TIME_STEPS
+
+    # Initialize a list to hold the result dictionaries.
+    num_dicts = len(batch[0])
+    result = [{} for _ in range(num_dicts)]
+
+    # Loop over each index in the tuples
+    for i in range(num_dicts):
+        # Get all dictionaries at the current index across all tuples
+        dicts_at_index = [tup[i] for tup in batch]
+
+        # Get the keys (assuming all dictionaries have the same keys)
+        keys = dicts_at_index[0].keys()
+
+        # For each key, concatenate the tensors from all dictionaries at the current index
+        for key in keys:
+
+            # Collect all tensors associated with the current key
+            tensors_to_concat = [
+                torch.nn.functional.pad(
+                    d[key],
+                    (0, 0, 0, max_size - d[key].size(1)),
+                    "constant",
+                    0,
+                )
+                for d in dicts_at_index
+            ]
+
+            # Concatenate tensors along a new dimension (e.g., dimension 0)
+            result[i][key] = torch.stack(tensors_to_concat, dim=0)
+
+    # Convert the list of dictionaries into a tuple
+    return tuple(result)
 
 
 class AnalyzerChoices(Enum):
