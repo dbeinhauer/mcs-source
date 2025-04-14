@@ -16,7 +16,7 @@ TIME_STEP=20
 ACTION="subset_dataset"
 FILENAME="$ACTION-$VARIANT-$SUBSET.pkl"
 
-RRESULTS_BASE_DIR="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/"
+RESULTS_BASE_DIR="/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/"
 RESULTS_SUBDIR="subset_dataset_analysis/"
 RESULTS_SAVE_PATH="$RESULTS_BASE_DIR$RESULTS_SUBDIR$FILENAME"
 
