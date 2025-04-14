@@ -1,6 +1,6 @@
 """
-This script contains definition of the custom RNN class used in the model. 
-It is especially needed due the need to play with custom neuron models instead 
+This script contains definition of the custom RNN class used in the model.
+It is especially needed due the need to play with custom neuron models instead
 of just simple non-linearity function.
 """
 
@@ -170,12 +170,12 @@ class CustomRNNCell(nn.Module):
         :param constraint_multiplier: Multiplier used on self-recurrent weights
         (either `-1` if inhibitory or `1` if excitatory).
         """
-        self.weights_ih_exc.weight.abs_() # in-place
+        self.weights_ih_exc.weight.abs_()  # in-place
         self.weights_ih_inh.weight.copy_(-self.weights_ih_inh.weight.abs())
         self.weights_hh.weight.copy_(
             constraint_multiplier * self.weights_hh.weight.abs()
         )
-        
+
     def _init_weights(self, weight_initialization_type: str):
         """
         Initializes module weights and biases. Weights are initialized using

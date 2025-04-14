@@ -5,7 +5,7 @@ and dataset analysis.
 
 import sys
 import os
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 import random
 import argparse
 from enum import Enum
@@ -29,7 +29,7 @@ from nn_model.type_variants import (
 )
 from nn_model.dataset_loader import SparseSpikeDataset  # , different_times_collate_fn
 from nn_model.model_executer import ModelExecuter
-from nn_model.type_variants import EvaluationFields
+from nn_model.type_variants import EvaluationFields, PathDefaultFields
 from nn_model.dictionary_handler import DictionaryHandler
 
 from evaluation_tools.plugins.dataset_analyzer import DatasetAnalyzer
@@ -38,7 +38,15 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
     HistogramFields,
     StatisticsFields,
+    DatasetDimensions,
+    DatasetVariantField,
 )
+
+from evaluation_tools.fields.evaluation_processor_fields import (
+    EvaluationProcessorChoices,
+)
+
+from execute_model import get_subset_variant_name
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
@@ -92,14 +100,10 @@ def different_times_collate_fn(batch):
     return tuple(result)
 
 
-class AnalyzerChoices(Enum):
-    HISTOGRAM_TRAIN = "histogram_train"
-    HISTOGRAM_TEST = "histogram_test"
-
-
-class ResponseAnalyzer:
+class EvaluationProcessor:
     """
-    Class used for analysis of the model responses and the dataset properties.
+    Class used for processing the dataset and evaluation results
+    for further statistical analysis.
     """
 
     target_subdirectory_prefix = "V1_"
@@ -117,6 +121,7 @@ class ResponseAnalyzer:
         self,
         train_dataset_dir: str,
         test_dataset_dir: str,
+        arguments,
         process_test: bool = False,
         responses_dir: str = "",
         dnn_responses_path: str = "",
@@ -142,24 +147,22 @@ class ResponseAnalyzer:
         # Initialize batch size (for loader) as default batch size for test dataset.
         self.batch_size = nn_model.globals.TEST_BATCH_SIZE
 
-        # Raw data loaders:
-        if not skip_dataset_load:
-            self.train_dataset, self.train_loader = self._init_dataloader(
-                is_test=False, data_workers_kwargs=data_workers_kwargs
-            )
-            self.test_dataset, self.test_loader = self._init_dataloader(
-                data_workers_kwargs=data_workers_kwargs
-            )
+        # Initialize data loaders and datasets.
+        self.train_dataset, self.train_loader, self.test_dataset, self.test_loader = (
+            self._init_data_loaders(arguments, skip_dataset_load, data_workers_kwargs)
+        )
 
         # Selected neurons for the plotting:
         self.selected_neurons = None
         if neurons_path:
-            self.selected_neurons = ResponseAnalyzer.load_selected_neurons(neurons_path)
+            self.selected_neurons = EvaluationProcessor.load_selected_neurons(
+                neurons_path
+            )
 
         # Selected image batches for plotting:
-        self.images_batches = ResponseAnalyzer.randomly_select_batches()
+        self.images_batches = EvaluationProcessor.randomly_select_batches()
         # Selected image indices for each selected batch selected for plotting.
-        self.batch_image_indices = ResponseAnalyzer.randomly_select_img_index(
+        self.batch_image_indices = EvaluationProcessor.randomly_select_img_index(
             range(0, nn_model.globals.TEST_BATCH_SIZE), len(self.images_batches)
         )
 
@@ -184,10 +187,54 @@ class ResponseAnalyzer:
         # Histogram bins and edges:
 
         self.dataset_analyzer = DatasetAnalyzer(process_test)
-        # self.histogram_experiment_counts: Dict[str, torch.Tensor] = {}
-        # self.bin_edges_experiment = np.zeros(0)
-        # self.histogram_bin_counts: Dict[str, torch.Tensor] = {}
-        # self.bin_edges_bins = np.zeros(0)
+
+    def _init_data_loaders(
+        self, arguments, skip_dataset_load: bool, data_workers_kwargs: Dict
+    ) -> Tuple[
+        Optional[SparseSpikeDataset],
+        Optional[DataLoader],
+        Optional[SparseSpikeDataset],
+        Optional[DataLoader],
+    ]:
+        """
+        Initializes raw dataset and dataloaders if specified.
+
+        :param arguments: Command line arguments.
+        :param skip_dataset_load: Flag whether skip the objects initialization.
+        :param data_workers_kwargs: Data workers kwargs.
+        :return: Returns tuple of both train and test dataset and dataloader objects.
+        """
+        if skip_dataset_load:
+            # Skip raw dataset usage -> return empty object.
+            return None, None, None, None
+
+        # Select correct subset (or no subset if specified)/
+        model_subset_path = get_subset_variant_name(
+            (
+                # Do not use model subset -> full dataset analysis.
+                ""
+                if arguments.action == EvaluationProcessorChoices.FULL_DATASET_ANALYSIS
+                # Use default subset path from the model.
+                else nn_model.globals.DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value]
+            ),
+            subset_variant=(
+                # Make sure we do not specify subset ID if full dataset analysis.
+                -1
+                if EvaluationProcessorChoices.FULL_DATASET_ANALYSIS
+                else arguments.dataset_subset_id
+            ),
+        )
+
+        train_dataset, train_loader = self._init_dataloader(
+            is_test=False,
+            model_subset_path=model_subset_path,
+            data_workers_kwargs=data_workers_kwargs,
+        )
+        test_dataset, test_loader = self._init_dataloader(
+            model_subset_path=model_subset_path,
+            data_workers_kwargs=data_workers_kwargs,
+        )
+        return train_dataset, train_loader, test_dataset, test_loader
 
     @staticmethod
     def load_pickle_file(filename: str):
@@ -220,12 +267,12 @@ class ResponseAnalyzer:
         :param path: Path of the pickle file where the neuron IDs are stored.
         :return: Returns dictionary of loaded neurons IDs for each layer.
         """
-        selected_neurons = ResponseAnalyzer.load_pickle_file(path)
+        selected_neurons = EvaluationProcessor.load_pickle_file(path)
 
         return {
             layer: data
             for layer, data in selected_neurons.items()
-            if layer.startswith(ResponseAnalyzer.target_subdirectory_prefix)
+            if layer.startswith(EvaluationProcessor.target_subdirectory_prefix)
         }
 
     @staticmethod
@@ -253,7 +300,7 @@ class ResponseAnalyzer:
         return random.choices(selection_range, k=selection_size)
 
     def _init_dataloader(
-        self, is_test=True, data_workers_kwargs={}
+        self, is_test=True, model_subset_path: str = "", data_workers_kwargs={}
     ) -> Tuple[SparseSpikeDataset, DataLoader]:
         """
         Initializes dataset and dataloader objects.
@@ -272,13 +319,13 @@ class ResponseAnalyzer:
             dataset_dir,
             input_layers,
             output_layers,
+            model_subset_path=model_subset_path,
             is_test=is_test,
         )
         loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
             shuffle=False,  # Load the dataset always in the same order.
-            # collate_fn=different_times_collate_fn,
             **data_workers_kwargs,
         )
 
@@ -369,7 +416,7 @@ class ResponseAnalyzer:
         :param vector2: Second vector to be summed.
         :return: Returns summed vectors.
         """
-        padded_1, padded_2 = ResponseAnalyzer.pad_tensors(vector1, vector2)
+        padded_1, padded_2 = EvaluationProcessor.pad_tensors(vector1, vector2)
 
         return padded_1 + padded_2
 
@@ -403,8 +450,8 @@ class ResponseAnalyzer:
         :param data: Tensor of shape `(num_images, time, num_neurons)` to be summed.
         :return: Returns summed data (for plotting mean responses).
         """
-        return ResponseAnalyzer._sum_over_images(
-            ResponseAnalyzer._sum_over_neurons(data)
+        return EvaluationProcessor._sum_over_images(
+            EvaluationProcessor._sum_over_neurons(data)
         )
 
     # @staticmethod
@@ -422,11 +469,11 @@ class ResponseAnalyzer:
         :param all_layer_data_batch: One batch of data to add to sum of spikes in all data in time.
         :param sums_dictionary: Current sum of spikes in all layers in time.
         """
-        summing_function = ResponseAnalyzer._time_sum_over_layer
+        summing_function = EvaluationProcessor._time_sum_over_layer
         if variant == EvaluationMeanVariants.NEURON_MEAN.value:
-            summing_function = ResponseAnalyzer._sum_over_images
+            summing_function = EvaluationProcessor._sum_over_images
         elif variant == EvaluationMeanVariants.IMAGE_MEAN.value:
-            summing_function = ResponseAnalyzer._sum_over_neurons
+            summing_function = EvaluationProcessor._sum_over_neurons
 
         for layer, layer_data in all_layer_data_batch.items():
             # Sum first across neurons dimension -> sum across batch dimension (images)
@@ -444,7 +491,7 @@ class ResponseAnalyzer:
                     # layer_data = layer_data[self.selected_images, :, :]
                     pass
 
-            sums_dictionary[layer] = ResponseAnalyzer._sum_vectors(
+            sums_dictionary[layer] = EvaluationProcessor._sum_vectors(
                 sums_dictionary[layer],
                 summing_function(layer_data),
             )
@@ -555,10 +602,10 @@ class ResponseAnalyzer:
         :param
         """
         layer_responses_sum: Dict[str, Dict[str, torch.Tensor]] = {
-            identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
+            identifier: {} for identifier in EvaluationProcessor.mean_responses_fields
         }
         neuron_responses_sum: Dict[str, Dict[str, torch.Tensor]] = {
-            identifier: {} for identifier in ResponseAnalyzer.mean_responses_fields
+            identifier: {} for identifier in EvaluationProcessor.mean_responses_fields
         }
 
         for i, response_filename in enumerate(tqdm(self.responses_filenames)):
@@ -566,7 +613,7 @@ class ResponseAnalyzer:
                 break
 
             all_predictions_and_targets = self._get_data_from_responses_file(
-                response_filename, ResponseAnalyzer.mean_responses_fields
+                response_filename, EvaluationProcessor.mean_responses_fields
             )
 
             for identifier, data in all_predictions_and_targets.items():
@@ -610,14 +657,14 @@ class ResponseAnalyzer:
 
     def get_rnn_responses_to_neuron_responses(self, subset: int = -1):
         self.rnn_to_prediction_responses = {
-            identifier: {} for identifier in ResponseAnalyzer.rnn_to_neuron_fields
+            identifier: {} for identifier in EvaluationProcessor.rnn_to_neuron_fields
         }
         for i, response_filename in enumerate(tqdm(self.responses_filenames)):
             if i == subset:
                 break
 
             rnn_and_normal_predictions = self._get_data_from_responses_file(
-                response_filename, ResponseAnalyzer.rnn_to_neuron_fields
+                response_filename, EvaluationProcessor.rnn_to_neuron_fields
             )
 
             for identifier, batch_data in rnn_and_normal_predictions.items():
@@ -650,30 +697,22 @@ class ResponseAnalyzer:
         """
         pass
 
-    def generate_histograms(
-        self, process_test: bool, save_path: str = "", subset: int = -1
-    ):
+    def run_dataset_processing(
+        self, process_test: bool, subset: int = -1
+    ) -> Dict[AnalysisFields, Any]:
         """
-        Generate histogram of neuronal spike rates and rates in each bin.
+        Runs dataset processing analysis. Either for the full dataset or
+        for the subsets based on the initialized data loader.
 
-        :param process_test: Whether to generate histogram on test dataset.
-        :param time_step: Size of time bins to process.
-        :param save_path: Where to store the histogram data.
+        :param process_test: Whether to process test dataset, else process train dataset.
         :param subset: What part to process.
         """
+        # Select correct dataset loader.
         loader = self.test_loader if process_test else self.train_loader
 
+        # Run full dataset analysis and get the results.
         self.dataset_analyzer.full_analysis_run(loader, process_test, subset=subset)
-        # histogram_data = self.dataset_analyzer.get_histogram_data
-        # spike_counts_data = self.dataset_analyzer.get_time_bin_spike_counts
-        # separate_experiments_data = (
-        #     self.dataset_analyzer.get_separate_experiments_analysis
-        # )
-
-        all_analysis_data = self.dataset_analyzer.get_all_processing_results
-
-        if save_path:
-            ResponseAnalyzer.store_pickle_file(save_path, all_analysis_data)
+        return self.dataset_analyzer.get_all_processing_results
 
 
 def main(arguments):
@@ -702,32 +741,31 @@ def main(arguments):
         ),  # try to always have 4 samples ready for the GPU
         "persistent_workers": workers_enabled,  # keep the worker threads alive
     }
+    # Whether we want to process the test dataset.
+    process_test = arguments.dataset_variant == DatasetVariantField.TEST.value
+    # Generate dataset analysis.
+    response_analyzer = EvaluationProcessor(
+        train_dir,
+        test_dir,
+        arguments,
+        process_test=process_test,
+        data_workers_kwargs=data_workers_kwargs,
+    )
 
-    # response_analyzer = ResponseAnalyzer(
-    #     train_dir,
-    #     test_dir,
-    #     process_test,
-    #     # responses_dir=responses_dir,
-    #     data_workers_kwargs=data_workers_kwargs,
-    # )
-
+    results = None
     if arguments.action in [
-        AnalyzerChoices.HISTOGRAM_TEST.value,
-        AnalyzerChoices.HISTOGRAM_TRAIN.value,
+        EvaluationProcessorChoices.FULL_DATASET_ANALYSIS.value,
+        EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS.value,
     ]:
-        # Generate histograms.
-        process_test = arguments.action == AnalyzerChoices.HISTOGRAM_TEST.value
-        response_analyzer = ResponseAnalyzer(
-            train_dir,
-            test_dir,
-            process_test=process_test,
-            data_workers_kwargs=data_workers_kwargs,
-        )
-        response_analyzer.generate_histograms(
+        # Run dataset analysis.
+        results = response_analyzer.run_dataset_processing(
             process_test,
-            arguments.results_save_path,
             subset=arguments.processing_subset,
         )
+
+    if arguments.results_save_path:
+        # Optionally save the results to pickle.
+        EvaluationProcessor.store_pickle_file(arguments.results_save_path, results)
 
 
 if __name__ == "__main__":
@@ -738,8 +776,22 @@ if __name__ == "__main__":
         "--action",
         type=str,
         required=True,
-        choices=[i.value for i in AnalyzerChoices._member_map_.values()],
+        choices=[i.value for i in EvaluationProcessorChoices._member_map_.values()],
         help="What type of action do.",
+    )
+    parser.add_argument(
+        "--dataset_variant",
+        type=str,
+        default=DatasetVariantField.TRAIN.value,
+        choices=[i.value for i in DatasetVariantField._member_map_.values()],
+        help="What dataset to evaluate.",
+    )
+    parser.add_argument(
+        "--dataset_subset_id",
+        type=int,
+        default=-1,
+        help="Variant ID of the subset of the size defined in `nn_model.globals.SIZE_MULTIPLIER, "
+        "if `-1` then do not take any subset variant (default subset or full subset).",
     )
     parser.add_argument(
         "--results_save_path",
@@ -765,8 +817,6 @@ if __name__ == "__main__":
         default=20,
         help="Size of the time bin to analyze.",
     )
-
-    # data = ResponseAnalyzer.load_pickle_file("results.pkl")
 
     args = parser.parse_args()
     main(args)

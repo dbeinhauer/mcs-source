@@ -15,8 +15,6 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
     StatisticsFields,
     DatasetDimensions,
     DatasetVariantField,
-    # HISTOGRAM_ANALYSES,
-    # SEPARATE_EXPERIMENT_ANALYSES,
 )
 from evaluation_tools.plugins.histogram_processor import HistogramProcessor
 from evaluation_tools.plugins.time_bin_spike_counter import TimeBinSpikeCounter
@@ -171,6 +169,17 @@ class DatasetAnalyzer:
         include_input: bool = True,
         include_output: bool = True,
     ):
+        """
+        Runs dataset analysis on the full loaded dataset (either full dataset or only
+        subset of neurons based on the loader provided).
+
+        :param loader: Dataset loader to obtain the data.
+        :param is_test: Flag whether we are processing test dataset.
+        :param layer: Analyze only specific layer (if `""` then all layers).
+        :param subset: Analyze only subset of batches (if `-1` then all).
+        :param include_input: Flag whether to analyze input layers (LGN).
+        :param include_output: Flag whether to analyze output layers (V1).
+        """
         # Select GPU if available.
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         for i, (inputs, targets) in enumerate(tqdm(loader)):

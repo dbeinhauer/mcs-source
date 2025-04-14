@@ -9,8 +9,10 @@ evaluation_tools/evaluation_results/full_evaluation_results/*/*
 evaluation_tools/evaluation_results/neuron_model_responses/*.pth
 evaluation_tools/evaluation_results/histograms/*.pkl
 evaluation_tools/evaluation_results_old/*
+evaluation_tools/evaluation_results/*
 wandb/*
 .wandb_api_key.sh
 .wandb_api_key
 metacentrum_scripts/prepared_jobs/*
 thesis_results/
+Luca_examples/

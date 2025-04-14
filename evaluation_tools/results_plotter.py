@@ -15,7 +15,7 @@ from nn_model.type_variants import (
     PathPlotDefaults,
     EvaluationFields,
 )
-from evaluation_tools.response_analyzer import ResponseAnalyzer
+from evaluation_tools.evaluation_processor import EvaluationProcessor
 
 
 class ResultsPlotter:
@@ -355,7 +355,7 @@ class ResultsPlotter:
         mean_targets = mean_data[EvaluationFields.TARGETS.value]
         neuron_ids_path = "/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_25_subset_10.pkl"
 
-        selected_neurons = ResponseAnalyzer.load_pickle_file(neuron_ids_path)
+        selected_neurons = EvaluationProcessor.load_pickle_file(neuron_ids_path)
 
         for layer in targets:
             # print(selected_neurons)

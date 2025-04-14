@@ -1,5 +1,5 @@
 """
-This source code defines dataset class for storing the experiment data. 
+This source code defines dataset class for storing the experiment data.
 """
 
 import os
