@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=histogram_creation
 #SBATCH --output=output_dir/output_%j.txt   
-#SBATCH --ntasks=8  # Requesting n processors
+#SBATCH --ntasks=4  # Requesting n processors
 #SBATCH --nodes=1
 
 #SBATCH --exclude=w[1-2,9-12]

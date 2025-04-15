@@ -20,6 +20,7 @@ from evaluation_tools.fields.dataset_parameters import ALL_TIME_STEP_VARIANTS
 from evaluation_tools.fields.evaluation_processor_fields import (
     EvaluationProcessorChoices,
 )
+from evaluation_tools.scripts.pickle_manipulation import load_pickle_file
 
 import nn_model.globals
 
@@ -36,44 +37,35 @@ class ResultAnalyzer:
 
         self.all_results: Dict[EvaluationProcessorChoices, Any] = {}
 
-    @staticmethod
-    def load_pickle_file(filename: str):
-        """
-        Loads pickle file.
-
-        :param filename: Name of the pickle file.
-        :return: Returns content of the pickle file.
-        """
-        with open(filename, "rb") as f:
-            return pickle.load(f)
-
-    @staticmethod
-    def store_pickle_file(filename: str, data_to_store):
-        """
-        Stored data to pickle file.
-
-        :param filename: Filename.
-        :param data_to_store: Data to be saved.
-        """
-        with open(filename, "wb") as f:
-            pickle.dump(data_to_store, f)
-        print(f"Data saved to {filename}")
+    @property
+    def get_all_results(self) -> Dict[EvaluationProcessorChoices, Any]:
+        return self.all_results
 
     def load_analysis_results(
         self,
-        directory: str,
+        base_dir: str,
+        results_variant: EvaluationProcessorChoices,
     ) -> Dict[DatasetVariantField, Dict[int, Dict[AnalysisFields, Any]]]:
+        """
+        Loads either all dataset analysis results on:
+            1. The full dataset with multiple time bins variants.
+            2. The subset dataset with multiple subset variants.
 
+        Stores the results to dictionary that captures all loaded results.
+
+        :param base_dir: Base directory with all target results.
+        :param results_variant: Variant of the results to load.
+        :return: Returns loaded results.
+        """
         results: Dict[DatasetVariantField, Dict[int, object]] = {}
-        pattern = re.compile(
-            rf"{ResultVariants.FULL_DATASET_ANALYSIS.value}-(.+)-(\d+)\.pkl"
-        )
+        pattern = re.compile(rf"{results_variant.value}-(.+)-(\d+)\.pkl")
 
-        for filename in os.listdir(directory):
+        for filename in os.listdir(base_dir):
             match = pattern.match(filename)
             if match:
-                variant_str, timestep_str = match.groups()
-                timestep = int(timestep_str)
+                # The file is one of the analysis results files.
+                variant_str, time_or_subset_str = match.groups()
+                time_or_subset = int(time_or_subset_str)
 
                 # Convert string to enum
                 try:
@@ -82,17 +74,18 @@ class ResultAnalyzer:
                     print(f"Skipping unknown variant: {variant_str}")
                     continue
 
-                # Insert into nested dictionary
                 if variant not in results:
+                    # Initialize the variant.
                     results[variant] = {}
 
-                file_path = os.path.join(directory, filename)
-                value = ResultAnalyzer.load_pickle_file(file_path)
+                # Load the data.
+                file_path = os.path.join(base_dir, filename)
+                value = load_pickle_file(file_path)
 
-                results[variant][timestep] = value
+                results[variant][time_or_subset] = value
 
         # Save the results to all results.
-        self.all_results[ResultVariants.FULL_DATASET_ANALYSIS] = results
+        self.all_results[results_variant] = results
 
         return results
 
@@ -100,11 +93,20 @@ class ResultAnalyzer:
 if __name__ == "__main__":
     EVALUATION_RESULTS_BASE = "/evaluation_tools/evaluation_results"
     analysis_paths = {
-        ResultVariants.FULL_DATASET_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/full_dataset_analysis/"
+        EvaluationProcessorChoices.FULL_DATASET_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/full_dataset_analysis/",
+        EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/subset_dataset_analysis/",
     }
     result_analyzer = ResultAnalyzer([variant for variant in analysis_paths])
-    results = result_analyzer.load_analysis_results(
-        analysis_paths[ResultVariants.FULL_DATASET_ANALYSIS]
+    results_full_analysis = result_analyzer.load_analysis_results(
+        analysis_paths[EvaluationProcessorChoices.FULL_DATASET_ANALYSIS],
+        EvaluationProcessorChoices.FULL_DATASET_ANALYSIS,
+    )
+    results_subset_analysis = result_analyzer.load_analysis_results(
+        analysis_paths[EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS],
+        EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS,
     )
 
-    print(results.keys())
+    all_results = result_analyzer.get_all_results
+    print(all_results)
+
+    # print(results.keys())

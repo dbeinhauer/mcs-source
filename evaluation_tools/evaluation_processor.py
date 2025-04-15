@@ -33,7 +33,6 @@ from nn_model.type_variants import EvaluationFields, PathDefaultFields
 from nn_model.dictionary_handler import DictionaryHandler
 
 from evaluation_tools.plugins.dataset_analyzer import DatasetAnalyzer
-
 from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
     HistogramFields,
@@ -41,11 +40,13 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
     DatasetDimensions,
     DatasetVariantField,
 )
-
 from evaluation_tools.fields.evaluation_processor_fields import (
     EvaluationProcessorChoices,
 )
-
+from evaluation_tools.scripts.pickle_manipulation import (
+    load_pickle_file,
+    store_pickle_file,
+)
 from execute_model import get_subset_variant_name
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
@@ -64,7 +65,6 @@ def different_times_collate_fn(batch):
     :return: Returns tuple of padded batch of input and output data.
     """
     # Find the maximum size in the second (time) dimension.
-    # max_size = max([next(iter(item[0].values())).size(1) for item in batch])
     max_size = nn_model.globals.NORMAL_NUM_TIME_STEPS
 
     # Initialize a list to hold the result dictionaries.
@@ -188,6 +188,40 @@ class EvaluationProcessor:
 
         self.dataset_analyzer = DatasetAnalyzer(process_test)
 
+    def _init_dataloader(
+        self, is_test=True, model_subset_path: str = "", data_workers_kwargs={}
+    ) -> Tuple[SparseSpikeDataset, DataLoader]:
+        """
+        Initializes dataset and dataloader objects.
+
+        :param is_test: Flag whether load test dataset (multitrial dataset).
+        :param model_subset_path: Path to subset indices, if `""` then full dataset.
+        :param data_workers_kwargs: Kwargs of the DataLoader class.
+        :return: Returns tuple of initialized dataset object and DataLoader object.
+        """
+        input_layers, output_layers = DictionaryHandler.split_input_output_layers(
+            nn_model.globals.ORIGINAL_SIZES
+        )
+        dataset_dir = self.test_dataset_dir
+        if not is_test:
+            dataset_dir = self.train_dataset_dir
+
+        dataset = SparseSpikeDataset(
+            dataset_dir,
+            input_layers,
+            output_layers,
+            model_subset_path=model_subset_path,
+            is_test=is_test,
+        )
+        loader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=False,  # Load the dataset always in the same order.
+            **data_workers_kwargs,
+        )
+
+        return dataset, loader
+
     def _init_data_loaders(
         self, arguments, skip_dataset_load: bool, data_workers_kwargs: Dict
     ) -> Tuple[
@@ -237,29 +271,6 @@ class EvaluationProcessor:
         return train_dataset, train_loader, test_dataset, test_loader
 
     @staticmethod
-    def load_pickle_file(filename: str):
-        """
-        Loads pickle file.
-
-        :param filename: Name of the pickle file.
-        :return: Returns content of the pickle file.
-        """
-        with open(filename, "rb") as f:
-            return pickle.load(f)
-
-    @staticmethod
-    def store_pickle_file(filename: str, data_to_store):
-        """
-        Stored data to pickle file.
-
-        :param filename: Filename.
-        :param data_to_store: Data to be saved.
-        """
-        with open(filename, "wb") as f:
-            pickle.dump(data_to_store, f)
-        print(f"Data saved to {filename}")
-
-    @staticmethod
     def load_selected_neurons(path: str) -> Dict:
         """
         Loads selected neurons for output layers from pickle file.
@@ -267,7 +278,7 @@ class EvaluationProcessor:
         :param path: Path of the pickle file where the neuron IDs are stored.
         :return: Returns dictionary of loaded neurons IDs for each layer.
         """
-        selected_neurons = EvaluationProcessor.load_pickle_file(path)
+        selected_neurons = load_pickle_file(path)
 
         return {
             layer: data
@@ -298,38 +309,6 @@ class EvaluationProcessor:
         :return: Returns list of randomly selected image indices.
         """
         return random.choices(selection_range, k=selection_size)
-
-    def _init_dataloader(
-        self, is_test=True, model_subset_path: str = "", data_workers_kwargs={}
-    ) -> Tuple[SparseSpikeDataset, DataLoader]:
-        """
-        Initializes dataset and dataloader objects.
-
-        :param is_test: Flag whether load test dataset (multitrial dataset).
-        :return: Returns tuple of initialized dataset object and DataLoader object.
-        """
-        input_layers, output_layers = DictionaryHandler.split_input_output_layers(
-            nn_model.globals.ORIGINAL_SIZES
-        )
-        dataset_dir = self.test_dataset_dir
-        if not is_test:
-            dataset_dir = self.train_dataset_dir
-
-        dataset = SparseSpikeDataset(
-            dataset_dir,
-            input_layers,
-            output_layers,
-            model_subset_path=model_subset_path,
-            is_test=is_test,
-        )
-        loader = DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=False,  # Load the dataset always in the same order.
-            **data_workers_kwargs,
-        )
-
-        return dataset, loader
 
     def _load_responses_filenames(self, responses_dir: str = "") -> List[str]:
         """
@@ -454,7 +433,6 @@ class EvaluationProcessor:
             EvaluationProcessor._sum_over_neurons(data)
         )
 
-    # @staticmethod
     def _update_time_sum(
         self,
         all_layer_data_batch: Dict[str, torch.Tensor],
@@ -532,63 +510,10 @@ class EvaluationProcessor:
             for layer, layer_data in responses_sum.items()
         }
 
-    def get_original_data_mean_over_time(
-        self,
-        subset=-1,
-        process_test: bool = True,
-        include_input: bool = True,
-        include_output: bool = False,
-    ):
-        """
-        Iterates through provided data
-
-        :param subset: _description_, defaults to -1ta
-        :param process_test: _description_, defaults to True
-        :param include_input: _description_, defaults to True
-        :param include_output: _description_, defaults to False
-        """
-        layer_responses_sum = {}
-
-        trials_multiplier = 20
-        loader = self.test_loader
-        if not process_test:
-            # Processing train set -> use train loader and number of trials is 1.
-            loader = self.train_loader
-            trials_multiplier = 1
-
-        for i, (inputs, targets) in enumerate(tqdm(loader)):
-            if i == subset:
-                # Create the mean out of the subset of batches.
-                break
-
-            batch_to_process = inputs
-            if include_output:
-                batch_to_process = targets
-                if include_input:
-                    batch_to_process = {**inputs, **targets}
-
-            self._update_time_sum(
-                {
-                    layer: torch.sum(data.float(), dim=1)
-                    for layer, data in batch_to_process.items()
-                },
-                layer_responses_sum,
-                variant=EvaluationMeanVariants.LAYER_MEAN.value,
-            )
-
-        self.mean_input_layer_responses = self._compute_mean_responses(
-            layer_responses_sum,
-            len(self.test_loader),
-            nn_model.globals.TEST_BATCH_SIZE * trials_multiplier,
-            subset=subset,
-        )
-
-        return self.mean_input_layer_responses
-
     def _get_data_from_responses_file(self, filename, keys_to_select):
         return {
             key: value
-            for key, value in self.load_pickle_file(
+            for key, value in load_pickle_file(
                 self.responses_dir + "/" + filename
             ).items()
             if key in keys_to_select
@@ -687,15 +612,6 @@ class EvaluationProcessor:
                     )
 
         return self.rnn_to_prediction_responses
-
-    def compute_mean_neuron_response_per_all_images(self, neuron_id: int, layer: str):
-        """
-        Computes mean spatio-temporal response of a selected neurons through all images.
-
-        :param neuron_id: ID of the neuron to compute the mean for.
-        :param layer: name of the layer where the selected neuron lies.
-        """
-        pass
 
     def run_dataset_processing(
         self, process_test: bool, subset: int = -1
