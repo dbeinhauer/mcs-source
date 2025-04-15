@@ -412,8 +412,8 @@ class ModelExecuter:
 
     @staticmethod
     def _add_trial_predictions_to_list_of_all_predictions(
-        trial_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
-        all_predictions: Dict[str, Dict[str, List[torch.Tensor]]],
+        trial_predictions: Dict[PredictionTypes, Dict[str, List[torch.Tensor]]],
+        all_predictions: Dict[PredictionTypes, Dict[str, List[torch.Tensor]]],
         save_recurrent_state: bool,
     ):
         """
@@ -433,12 +433,12 @@ class ModelExecuter:
                     0
                 )  # RNN default (do not save predictions).
                 if (
-                    prediction_type == PredictionTypes.FULL_PREDICTION.value
+                    prediction_type in [PredictionTypes.FULL_PREDICTION, PredictionTypes.TRAIN_LIKE_PREDICTION]
                     or save_recurrent_state
                 ):
                     # In case we are doing full prediction or we specified we want RNN linearity
                     # values (of layers) -> store them.
-                    if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+                    if prediction_type == PredictionTypes.RNN_PREDICTION:
                         # TODO: currently skipping this step as it does not work correctly.
                         continue
 
@@ -692,11 +692,23 @@ class ModelExecuter:
         synaptic_adaptation_hidden: Dict[
             str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
         ],
+        evaluation_train_like_forward: bool = False,
     ) -> Tuple[
         Dict[str, torch.Tensor],
         Dict[str, Optional[Tuple[torch.Tensor, ...]]],
         Dict[str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]],
     ]:
+        """_summary_
+
+        :param inputs: _description_
+        :param hidden_states: _description_
+        :param neuron_hidden: _description_
+        :param synaptic_adaptation_hidden: _description_
+        :param evaluation_train_like_forward: Whether to run hidden steps resetting while 
+        evaluation run (to test the performance of the model on the prediction of the only one 
+        time step - same procedure as in train steps).
+        :return: _description_
+        """
         all_predictions, _, neuron_hidden, synaptic_adaptation_hidden = self.model(
             inputs,  # input of time t
             # Hidden states based on the layer (some of them from t, some of them form t-1).
@@ -704,6 +716,7 @@ class ModelExecuter:
             hidden_states,
             neuron_hidden,
             synaptic_adaptation_hidden,
+            evaluation_train_like_forward=evaluation_train_like_forward
         )
 
         # Take last time step predictions (those are the visible time steps predictions).
@@ -904,13 +917,69 @@ class ModelExecuter:
             torch.load(self.evaluation_results_saver.best_model_path, weights_only=True)
         )
         self.logger.print_best_model_evaluation(self.best_metric)
+        
+    # def _perform_train_like_predictions(self, trial_inputs, all_targets, trial_id: int):
+    #     """
+    #     Performs train like evaluation. After each predicted time step it resets its 
+    #     hidden states based on the previous target value.
+
+    #     :param trial_inputs: All inputs for the trial.
+    #     :param all_targets: All targets across all trials (to be converted to CUDA there for the trial).
+    #     :param trial_id: Trial ID.
+    #     :return: Returns model predictions for the given sequence of inputs while we reset 
+    #     the hidden states using the previous targets (same process as while training).
+    #     """
+        
+    #     # Move all trial hidden states to cuda for train-like evaluation.
+    #     trial_all_hidden =  ModelExecuter._move_data_to_cuda(
+    #         {
+    #             layer: layer_input[:, trial_id, :, :]
+    #             for layer, layer_input in all_targets.items()
+    #         }
+    #     )
+    
+    #     time_length = trial_inputs[LayerType.X_ON.value].size(1)
+        
+    #     # Hidden states of the neuron.
+    #     neuron_hidden, synaptic_adaptation_hidden = (
+    #         ModelExecuter._init_modules_hidden_states()
+    #     )
+        
+    #     # trial_train_like_predictions: Dict[str, List[torch.Tensor]] = {
+    #     #     layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
+    #     # }
+        
+    #     for visible_time in range(
+    #         1, time_length
+    #     ):  # We skip the first time step because we do not have initial hidden values for them.
+    #         # Get data for the current time step.
+    #         # print(visible_time)
+    #         current_input, _, current_hidden = ModelExecuter._get_train_current_time_data(
+    #             visible_time, trial_inputs, trial_all_hidden, trial_all_hidden
+    #         )
+
+    #         # Perform model forward step.
+    #         predictions, neuron_hidden, synaptic_adaptation_hidden = (
+    #             self._model_forward_step(
+    #                 current_input, 
+    #                 current_hidden, 
+    #                 neuron_hidden, 
+    #                 synaptic_adaptation_hidden, 
+    #                 evaluation_train_like_forward=True,
+    #             )
+    #         )
+    #         # trial_train_like_predictions.append(predictions)
+    #         self.model._append_outputs(trial_train_like_predictions, predictions)
+        
+    #     return trial_train_like_predictions
+            
 
     def _get_all_trials_predictions(
         self,
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-    ) -> Dict[str, Dict[str, List[torch.Tensor]]]:
+    ) -> Dict[PredictionTypes, Dict[str, List[torch.Tensor]]]:
         """
         Computes predictions for all trials (used for evaluation usually).
 
@@ -923,11 +992,11 @@ class ModelExecuter:
         predictions before passing information through neuron model (RNN predictions).
         """
         # Initialize dictionaries with the keys of all output layers names.
-        all_predictions: Dict[str, Dict[str, List[torch.Tensor]]] = {
-            prediction_type.value: {
+        all_predictions: Dict[PredictionTypes, Dict[str, List[torch.Tensor]]] = {
+            prediction_type: {
                 layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
             }
-            for prediction_type in list(PredictionTypes)
+            for prediction_type in PredictionTypes
         }
 
         # Get predictions for each trial.
@@ -957,17 +1026,46 @@ class ModelExecuter:
                 neuron_hidden,
                 synaptic_adaptation_hidden,
             )
+            
+            neuron_hidden, synaptic_adaptation_hidden = (
+                ModelExecuter._init_modules_hidden_states()
+            )
+            trial_all_hidden =  ModelExecuter._move_data_to_cuda(
+                {
+                    layer: layer_input[:, trial, :, :]
+                    for layer, layer_input in targets.items()
+                }
+            )
+            
+            trial_train_like_predictions, _, _, _ = self.model(
+                trial_inputs,
+                trial_all_hidden,
+                neuron_hidden,
+                synaptic_adaptation_hidden,
+                evaluation_train_like_forward=True,
+            )
+            
+            # trial_train_like_predictions = {}
+            # # # Pass all targets to be moved to CUDA inside for the trial (we might have the 
+            # # # option to skip this in the future and later allocation saves GPU memory).
+            # trial_train_like_predictions = self._perform_train_like_predictions(
+            #     trial_inputs, 
+            #     targets,
+            #     trial,
+            # )
+            # print("Trial Done")
 
             # Accumulate all trials predictions.
             ModelExecuter._add_trial_predictions_to_list_of_all_predictions(
                 {
-                    PredictionTypes.FULL_PREDICTION.value: trial_predictions,
-                    PredictionTypes.RNN_PREDICTION.value: trial_rnn_predictions,
+                    PredictionTypes.FULL_PREDICTION: trial_predictions,
+                    PredictionTypes.TRAIN_LIKE_PREDICTION: trial_train_like_predictions,
+                    PredictionTypes.RNN_PREDICTION: trial_rnn_predictions,
                 },
                 all_predictions,
                 self.model.return_recurrent_state,
             )
-
+            
         return all_predictions
 
     def _predict_for_evaluation(
@@ -975,7 +1073,7 @@ class ModelExecuter:
         inputs: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
         num_trials: int,
-    ) -> Dict[str, Dict[str, torch.Tensor]]:
+    ) -> Dict[PredictionTypes, Dict[str, torch.Tensor]]:
         """
         Performs prediction of the model for each trial. Then stacks the predictions
         into one tensors of size `(num_trials, batch_size, time, num_neurons)` and
@@ -1000,14 +1098,14 @@ class ModelExecuter:
         for prediction_type, all_layers_predictions in all_predictions.items():
             # Iterate all prediction types
             if (
-                prediction_type == PredictionTypes.RNN_PREDICTION.value
+                prediction_type == PredictionTypes.RNN_PREDICTION
                 and not self.model.return_recurrent_state
             ):
                 # In case we do not want to save RNN predictions -> skip them
                 return_predictions[prediction_type] = {}
                 continue
 
-            if prediction_type == PredictionTypes.RNN_PREDICTION.value:
+            if prediction_type == PredictionTypes.RNN_PREDICTION:
                 # TODO: currently skipping RNN linearity results storage as it is broken.
                 continue
 
@@ -1110,7 +1208,7 @@ class ModelExecuter:
                 cc_norm, cc_abs = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
                     {layer: target[:, :, 1:, :] for layer, target in targets.items()},
-                    all_predictions[PredictionTypes.FULL_PREDICTION.value],
+                    all_predictions[PredictionTypes.FULL_PREDICTION],
                 )
                 cc_norm_sum += cc_norm
                 cc_abs_sum += cc_abs

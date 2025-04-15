@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=histogram_creation
+#SBATCH --job-name=full_dataset_analysis
 #SBATCH --output=output_dir/output_%j.txt   
 #SBATCH --ntasks=8  # Requesting n processors
 #SBATCH --nodes=1

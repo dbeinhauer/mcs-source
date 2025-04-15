@@ -111,10 +111,16 @@ class LayerConstraintFields(Enum):
 
 class PredictionTypes(Enum):
     """
-    All variants of predictions that are provided by the model.
+    All variants of predictions that are provided by the model 
+    (to distinguish between the predictions).
     """
 
+    # General model prediction -> full sequence prediction (without resetting).
     FULL_PREDICTION = "full_prediction"
+    # Predictions where we reset the hidden states based on the target 
+    # (same approach as in train).
+    TRAIN_LIKE_PREDICTION = "train_like_prediction"
+    # Predictions of the outer RNN (not working currently).
     RNN_PREDICTION = "rnn_prediction"
 
 
@@ -129,10 +135,11 @@ class NeuronModulePredictionFields(Enum):
 
 class EvaluationFields(Enum):
     """
-    All evaluation fields names.
+    All evaluation fields names for storing the results.
     """
 
     PREDICTIONS = "predictions"
+    TRAIN_LIKE_PREDICTION = "train_like_predictions"
     TARGETS = "targets"
     RNN_PREDICTIONS = "rnn_predictions"
 
