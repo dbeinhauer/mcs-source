@@ -54,6 +54,18 @@ Dimension `[num_experiments, num_trials]` experiments:
     - approx max size: ~57750000000
 
 
+## Model Comparison Evaluation
+1. Compare batches separately -> Ideally have results in batch vise 
+    - MSE
+    - Pearson (per neuron)
+    - synchrony curve `[batch, time]` 
+        - synchrony MSE
+    - MSE over time `[batch, time]`
+    - drift - free vs. forced
+        - how much is the information lost in time
+
+
+
 
 # Experiments
 ## Dataset

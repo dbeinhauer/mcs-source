@@ -1,5 +1,5 @@
 """
-This source defines simple class that is used to save and load best model. 
+This source defines simple class that is used to save and load best model.
 And save model evaluation results.
 """
 
@@ -36,7 +36,7 @@ class EvaluationResultsSaver:
     def save_predictions_batch(
         self,
         batch_index: int,
-        all_predictions: Dict[str, Dict[str, torch.Tensor]],
+        all_predictions: Dict[PredictionTypes, Dict[str, torch.Tensor]],
         targets: Dict[str, torch.Tensor],
         filename: str = "",
     ):
@@ -103,9 +103,7 @@ class EvaluationResultsSaver:
             batch_index,
             {
                 prediction_type: {
-                    layer: torch.mean(
-                        prediction, dim=1
-                    )
+                    layer: torch.mean(prediction, dim=1)
                     for layer, prediction in predictions.items()
                 }
                 for prediction_type, predictions in all_predictions.items()

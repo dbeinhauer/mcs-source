@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Check if the correct number of arguments is passed
-if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then
-    echo "Usage: $0 <output_dir> <model> <learning_rate> <num_epochs> [wandb_api_key]"
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "Usage: $0 <output_dir> [wandb_api_key]"
     exit 1
 fi
 
 # Set Weights and Biases API Key if not specified
-if [ "$#" -eq  4 ]; then
+if [ "$#" -eq  1 ]; then
     echo "Running .wandb_api_key.sh because wandb_api_key wasn't specified."
     source ./.wandb_api_key.sh || exit 1
 fi
@@ -15,11 +15,11 @@ fi
 # Directory to store the output log
 OUTPUT_DIR=$1
 # Assign command-line arguments to variables
-MODEL=$2
-LEARNING_RATE=$3
-NUM_EPOCHS=$4
+# MODEL=$2
+# LEARNING_RATE=$3
+# NUM_EPOCHS=$4
 
-SUBSET_ID
+SUBSET_ID=0
 
 # Set wandb api key if specified
 if [ "$#" -eq 5 ]; then
@@ -30,10 +30,21 @@ if [ "$#" -eq 5 ]; then
 fi
 
 # Command to execute, including the learning rate and number of epochs
-COMMAND="python execute_model.py \
---model=$MODEL \
---learning_rate=$LEARNING_RATE \
---num_epochs=$NUM_EPOCHS"
+COMMAND="python execute_model.py --num_data_workers=4 \
+--learning_rate=0.00001 \
+--model=dnn_joint \
+--num_epochs=10 \
+--num_backpropagation_time_steps=1 \
+--neuron_num_layers=5 \
+--neuron_layer_size=10 \
+--neuron_rnn_variant=gru \
+--synaptic_adaptation_size=10 \
+--synaptic_adaptation_num_layers=1 \
+--wandb_project_name=eval_dnn_joint \
+--save_all_predictions \
+--neuron_residual \
+--subset_variant=$SUBSET_ID \
+--best_model_evaluation"
 
 # Print the command to be run
 echo "Running command: $COMMAND"
