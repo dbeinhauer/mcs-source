@@ -32,6 +32,7 @@ SYN_ADAPT_LGN=false
 TRAIN_SUBSET=-1.0
 WANDB_NAME=""
 SIZE_MULTIPLIER=0.1
+EVALUATION_RUN=false
 
 # Parse long options
 while [[ $# -gt 0 ]]; do
@@ -108,8 +109,12 @@ while [[ $# -gt 0 ]]; do
         SIZE_MULTIPLIER="$2"
         shift 2
         ;;
+    --evaluation_run)
+        EVALUATION_RUN=true # Boolean flag
+        shift 1
+        ;;
     --help)
-        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value] [--size_multiplier value]"
+        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value] [--size_multiplier value] [--evaluation_run]"
         exit 0
         ;;
     *)
@@ -159,6 +164,12 @@ fi
 if (($(echo "$TRAIN_SUBSET != -1.0" | bc -l))); then # Use bc for float comparison
     MODEL_PARAMS="$MODEL_PARAMS \\
 --train_subset=$TRAIN_SUBSET"
+fi
+
+# Add best model evaluation option (without training).
+if [ "$EVALUATION_RUN" = true ]; then
+    MODEL_PARAMS="$MODEL_PARAMS \\
+--best_model_evaluation"
 fi
 
 # Run the generate_script.py with the specified parameters and submit the job

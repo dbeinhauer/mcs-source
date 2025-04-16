@@ -93,17 +93,6 @@ def main():
     # Handle SIZE_MULTIPLIER separately
     size_multipliers = settings.get("SIZE_MULTIPLIER", [None])
 
-    # # Run each combination
-    # for size_multiplier in size_multipliers:
-    #     if size_multiplier is not None:
-    #         os.environ["SIZE_MULTIPLIER"] = (
-    #             size_multiplier  # Set as environment variable
-    #         )
-    #     for combination in combinations:
-    #         cmd = build_command(base_command, settings, keys, combination)
-    #         print(f"Running: {cmd} with SIZE_MULTIPLIER={size_multiplier}")
-    #         subprocess.run(cmd, shell=True)
-
     # Run each combination
     for combination in combinations:
         cmd = build_command(base_command, settings, keys, combination)
