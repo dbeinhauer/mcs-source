@@ -12,19 +12,17 @@ class BatchSummaryFields(Enum):
     """
 
     MSE = "mse"
-    NEURON_PEARSON = "neuron_pearson"
+    PEARSON = "pearson"
     # Synchrony curve in time.
     SYNCHRONY = "synchrony"
     # MSE of the synchrony curves.
     MSE_SYNCHRONY = "mse_synchrony"
+    # Pearson's CC of synchrony curves.
+    PEARSON_SYNCHRONY = "person_synchrony"
     # Drift in time between classical predictions and teacher-forced ones.
     DRIFT_FREE_FORCED = "drift_free_forced"
-
-    # Counts of the predictions, targets and teacher-forced predictions
-    # across the time bins for plotting the model dynamics.
-    PREDICTION_TIME_COUNT = "prediction_time_count"
-    TARGET_TIME_COUNT = "target_time_count"
-    TRAIN_LIKE_TIME_COUNT = "train_like_time_count"
+    # Drift delta - how much does the drift change in each time step.
+    DRIFT_DELTA = "drift_delta"
 
 
 class PredictionDimensions(Enum):
@@ -51,3 +49,16 @@ class EvaluationPairsVariants(Enum):
         EvaluationFields.TRAIN_LIKE_PREDICTION,
         EvaluationFields.TARGETS,
     )
+
+
+class BatchJobParameters(Enum):
+    """
+    All parameters needed for the batch job.
+    """
+
+    # While single evaluation -> the fields to be taken.
+    EVALUATION_FIELDS_TO_COMPUTE = "evaluation_fields_to_compute"
+    # While paired-wise evaluation metric -> all pairs to be take.
+    PAIRS_TO_COMPUTE = "pairs_to_compute"
+    # Summary function to be applied on the selected batch.
+    FUNCTION_TO_APPLY = "function_to_apply"

@@ -19,8 +19,11 @@ from evaluation_tools.fields.experiment_parameters_fields import (
 from evaluation_tools.plugins.wandb_processor import WandbProcessor
 from evaluation_tools.scripts.pickle_manipulation import load_pickle_file
 from nn_model.type_variants import EvaluationFields
-
 from evaluation_tools.plugins.batch_prediction_processor import BatchPredictionProcessor
+from evaluation_tools.fields.prediction_analysis_fields import (
+    BatchSummaryFields,
+    EvaluationPairsVariants,
+)
 
 
 class PredictionsAnalyzer:
@@ -116,7 +119,19 @@ class PredictionsAnalyzer:
         }
 
     @staticmethod
-    def load_all_model_predictions(responses_dir: str, subset: int = -1):
+    def process_all_batches(responses_dir: str, subset: int = -1) -> List[
+        Dict[
+            BatchSummaryFields,
+            Dict[EvaluationPairsVariants | EvaluationFields, Dict[str, torch.Tensor]],
+        ]
+    ]:
+        """
+
+
+        :param responses_dir: _description_
+        :param subset: _description_, defaults to -1
+        :return: _description_
+        """
 
         responses_filenames = PredictionsAnalyzer._load_all_responses_filenames(
             responses_dir
@@ -125,7 +140,16 @@ class PredictionsAnalyzer:
             # Take only subset of responses.
             responses_filenames = responses_filenames[:subset]
 
-        for i, response_filename in enumerate(tqdm(responses_filenames)):
+        processed_subset_results: List[
+            Dict[
+                BatchSummaryFields,
+                Dict[
+                    EvaluationPairsVariants | EvaluationFields, Dict[str, torch.Tensor]
+                ],
+            ]
+        ] = []
+
+        for response_filename in tqdm(responses_filenames):
 
             batch_evaluation_results = (
                 PredictionsAnalyzer._get_batch_from_responses_file(
@@ -134,32 +158,57 @@ class PredictionsAnalyzer:
                     PredictionsAnalyzer.evaluation_fields_to_load,
                 )
             )
-            return batch_evaluation_results
+            processed_subset_results.append(
+                BatchPredictionProcessor.process_batch_results(batch_evaluation_results)
+            )
 
-    def load_all_subset_variants_predictions(
+        return batch_evaluation_results
+
+    def process_all_subset_variants_predictions(
         self, base_responses_dir: str, max_num_subsets: int = -1
-    ):
+    ) -> Dict[
+        int,
+        List[
+            Dict[
+                BatchSummaryFields,
+                Dict[
+                    EvaluationPairsVariants | EvaluationFields,
+                    Dict[str, torch.Tensor],
+                ],
+            ]
+        ],
+    ]:
 
         counter = 0
         pattern = re.compile(r"_sub-var-(\d+)_")  # Regex to capture var_num
 
+        all_model_subset_variant_analyses: Dict[
+            int,
+            List[
+                Dict[
+                    BatchSummaryFields,
+                    Dict[
+                        EvaluationPairsVariants | EvaluationFields,
+                        Dict[str, torch.Tensor],
+                    ],
+                ]
+            ],
+        ] = {}
+
         for response_subset_variant_directory in tqdm(os.listdir(base_responses_dir)):
             # Iterate through the base directory and find all subset variants model responses.
-            full_path = os.path.join(
+            full_path_to_subset = os.path.join(
                 base_responses_dir, response_subset_variant_directory
             )
-            if os.path.isdir(full_path):
+            if os.path.isdir(full_path_to_subset):
                 # The content of the directory is a directory -> check for match with model variant.
                 match = pattern.search(response_subset_variant_directory)
                 if match:
                     # The path exists and corresponds to some model variant
                     # -> load all batches of the predictions
-                    all_subset_variant_responses = (
-                        PredictionsAnalyzer.load_all_model_predictions(full_path)
-                    )
-
-                    return BatchPredictionProcessor.process_batch_results(
-                        all_subset_variant_responses
+                    variant_number = int(match.group(1))
+                    all_model_subset_variant_analyses[variant_number] = (
+                        PredictionsAnalyzer.process_all_batches(full_path_to_subset)
                     )
 
                     counter += 1
@@ -167,10 +216,12 @@ class PredictionsAnalyzer:
                         # Process only subset of model variants.
                         break
 
+        return all_model_subset_variant_analyses
+
 
 if __name__ == "__main__":
     base_dir = "/home/david/source/diplomka/testing_results/"
     prediction_analyzer = PredictionsAnalyzer()
-    result = prediction_analyzer.load_all_subset_variants_predictions(base_dir)
+    result = prediction_analyzer.process_all_subset_variants_predictions(base_dir)
 
     print(result)
