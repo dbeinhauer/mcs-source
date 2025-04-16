@@ -66,7 +66,7 @@ def init_wandb(
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
     }
 
-    if arguments.best_model_evaluation or arguments.debug:
+    if arguments.debug:
         # Disable weights and biases tracking if there is only evaluation or debugging.
         os.environ["WANDB_DISABLED"] = "true"
     else:
