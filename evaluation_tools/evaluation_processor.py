@@ -681,7 +681,7 @@ def main(arguments):
 
     if arguments.results_save_path:
         # Optionally save the results to pickle.
-        EvaluationProcessor.store_pickle_file(arguments.results_save_path, results)
+        store_pickle_file(arguments.results_save_path, results)
 
 
 if __name__ == "__main__":
