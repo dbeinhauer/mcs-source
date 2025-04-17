@@ -10,6 +10,7 @@ import random
 import argparse
 from enum import Enum
 
+import pandas as pd
 import pickle
 import numpy as np
 import torch
@@ -33,12 +34,20 @@ from nn_model.type_variants import EvaluationFields, PathDefaultFields
 from nn_model.dictionary_handler import DictionaryHandler
 
 from evaluation_tools.plugins.dataset_analyzer import DatasetAnalyzer
+from evaluation_tools.plugins.wandb_processor import WandbProcessor
+from evaluation_tools.plugins.predictions_analyzer import PredictionsAnalyzer
 from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
     HistogramFields,
     StatisticsFields,
     DatasetDimensions,
     DatasetVariantField,
+)
+from evaluation_tools.fields.experiment_parameters_fields import (
+    WandbExperimentVariants,
+    GridSearchRunVariants,
+    EvaluationRunVariants,
+    AdditionalExperiments,
 )
 from evaluation_tools.fields.evaluation_processor_fields import (
     EvaluationProcessorChoices,
@@ -117,11 +126,49 @@ class EvaluationProcessor:
         EvaluationFields.RNN_PREDICTIONS.value,
     ]
 
+    # All Weights and Biases projects that we are interested in processing.
+    wandb_variants_to_process = {
+        WandbExperimentVariants.GRID_SEARCH: [
+            GridSearchRunVariants.SIMPLE_TANH,
+            GridSearchRunVariants.SIMPLE_LEAKYTANH,
+            GridSearchRunVariants.DNN,
+            GridSearchRunVariants.RNN,
+            GridSearchRunVariants.SYNAPTIC_ADAPTATION,
+        ],
+        WandbExperimentVariants.EVALUATION: [
+            EvaluationRunVariants.SIMPLE_TANH,
+            EvaluationRunVariants.SIMPLE_LEAKYTANH,
+            EvaluationRunVariants.DNN_JOINT,
+            EvaluationRunVariants.DNN_SEPARATE,
+            EvaluationRunVariants.RNN_BACKPROPAGATION_5,
+            EvaluationRunVariants.RNN_BACKPROPAGATION_10,
+            EvaluationRunVariants.SYN_ADAPT_BACKPROPAGATION_5,
+            # EvaluationRunVariants.SYN_ADAPT_BACKPROPAGATION_10,
+        ],
+        WandbExperimentVariants.ADDITIONAL: [
+            AdditionalExperiments.DATASET_SUBSET_SIZE,
+            # AdditionalExperiments.MODEL_SIZES,
+        ],
+    }
+
+    model_variants_for_evaluation = [
+        EvaluationRunVariants.DNN_JOINT,
+        EvaluationRunVariants.DNN_SEPARATE,
+    ]
+
+    additional_experiments = []
+
     def __init__(
         self,
         train_dataset_dir: str,
         test_dataset_dir: str,
         arguments,
+        all_wandb_variants: Dict[
+            WandbExperimentVariants,
+            List[GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments],
+        ] = {},
+        model_variants_for_evaluation: List[EvaluationRunVariants] = [],
+        additional_experiments: List[AdditionalExperiments] = [],
         process_test: bool = False,
         responses_dir: str = "",
         dnn_responses_path: str = "",
@@ -142,6 +189,8 @@ class EvaluationProcessor:
         self.train_dataset_dir = train_dataset_dir
         self.test_dataset_dir = test_dataset_dir
         self.responses_dir = responses_dir
+
+        # TODO: Probably will delete (not functional currently)
         self.dnn_responses_path = dnn_responses_path
 
         # Initialize batch size (for loader) as default batch size for test dataset.
@@ -186,7 +235,31 @@ class EvaluationProcessor:
         self.rnn_to_prediction_responses: Dict[str, Dict[str, torch.Tensor]] = {}
         # Histogram bins and edges:
 
+        # ------------------------------------NEW REFINED VERSION------------
+
+        self.all_model_predictions_base_dir = arguments.evaluation_results_base_dir
+
+        # Analyzer of the dataset.
         self.dataset_analyzer = DatasetAnalyzer(process_test)
+
+        # Weight and Biases results processor.
+        if not all_wandb_variants:
+            # Variants not defined -> use the default ones.
+            all_wandb_variants = EvaluationProcessor.wandb_variants_to_process
+        self.wandb_processor = WandbProcessor(all_wandb_variants)
+
+        # Processor of the model prediction results.
+        if not model_variants_for_evaluation:
+            # Evaluation variants not selected -> use the default.
+            model_variants_for_evaluation = (
+                EvaluationProcessor.model_variants_for_evaluation
+            )
+        if not additional_experiments:
+            # Additional experiments not selected -> use the default.
+            additional_experiments = EvaluationProcessor.additional_experiments
+        self.predictions_analyzer = PredictionsAnalyzer(
+            model_variants_for_evaluation, additional_experiments
+        )
 
     def _init_dataloader(
         self, is_test=True, model_subset_path: str = "", data_workers_kwargs={}
@@ -630,6 +703,47 @@ class EvaluationProcessor:
         self.dataset_analyzer.full_analysis_run(loader, process_test, subset=subset)
         return self.dataset_analyzer.get_all_processing_results
 
+    def run_wandb_results_processing(
+        self,
+        all_wandb_variants: Dict[
+            WandbExperimentVariants,
+            List[GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments],
+        ] = {},
+    ) -> pd.DataFrame:
+        """
+        Loads all selected projects from Weights and Biases and filters only
+        relevant fields. At the end converts the data to pandas DataFrame.
+
+        :param all_wandb_variants: Optionally process different variants, if `{}` then default.
+        :return: Returns Weights and Biases results as pandas DataFrame.
+        """
+        self.wandb_processor.load_all_results(all_wandb_variants)
+        return self.wandb_processor.to_pandas()
+
+    def run_prediction_processing(
+        self, base_dir: str = "", evaluation_variants: List[EvaluationRunVariants] = []
+    ) -> pd.DataFrame:
+        """
+        Processes predictions of all model variants for each neuron subset variants
+        and for all batches and converts the processing results to pandas DataFrame.
+
+        :param base_dir: Base directory where all model variants predictions are stored,
+        if `""` then use default base.
+        :param evaluation_variants: What evaluation variants we are interested, if `[]` then default.
+        :return: Returns processed all models predictions as pandas dataframe for each batch of data.
+        """
+
+        if not base_dir:
+            # If not defined otherwise set base directory with the
+            # evaluation results as default.
+            base_dir = self.all_model_predictions_base_dir
+
+        self.predictions_analyzer.process_all_model_variants_predictions(
+            base_dir, evaluation_variants=evaluation_variants
+        )
+
+        return self.predictions_analyzer.all_model_variants_summary_to_pandas()
+
 
 def main(arguments):
 
@@ -660,7 +774,7 @@ def main(arguments):
     # Whether we want to process the test dataset.
     process_test = arguments.dataset_variant == DatasetVariantField.TEST.value
     # Generate dataset analysis.
-    response_analyzer = EvaluationProcessor(
+    evaluation_processor = EvaluationProcessor(
         train_dir,
         test_dir,
         arguments,
@@ -674,10 +788,14 @@ def main(arguments):
         EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS.value,
     ]:
         # Run dataset analysis.
-        results = response_analyzer.run_dataset_processing(
+        results = evaluation_processor.run_dataset_processing(
             process_test,
             subset=arguments.processing_subset,
         )
+    elif arguments.action in EvaluationProcessorChoices.WANDB_ANALYSIS:
+        results = evaluation_processor.run_wandb_results_processing()
+    elif arguments.action in EvaluationProcessorChoices.PREDICTION_ANALYSIS:
+        evaluation_processor.pr
 
     if arguments.results_save_path:
         # Optionally save the results to pickle.
@@ -732,6 +850,12 @@ if __name__ == "__main__":
         type=int,
         default=20,
         help="Size of the time bin to analyze.",
+    )
+    parser.add_argument(
+        "--evaluation_results_base_dir",
+        type=str,
+        default=f"{nn_model.globals.PROJECT_ROOT}/thesis_results/evaluation/",
+        help="Base directory where all model variants evaluation results are stored.",
     )
 
     args = parser.parse_args()

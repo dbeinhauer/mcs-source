@@ -44,6 +44,9 @@ class EvaluationRunVariants(Enum):
     # RNN evaluation on different number of truncated backpropagation through time steps.
     RNN_BACKPROPAGATION_5 = "rnn_separate_5_evaluation"
     RNN_BACKPROPAGATION_10 = "rnn_separate_10_evaluation"
+    # Synaptic adaptation on only LGN connections.
+    SYN_ADAPT_BACKPROPAGATION_5 = "syn_only_lgn_5_evaluation"
+    SYN_ADAPT_BACKPROPAGATION_10 = "syn_only_lgn_10_evaluation"
 
 
 class AdditionalExperiments(Enum):
@@ -55,3 +58,7 @@ class AdditionalExperiments(Enum):
     DATASET_SUBSET_SIZE = "subset_size"
     # Experiment evaluating influence of model subset size on model performance.
     MODEL_SIZES = "model_sizes"
+
+
+NUM_EVALUATION_SUBSETS = 20
+NUM_EVALUATION_BATCHES = 90

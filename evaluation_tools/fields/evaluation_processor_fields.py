@@ -14,3 +14,7 @@ class EvaluationProcessorChoices(Enum):
     FULL_DATASET_ANALYSIS = "full_dataset"
     # Evaluate provided neuron subsets (typically of time bins 20).
     SUBSET_DATASET_ANALYSIS = "subset_dataset"
+    # Weights and Biases results processing.
+    WANDB_ANALYSIS = "wandb_analysis"
+    # Analysis of the model predictions
+    PREDICTION_ANALYSIS = "prediction_analysis"
