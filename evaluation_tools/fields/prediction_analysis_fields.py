@@ -2,6 +2,7 @@
 This script defines all variants for the analysis of the model predictions.
 """
 
+from typing import Union
 from enum import Enum
 from nn_model.type_variants import EvaluationFields
 
@@ -49,6 +50,11 @@ class EvaluationPairsVariants(Enum):
         EvaluationFields.TRAIN_LIKE_PREDICTION,
         EvaluationFields.TARGETS,
     )
+
+
+# All field defining different evaluation results in either pair of separately
+# that have been used to compute specific metric.
+PredictionAnalysisVariants = Union[EvaluationFields, EvaluationPairsVariants]
 
 
 class BatchJobParameters(Enum):

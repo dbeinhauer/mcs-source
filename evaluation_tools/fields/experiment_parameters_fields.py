@@ -31,7 +31,7 @@ class GridSearchRunVariants(Enum):
     SYNAPTIC_ADAPTATION = "syn_adaptation_grid"
 
 
-class EvaluationRunVariants(Enum):
+class ModelEvaluationRunVariant(Enum):
     """
     All evaluation variants of experiments with 20 subsets and same parameters.
     """

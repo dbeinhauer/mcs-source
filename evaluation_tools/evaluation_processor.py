@@ -46,7 +46,7 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
 from evaluation_tools.fields.experiment_parameters_fields import (
     WandbExperimentVariants,
     GridSearchRunVariants,
-    EvaluationRunVariants,
+    ModelEvaluationRunVariant,
     AdditionalExperiments,
 )
 from evaluation_tools.fields.evaluation_processor_fields import (
@@ -136,13 +136,13 @@ class EvaluationProcessor:
             GridSearchRunVariants.SYNAPTIC_ADAPTATION,
         ],
         WandbExperimentVariants.EVALUATION: [
-            EvaluationRunVariants.SIMPLE_TANH,
-            EvaluationRunVariants.SIMPLE_LEAKYTANH,
-            EvaluationRunVariants.DNN_JOINT,
-            EvaluationRunVariants.DNN_SEPARATE,
-            EvaluationRunVariants.RNN_BACKPROPAGATION_5,
-            EvaluationRunVariants.RNN_BACKPROPAGATION_10,
-            EvaluationRunVariants.SYN_ADAPT_BACKPROPAGATION_5,
+            ModelEvaluationRunVariant.SIMPLE_TANH,
+            ModelEvaluationRunVariant.SIMPLE_LEAKYTANH,
+            ModelEvaluationRunVariant.DNN_JOINT,
+            ModelEvaluationRunVariant.DNN_SEPARATE,
+            ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
+            ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
+            ModelEvaluationRunVariant.SYN_ADAPT_BACKPROPAGATION_5,
             # EvaluationRunVariants.SYN_ADAPT_BACKPROPAGATION_10,
         ],
         WandbExperimentVariants.ADDITIONAL: [
@@ -152,8 +152,8 @@ class EvaluationProcessor:
     }
 
     model_variants_for_evaluation = [
-        EvaluationRunVariants.DNN_JOINT,
-        EvaluationRunVariants.DNN_SEPARATE,
+        ModelEvaluationRunVariant.DNN_JOINT,
+        ModelEvaluationRunVariant.DNN_SEPARATE,
     ]
 
     additional_experiments = []
@@ -165,9 +165,13 @@ class EvaluationProcessor:
         arguments,
         all_wandb_variants: Dict[
             WandbExperimentVariants,
-            List[GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments],
+            List[
+                GridSearchRunVariants
+                | ModelEvaluationRunVariant
+                | AdditionalExperiments
+            ],
         ] = {},
-        model_variants_for_evaluation: List[EvaluationRunVariants] = [],
+        model_variants_for_evaluation: List[ModelEvaluationRunVariant] = [],
         additional_experiments: List[AdditionalExperiments] = [],
         process_test: bool = False,
         responses_dir: str = "",
@@ -707,7 +711,11 @@ class EvaluationProcessor:
         self,
         all_wandb_variants: Dict[
             WandbExperimentVariants,
-            List[GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments],
+            List[
+                GridSearchRunVariants
+                | ModelEvaluationRunVariant
+                | AdditionalExperiments
+            ],
         ] = {},
     ) -> pd.DataFrame:
         """
@@ -721,7 +729,9 @@ class EvaluationProcessor:
         return self.wandb_processor.to_pandas()
 
     def run_prediction_processing(
-        self, base_dir: str = "", evaluation_variants: List[EvaluationRunVariants] = []
+        self,
+        base_dir: str = "",
+        evaluation_variants: List[ModelEvaluationRunVariant] = [],
     ) -> pd.DataFrame:
         """
         Processes predictions of all model variants for each neuron subset variants
@@ -742,7 +752,7 @@ class EvaluationProcessor:
             base_dir, evaluation_variants=evaluation_variants
         )
 
-        return self.predictions_analyzer.all_model_variants_summary_to_pandas()
+        return self.predictions_analyzer.to_pandas()
 
 
 def main(arguments):

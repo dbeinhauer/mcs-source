@@ -10,7 +10,7 @@ import wandb
 from evaluation_tools.fields.experiment_parameters_fields import (
     WANDB_ENTITY,
     GridSearchRunVariants,
-    EvaluationRunVariants,
+    ModelEvaluationRunVariant,
     AdditionalExperiments,
     WandbExperimentVariants,
 )
@@ -44,7 +44,11 @@ class WandbProcessor:
         self,
         all_variants: Dict[
             WandbExperimentVariants,
-            List[GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments],
+            List[
+                GridSearchRunVariants
+                | ModelEvaluationRunVariant
+                | AdditionalExperiments
+            ],
         ],
     ):
         self.all_variants = all_variants
@@ -52,7 +56,9 @@ class WandbProcessor:
         self.all_results: Dict[
             WandbExperimentVariants,
             Dict[
-                GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments,
+                GridSearchRunVariants
+                | ModelEvaluationRunVariant
+                | AdditionalExperiments,
                 pd.DataFrame,
             ],
         ] = {}
@@ -76,7 +82,9 @@ class WandbProcessor:
         wandb_results: Dict[
             WandbExperimentVariants,
             Dict[
-                GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments,
+                GridSearchRunVariants
+                | ModelEvaluationRunVariant
+                | AdditionalExperiments,
                 pd.DataFrame,
             ],
         ] = {},
@@ -121,7 +129,9 @@ class WandbProcessor:
 
     @staticmethod
     def load_results(
-        variant: GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments,
+        variant: (
+            GridSearchRunVariants | ModelEvaluationRunVariant | AdditionalExperiments
+        ),
     ) -> pd.DataFrame:
         """
         Loads dataframe from one project in wandb.
@@ -156,12 +166,16 @@ class WandbProcessor:
         self,
         all_variants: Dict[
             WandbExperimentVariants,
-            List[GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments],
+            List[
+                GridSearchRunVariants
+                | ModelEvaluationRunVariant
+                | AdditionalExperiments
+            ],
         ] = {},
     ) -> Dict[
         WandbExperimentVariants,
         Dict[
-            GridSearchRunVariants | EvaluationRunVariants | AdditionalExperiments,
+            GridSearchRunVariants | ModelEvaluationRunVariant | AdditionalExperiments,
             pd.DataFrame,
         ],
     ]:
