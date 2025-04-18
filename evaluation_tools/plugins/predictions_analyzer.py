@@ -300,7 +300,7 @@ class PredictionsAnalyzer:
         if not evaluation_variants:
             evaluation_variants = self.evaluation_variants
 
-        for evaluation_variant in evaluation_variants:
+        for evaluation_variant in tqdm(evaluation_variants):
             # Run through all model variants.
             variant_base_dir = (
                 base_dir
