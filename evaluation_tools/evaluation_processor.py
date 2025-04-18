@@ -424,6 +424,7 @@ class EvaluationProcessor:
             base_dir, evaluation_variants=evaluation_variants
         )
 
+        print("Converting to pandas.")
         return self.predictions_analyzer.to_pandas()
 
 
