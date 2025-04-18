@@ -6,6 +6,8 @@ with the histogram data. It is meant to be part of the `DatasetAnalyzer` class
 from typing import Any, Dict, List
 
 import torch
+import pandas as pd
+import numpy as np
 
 import nn_model.globals
 from evaluation_tools.fields.dataset_analyzer_fields import (
@@ -200,3 +202,26 @@ class HistogramProcessor:
                 for layer, value in variant_values[HistogramFields.COUNTS].items()
             }
         return histogram_variants
+
+    @staticmethod
+    def to_pandas(
+        histogram_variants: Dict[HistogramFields, Any],
+    ) -> pd.DataFrame:
+        """
+        Converts histogram already converted to numpy to pandas representation.
+
+        :param histogram_variants: Histograms to be converted already in numpy.
+        :return: Returns histograms as pandas dataframe.
+        """
+        rows = []
+
+        histogram_counts = histogram_variants[HistogramFields.COUNTS]
+        for layer, layer_counts in histogram_counts.items():
+            rows.append(
+                {
+                    "layer_name": layer,
+                    "bins": histogram_variants[HistogramFields.BINS],
+                    "counts": layer_counts,
+                }
+            )
+        return pd.DataFrame(rows)

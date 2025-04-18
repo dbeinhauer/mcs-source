@@ -5,6 +5,8 @@ This script serves for processing the data in single experiment
 
 from typing import List, Dict, Any, Tuple
 
+import numpy as np
+import pandas as pd
 import torch
 
 from evaluation_tools.fields.dataset_analyzer_fields import (
@@ -184,7 +186,7 @@ class SeparateExperimentProcessor:
     @staticmethod
     def to_numpy(
         data: Dict[StatisticsFields, Dict[str, List[torch.Tensor]]],
-    ) -> Dict[StatisticsFields, Dict[str, Any]]:
+    ) -> Dict[StatisticsFields, Dict[str, np.ndarray]]:
         """
         Converts the analysis results to numpy representation.
 
@@ -199,3 +201,26 @@ class SeparateExperimentProcessor:
             }
             for statistics_type, statistics_values in data.items()
         }
+
+    @staticmethod
+    def to_pandas(
+        all_results: Dict[StatisticsFields, Dict[str, np.ndarray]],
+    ) -> pd.DataFrame:
+        """
+        Converts all results already in numpy to pandas.
+
+        :param all_results: Results to be converted.
+        :return: Converted results to pandas dataframe.
+        """
+        rows = []
+        for statistics_type, statistic_values in all_results.items():
+            for layer, layer_data in statistic_values.items():
+                rows.append(
+                    {
+                        "statistics_type": statistics_type,
+                        "layer_name": layer,
+                        "values": layer_data,
+                    }
+                )
+
+        return pd.DataFrame(rows)

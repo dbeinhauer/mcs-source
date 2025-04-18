@@ -5,6 +5,8 @@ in each time bin.
 
 from typing import Dict
 
+import pandas as pd
+import numpy as np
 import torch
 
 from evaluation_tools.fields.dataset_analyzer_fields import DatasetDimensions
@@ -57,7 +59,9 @@ class TimeBinSpikeCounter:
         return time_bin_spike_counts
 
     @staticmethod
-    def to_numpy(time_bin_spike_counts: Dict[str, torch.Tensor]) -> Dict:
+    def to_numpy(
+        time_bin_spike_counts: Dict[str, torch.Tensor],
+    ) -> Dict[str, np.ndarray]:
         """
         Converts the time bin counts to numpy array values.
 
@@ -65,3 +69,22 @@ class TimeBinSpikeCounter:
         :return: Returns converted values to numpy array.
         """
         return {layer: value.numpy() for layer, value in time_bin_spike_counts.items()}
+
+    @staticmethod
+    def to_pandas(time_bin_spike_counts: Dict[str, np.ndarray]) -> pd.DataFrame:
+        """
+        Converts time bin counts to pandas.
+
+        :param time_bin_spike_counts: Time bin counts already in numpy.
+        :return: Returns pandas dataframe of the time bin counts.
+        """
+        rows = []
+
+        for layer, layer_counts in time_bin_spike_counts.items():
+            rows.append(
+                {
+                    "layer_name": layer,
+                    "counts": layer_counts,
+                }
+            )
+        return pd.DataFrame(rows)

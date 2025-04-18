@@ -6,6 +6,8 @@ as it contains only 1 trial.
 
 from typing import Dict, Any
 
+import numpy as np
+import pandas as pd
 import torch
 
 from evaluation_tools.fields.dataset_analyzer_fields import (
@@ -86,8 +88,27 @@ class FanoFactorProcessor:
         return all_fano_data
 
     @staticmethod
-    def to_numpy(all_fano_data: Dict[str, torch.Tensor]) -> Dict[str, Any]:
+    def to_numpy(all_fano_data: Dict[str, torch.Tensor]) -> Dict[str, np.ndarray]:
         """
         Convert data to numpy.
         """
         return {layer: data.numpy() for layer, data in all_fano_data.items()}
+
+    @staticmethod
+    def to_pandas(all_results: Dict[str, np.ndarray]) -> pd.DataFrame:
+        """
+        Converts to pandas.
+
+        :param all_results: Results to be converted to pandas.
+        :return: Returns pandas dataframe of the results.
+        """
+        rows = []
+
+        for layer, values in all_results.items():
+            rows.append(
+                {
+                    "layer_name": layer,
+                    "values": values,
+                }
+            )
+        return pd.DataFrame(rows)

@@ -4,6 +4,8 @@ This script serves for summarization of data for each neuron separately.
 
 from typing import Dict, Any
 
+import pandas as pd
+import numpy as np
 import torch
 
 from evaluation_tools.fields.dataset_analyzer_fields import DatasetDimensions
@@ -49,7 +51,7 @@ class NeuronSummarizer:
         return all_sum_data
 
     @staticmethod
-    def to_numpy(all_sum_data: Dict[str, torch.Tensor]) -> Dict[str, Any]:
+    def to_numpy(all_sum_data: Dict[str, torch.Tensor]) -> Dict[str, np.ndarray]:
         """
         Converts all data to numpy.
 
@@ -57,3 +59,22 @@ class NeuronSummarizer:
         :return: Returns converted data in numpy arrays.
         """
         return {layer: data.numpy() for layer, data in all_sum_data.items()}
+
+    @staticmethod
+    def to_pandas(all_results: Dict[str, np.ndarray]) -> pd.DataFrame:
+        """
+        Converts to pandas.
+
+        :param all_results: Results to be converted to pandas.
+        :return: Returns pandas dataframe of the results.
+        """
+        rows = []
+
+        for layer, values in all_results.items():
+            rows.append(
+                {
+                    "layer_name": layer,
+                    "values": values,
+                }
+            )
+        return pd.DataFrame(rows)
