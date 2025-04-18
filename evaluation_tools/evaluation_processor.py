@@ -166,8 +166,7 @@ class EvaluationProcessor:
         arguments,
         all_wandb_variants: Dict[
             WandbExperimentVariants,
-            List[AllWandbVariants
-            ],
+            List[AllWandbVariants],
         ] = {},
         model_variants_for_evaluation: List[ModelEvaluationRunVariant] = [],
         additional_experiments: List[AdditionalExperiments] = [],
@@ -380,14 +379,13 @@ class EvaluationProcessor:
 
         # Run full dataset analysis and get the results.
         self.dataset_analyzer.full_analysis_run(loader, process_test, subset=subset)
-        return self.dataset_analyzer.get_all_processing_results
+        return self.dataset_analyzer.to_pandas()
 
     def run_wandb_results_processing(
         self,
         all_wandb_variants: Dict[
             WandbExperimentVariants,
-            List[AllWandbVariants
-            ],
+            List[AllWandbVariants],
         ] = {},
     ) -> pd.DataFrame:
         """

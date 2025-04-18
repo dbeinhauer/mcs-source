@@ -8,6 +8,7 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
 )
 
 ALL_TIME_STEP_VARIANTS = [1, 5, 10, 15, 20]
+ALL_SUBSET_IDS = range(0, 20)
 
 DATASET_SIZES = {
     DatasetVariantField.TRAIN: {
