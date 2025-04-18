@@ -12,6 +12,7 @@ from evaluation_tools.fields.prediction_analysis_fields import (
     PredictionDimensions,
     EvaluationPairsVariants,
     BatchJobParameters,
+    PredictionAnalysisVariants
 )
 
 
@@ -330,7 +331,7 @@ class BatchPredictionProcessor:
         batch_data: Dict[EvaluationFields, Dict[str, torch.Tensor]],
     ) -> Dict[
         BatchSummaryFields,
-        Dict[EvaluationPairsVariants | EvaluationFields, Dict[str, torch.Tensor]],
+        Dict[PredictionAnalysisVariants, Dict[str, torch.Tensor]],
     ]:
         """
         Processes one batch with all specified computations of the statistical properties.

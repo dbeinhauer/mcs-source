@@ -187,7 +187,7 @@ class PredictionsAnalyzer:
             ],
         ] = {}
 
-        for response_filename in responses_filenames:
+        for response_filename in tqdm(responses_filenames):
             # Process all batches.
             batch_id = int(response_filename.split("_")[1].split(".")[0])
 
@@ -245,7 +245,7 @@ class PredictionsAnalyzer:
             ],
         ] = {}
 
-        for response_subset_variant_directory in tqdm(os.listdir(base_responses_dir)):
+        for response_subset_variant_directory in os.listdir(base_responses_dir):
             # Iterate through the base directory and find all subset variants model responses.
             full_path_to_subset = os.path.join(
                 base_responses_dir, response_subset_variant_directory
