@@ -187,7 +187,7 @@ class PredictionsAnalyzer:
             ],
         ] = {}
 
-        for response_filename in tqdm(responses_filenames):
+        for response_filename in responses_filenames:
             # Process all batches.
             batch_id = int(response_filename.split("_")[1].split(".")[0])
 
