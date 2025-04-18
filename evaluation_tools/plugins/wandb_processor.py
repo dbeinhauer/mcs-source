@@ -122,9 +122,7 @@ class WandbProcessor:
 
     @staticmethod
     def load_results(
-        variant: (
-            GridSearchRunVariants | ModelEvaluationRunVariant | AdditionalExperiments
-        ),
+        variant: AllWandbVariants,
     ) -> pd.DataFrame:
         """
         Loads dataframe from one project in wandb.
@@ -164,7 +162,7 @@ class WandbProcessor:
     ) -> Dict[
         WandbExperimentVariants,
         Dict[
-            GridSearchRunVariants | ModelEvaluationRunVariant | AdditionalExperiments,
+            AllWandbVariants,
             pd.DataFrame,
         ],
     ]:
