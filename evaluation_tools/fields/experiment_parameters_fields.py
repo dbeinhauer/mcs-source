@@ -2,6 +2,7 @@
 This script defines variants of experiments, setup and other.
 """
 
+from typing import Union
 from enum import Enum
 
 # Entity from which take the weights and biases results.
@@ -59,6 +60,10 @@ class AdditionalExperiments(Enum):
     # Experiment evaluating influence of model subset size on model performance.
     MODEL_SIZES = "model_sizes"
 
+
+AllWandbVariants = Union[
+    GridSearchRunVariants, ModelEvaluationRunVariant, AdditionalExperiments
+]
 
 NUM_EVALUATION_SUBSETS = 20
 NUM_EVALUATION_BATCHES = 90

@@ -13,6 +13,7 @@ from evaluation_tools.fields.experiment_parameters_fields import (
     ModelEvaluationRunVariant,
     AdditionalExperiments,
     WandbExperimentVariants,
+    AllWandbVariants,
 )
 
 
@@ -44,11 +45,7 @@ class WandbProcessor:
         self,
         all_variants: Dict[
             WandbExperimentVariants,
-            List[
-                GridSearchRunVariants
-                | ModelEvaluationRunVariant
-                | AdditionalExperiments
-            ],
+            List[AllWandbVariants],
         ],
     ):
         self.all_variants = all_variants
@@ -56,9 +53,7 @@ class WandbProcessor:
         self.all_results: Dict[
             WandbExperimentVariants,
             Dict[
-                GridSearchRunVariants
-                | ModelEvaluationRunVariant
-                | AdditionalExperiments,
+                AllWandbVariants,
                 pd.DataFrame,
             ],
         ] = {}
@@ -82,9 +77,7 @@ class WandbProcessor:
         wandb_results: Dict[
             WandbExperimentVariants,
             Dict[
-                GridSearchRunVariants
-                | ModelEvaluationRunVariant
-                | AdditionalExperiments,
+                AllWandbVariants,
                 pd.DataFrame,
             ],
         ] = {},
@@ -166,11 +159,7 @@ class WandbProcessor:
         self,
         all_variants: Dict[
             WandbExperimentVariants,
-            List[
-                GridSearchRunVariants
-                | ModelEvaluationRunVariant
-                | AdditionalExperiments
-            ],
+            List[AllWandbVariants],
         ] = {},
     ) -> Dict[
         WandbExperimentVariants,
