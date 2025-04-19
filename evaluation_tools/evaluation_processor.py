@@ -143,8 +143,8 @@ class EvaluationProcessor:
             ModelEvaluationRunVariant.DNN_SEPARATE,
             ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
             ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
-            ModelEvaluationRunVariant.SYN_ADAPT_BACKPROPAGATION_5,
-            # EvaluationRunVariants.SYN_ADAPT_BACKPROPAGATION_10,
+            ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
+            ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10,
         ],
         WandbExperimentVariants.ADDITIONAL: [
             AdditionalExperiments.DATASET_SUBSET_SIZE,
@@ -433,13 +433,6 @@ def main(arguments):
 
     train_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TRAIN_DIR.value]
     test_dir = nn_model.globals.DEFAULT_PATHS[PathDefaultFields.TEST_DIR.value]
-
-    model_name = "model-10_sub-var-9_step-20_lr-7.5e-06_simple_optim-steps-1_neuron-layers-5-size-10-activation-leakytanh-res-False_hid-time-1_grad-clip-10000.0_optim-default_weight-init-default_synaptic-False-size-10-layers-1"
-
-    responses_dir = f"/home/david/source/diplomka/thesis_results/simple/full_evaluation_results/{model_name}/"
-
-    dnn_responses_dir = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_results/neuron_model_responses/{model_name}.pth"
-    neurons_path = f"/home/beinhaud/diplomka/mcs-source/evaluation_tools/evaluation_subsets/neurons/model_size_{int(nn_model.globals.SIZE_MULTIPLIER*100)}_subset_10.pkl"
 
     num_data_workers = args.num_data_workers
     workers_enabled = num_data_workers > 0
