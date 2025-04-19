@@ -7,6 +7,7 @@ import pickle
 from pathlib import Path
 
 import numpy as np
+import torch
 
 from nn_model.type_variants import (
     LayerType,
@@ -138,3 +139,4 @@ for layer, xyo in POS_ORI_DICT.items():
     subset_filter = NEURON_SELECTION[layer].astype(int)
     for attr in xyo.keys():
         POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[subset_filter].astype(float)
+        POS_ORI_DICT[layer][attr] = torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
