@@ -23,14 +23,15 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
 class TemporalEvolutionProcessor:
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
-        self.time_evolution_df = TemporalEvolutionProcessor._get_all_time_evolution(
-            all_results
+        self.time_evolution_full_dataset_df = (
+            TemporalEvolutionProcessor._get_all_full_dataset_time_evolution(all_results)
         )
 
     @staticmethod
-    def _get_all_time_evolution(
+    def _get_all_full_dataset_time_evolution(
         all_results: Dict[EvaluationProcessorChoices, pd.DataFrame],
     ):
+
         return DatasetResultsProcessor.get_analysis_type(
             DatasetResultsProcessor.get_full_dataset_variant(all_results),
             AnalysisFields.TIME_BIN_SPIKE_COUNTS,
@@ -52,7 +53,7 @@ class TemporalEvolutionProcessor:
     def _reformat_time_evolution_dataframe(original_df: pd.DataFrame) -> pd.DataFrame:
         """
         :param original_df: Original dataframe as a results from analysis tools.
-        :return: Histogram dataframe reformated for easier manipulation while plotting.
+        :return: Dataframe reformated for easier manipulation while plotting.
         """
         return DatasetResultsProcessor.reformat_dataset_dataframe(
             original_df, TemporalEvolutionProcessor._time_count_reformating_row
@@ -205,7 +206,7 @@ class TemporalEvolutionProcessor:
         """
         if not original_df:
             # Dataframe not specified -> use default one.
-            original_df = self.time_evolution_df
+            original_df = self.time_evolution_full_dataset_df
 
         selected_df = DatasetResultsProcessor.get_dataset_type(
             original_df, is_test=is_test

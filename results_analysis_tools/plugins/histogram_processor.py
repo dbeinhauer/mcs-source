@@ -25,12 +25,14 @@ class DatasetHistogramProcessor:
     """
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
-        self.time_bin_histograms = (
-            DatasetHistogramProcessor._get_all_time_bin_histograms(all_results)
+        self.time_bin_histograms_full_dataset = (
+            DatasetHistogramProcessor._get_all_full_dataset_time_bin_histograms(
+                all_results
+            )
         )
 
     @staticmethod
-    def _get_all_time_bin_histograms(
+    def _get_all_full_dataset_time_bin_histograms(
         all_results: Dict[EvaluationProcessorChoices, pd.DataFrame],
     ) -> pd.DataFrame:
         """
@@ -114,7 +116,7 @@ class DatasetHistogramProcessor:
         """
         if not original_df:
             # Dataframe not specified -> use default one.
-            original_df = self.time_bin_histograms
+            original_df = self.time_bin_histograms_full_dataset
 
         selected_df = DatasetResultsProcessor.get_dataset_type(
             original_df, is_test=is_test
