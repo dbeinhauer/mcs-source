@@ -2,7 +2,7 @@
 This script defines class for processing the dataset histograms.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,10 @@ from evaluation_tools.fields.evaluation_processor_fields import (
 )
 from evaluation_tools.fields.dataset_analyzer_fields import (
     AnalysisFields,
-    DatasetVariantField,
+)
+
+from results_analysis_tools.plugins.dataset_results_processor import (
+    DatasetResultsProcessor,
 )
 
 
@@ -34,10 +37,18 @@ class DatasetHistogramProcessor:
         :param all_results: All analyses results.
         :return: Returns time bins counts histograms for all variants.
         """
-        df = all_results[EvaluationProcessorChoices.FULL_DATASET_ANALYSIS]
-        df = df[df["analysis_type"] == AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES]
 
-        return df
+        return DatasetResultsProcessor.get_analysis_type(
+            DatasetResultsProcessor.get_full_dataset_variant(all_results),
+            AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES,
+        )
+
+    @staticmethod
+    def _histogram_reformating_row(row: pd.Series) -> Dict[str, Any]:
+        return {
+            "counts": row["counts"],
+            "bins": row["bins"],
+        }
 
     @staticmethod
     def _reformat_histogram_dataframe(original_df: pd.DataFrame) -> pd.DataFrame:
@@ -45,31 +56,9 @@ class DatasetHistogramProcessor:
         :param original_df: Original dataframe as a results from analysis tools.
         :return: Histogram dataframe reformated for easier manipulation while plotting.
         """
-        flat_data = []
-
-        for _, row in original_df.iterrows():
-            time_step = row["time_step"]
-            analysis_results = row["analysis_results"]
-
-            if isinstance(analysis_results, pd.DataFrame):
-                for _, subrow in analysis_results.iterrows():
-                    layer = subrow["layer_name"]
-                    # Ensure it's a string
-                    if isinstance(layer, (list, np.ndarray)):
-                        layer = str(layer[0])  # or use .item() if it's 0-dim
-                    else:
-                        layer = str(layer)
-
-                    flat_data.append(
-                        {
-                            "time_step": time_step,
-                            "layer": layer,
-                            "counts": subrow["counts"],
-                            "bins": subrow["bins"],
-                        }
-                    )
-
-        return pd.DataFrame(flat_data)
+        return DatasetResultsProcessor.reformat_dataset_dataframe(
+            original_df, DatasetHistogramProcessor._histogram_reformating_row
+        )
 
     @staticmethod
     def _normalize_histogram_for_plotting(
@@ -127,10 +116,9 @@ class DatasetHistogramProcessor:
             # Dataframe not specified -> use default one.
             original_df = self.time_bin_histograms
 
-        dataset_variant = (
-            DatasetVariantField.TEST if is_test else DatasetVariantField.TRAIN
+        selected_df = DatasetResultsProcessor.get_dataset_type(
+            original_df, is_test=is_test
         )
-        selected_df = original_df[original_df["dataset_variant"] == dataset_variant]
         return DatasetHistogramProcessor._normalize_histogram_for_plotting(
             DatasetHistogramProcessor._reformat_histogram_dataframe(selected_df)
         )
@@ -170,3 +158,46 @@ class DatasetHistogramProcessor:
             distributions[ts] = dist
 
         return distributions
+
+    @staticmethod
+    def format_distribution_as_latex_table(
+        variant_dict: Dict[int, List[Tuple[int, float]]],
+    ) -> str:
+        """
+        Formats spike count distribution to a Latex Table representation.
+
+        :param variant_dict: Distribution in format: {num_spikes: {time_bin_size: ratio}}
+        :return: Returns LaTex table representation of the time bin count distribution.
+        """
+        # Step 1: Get all time_steps and all bins (assumes bins are the same for all)
+        time_steps = sorted(variant_dict.keys())
+        bins = sorted({b for counts in variant_dict.values() for b, _ in counts})
+
+        # Step 2: Build a dictionary: bin → list of densities per time_step
+        bin_to_densities = {b: [] for b in bins}
+        for b in bins:
+            for ts in time_steps:
+                density_dict = dict(variant_dict[ts])
+                bin_to_densities[b].append(
+                    density_dict.get(b, 0.0)
+                )  # default to 0 if missing
+
+        # Step 3: Format as LaTeX
+        header = " & ".join(
+            ["\\textbf{Bin}"] + [f"\\textbf{{{ts} ms}}" for ts in time_steps]
+        )
+        lines = [
+            "\\begin{tabular}{r | " + " ".join(["r"] * len(time_steps)) + "}",
+        ]
+        lines.append(header + " \\\\ \\hline")
+
+        for b in bins:
+            row = (
+                f"{b} & "
+                + " & ".join([f"{d:.4f}" for d in bin_to_densities[b]])
+                + " \\\\"
+            )
+            lines.append(row)
+
+        lines.append("\\end{tabular}")
+        return "\n".join(lines)

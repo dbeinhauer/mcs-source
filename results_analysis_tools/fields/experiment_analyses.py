@@ -11,6 +11,7 @@ class PlottingVariants(Enum):
     """
 
     TIME_BIN_COUNT_RATIO = "time_bin_count_ratio"
+    TEMPORAL_SPIKE_DISTRIBUTION = "temporal_spike_distribution"
 
 
 class PluginVariants(Enum):
@@ -19,3 +20,4 @@ class PluginVariants(Enum):
     """
 
     DATASET_HISTOGRAM_PROCESSOR = "dataset_histogram_processor"
+    TEMPORAL_EVOLUTION_PROCESSOR = "temporal_evolution_processor"

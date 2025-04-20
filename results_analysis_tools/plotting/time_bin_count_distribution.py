@@ -30,7 +30,7 @@ def plot_dataset_variant_all_time_bins(
 
     # Create figure
     fig, axes = plt.subplots(
-        n_rows, n_cols, figsize=(n_cols * 6, n_rows * 4), sharex=True, sharey=True
+        n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4), sharex=True, sharey=True
     )
     axes = axes.flatten()
 
@@ -60,15 +60,15 @@ def plot_dataset_variant_all_time_bins(
 
         ax.set_title(
             f"Layer: {layer}",
-            fontsize=17,
+            fontsize=18,
         )
         ax.set_xlabel(
             "Spike count",
-            fontsize=15,
+            fontsize=16,
         )
         ax.set_ylabel(
             "Normalized bin density",
-            fontsize=15,
+            fontsize=16,
         )
 
     # Remove empty subplots
@@ -93,16 +93,18 @@ def plot_dataset_variant_all_time_bins(
             ax.set_xlabel("")
             ax.tick_params(labelbottom=False)
 
+        ax.grid(True, which="both", axis="both", linestyle="--", alpha=0.3)
+
     # Optional: shared legend outside
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(
         handles,
         labels,
         title="Time step",
-        bbox_to_anchor=(0.99, 0.5),
+        bbox_to_anchor=(0.92, 0.5),
         loc="center left",
         fontsize=12,
-        title_fontsize=13,
+        title_fontsize=14,
     )
 
     dataset_variant = "Test" if is_test else "Train"
@@ -110,7 +112,7 @@ def plot_dataset_variant_all_time_bins(
         f"Normalized Histogram Distributions Across Layers - {dataset_variant} Dataset",
         fontsize=22,
     )
-    plt.tight_layout(rect=[0, 0, 0.99, 0.99])  # leave space for legend and title
+    plt.tight_layout(rect=[0, 0, 0.92, 0.99])  # leave space for legend and title
 
     if save_fig:
         fig.savefig(save_fig, format="pdf", bbox_inches="tight")
