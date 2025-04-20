@@ -220,3 +220,41 @@ class TemporalEvolutionProcessor:
                 )
             )
         )
+
+    def compute_correlation_matrix(
+        self, original_df: pd.DataFrame = None, is_test: bool = False
+    ) -> pd.DataFrame:
+        """
+        Creates correlation matrix of the density values across all time steps
+        across all layers for all time bin sizes.
+
+        :param original_df: Original dataframe analysis data.
+        :param is_test: Whether to take test dataset.
+        :return: Returns Pearson correlation matrix of the count densities across all
+        time steps across all layers. The matrix is in the format for `seaborn.heatmap`.
+        """
+        # Pivot: rows = time, columns = time_step, values = density
+        long_df = self.prepare_for_plotting(original_df, is_test=is_test)
+
+        # Aggregate across layers: average density at each (time, time_step)
+        aggregated = (
+            long_df.groupby(["time", "time_step"])["density"].mean().reset_index()
+        )
+        # Replace string time_step with int.
+        aggregated["time_step"] = (
+            aggregated["time_step"].str.replace(" ms", "", regex=False).astype(int)
+        )
+        pivoted = aggregated.pivot(index="time", columns="time_step", values="density")
+        pivoted = pivoted.reindex(sorted(pivoted.columns), axis=1)
+        pivoted = pivoted[sorted(pivoted.columns)]
+
+        # Optional: fill or drop NaNs
+        pivoted = pivoted.fillna(0)
+
+        # Correlation matrix
+        corr_matrix = pivoted.corr(method="pearson")
+
+        corr_matrix.columns = [f"{col} ms" for col in corr_matrix.columns]
+        corr_matrix.index = [f"{row} ms" for row in corr_matrix.index]
+
+        return corr_matrix

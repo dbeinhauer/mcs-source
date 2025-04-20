@@ -65,7 +65,7 @@ class DatasetAnalyzer:
         # All fano factors.
         self.fano_factors: Dict[str, torch.Tensor] = {}
         Dict[AnalysisFields, Any]
-        self.all_processing_results: Dict[AnalysisFields, Any]
+        self.all_processing_results: Dict[AnalysisFields, Any] = None
         self.all_results_dataframe: pd.DataFrame = None
 
     @property
@@ -240,7 +240,7 @@ class DatasetAnalyzer:
             targets = {k: v.to(device) for k, v in targets.items()}
             # Take only specified layers.
             batch_data_dict = DatasetAnalyzer._select_layer_data(
-                inputs, targets, layer, include_input, include_output
+                inputs, targets, "", include_input, include_output
             )
 
             for layer, data in batch_data_dict.items():
@@ -277,3 +277,5 @@ class DatasetAnalyzer:
                     self.fano_factors = FanoFactorProcessor.batch_fano_computation(
                         data, layer, is_test, self.fano_factors
                     )
+
+        return self.get_all_processing_results

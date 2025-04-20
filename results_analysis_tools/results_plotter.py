@@ -9,6 +9,7 @@ from results_analysis_tools.plotting.time_bin_count_distribution import (
 )
 from results_analysis_tools.plotting.temporal_spike_distribution import (
     plot_temporal_spike_distribution_for_dataset_data,
+    plot_temporal_spiking_correlation_heatmap_for_each_bin_size,
 )
 from results_analysis_tools.fields.experiment_analyses import PlottingVariants
 
@@ -21,6 +22,7 @@ class ResultsPlotter:
     plotting_map = {
         PlottingVariants.TIME_BIN_COUNT_RATIO: plot_dataset_variant_all_time_bins,
         PlottingVariants.TEMPORAL_SPIKE_DISTRIBUTION: plot_temporal_spike_distribution_for_dataset_data,
+        PlottingVariants.CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET: plot_temporal_spiking_correlation_heatmap_for_each_bin_size,
     }
 
     @staticmethod

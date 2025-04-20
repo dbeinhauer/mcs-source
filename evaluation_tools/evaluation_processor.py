@@ -378,7 +378,9 @@ class EvaluationProcessor:
         loader = self.test_loader if process_test else self.train_loader
 
         # Run full dataset analysis and get the results.
-        self.dataset_analyzer.full_analysis_run(loader, process_test, subset=subset)
+        results = self.dataset_analyzer.full_analysis_run(
+            loader, process_test, subset=subset
+        )
         return self.dataset_analyzer.to_pandas()
 
     def run_wandb_results_processing(
@@ -438,12 +440,12 @@ def main(arguments):
     workers_enabled = num_data_workers > 0
     data_workers_kwargs = {
         "collate_fn": different_times_collate_fn,
-        "num_workers": num_data_workers,  # number of workers which will supply data to GPU
-        "pin_memory": workers_enabled,  # speed up data transfer to GPU
-        "prefetch_factor": (
-            num_data_workers // 2 if workers_enabled else None
-        ),  # try to always have 4 samples ready for the GPU
-        "persistent_workers": workers_enabled,  # keep the worker threads alive
+        # "num_workers": num_data_workers,  # number of workers which will supply data to GPU
+        # "pin_memory": workers_enabled,  # speed up data transfer to GPU
+        # "prefetch_factor": (
+        #     num_data_workers // 2 if workers_enabled else None
+        # ),  # try to always have 4 samples ready for the GPU
+        # "persistent_workers": workers_enabled,  # keep the worker threads alive
     }
     # Whether we want to process the test dataset.
     process_test = arguments.dataset_variant == DatasetVariantField.TEST.value

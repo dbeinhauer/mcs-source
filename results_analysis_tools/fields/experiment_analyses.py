@@ -12,6 +12,7 @@ class PlottingVariants(Enum):
 
     TIME_BIN_COUNT_RATIO = "time_bin_count_ratio"
     TEMPORAL_SPIKE_DISTRIBUTION = "temporal_spike_distribution"
+    CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET = "correlation_bin_size_temporal"
 
 
 class PluginVariants(Enum):

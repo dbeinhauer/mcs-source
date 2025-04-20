@@ -114,6 +114,21 @@ class ResultAnalyzer:
 
         return distribution
 
+    def dataset_time_binning_temporal_resolution_correlation_matrix(
+        self, is_test: bool = False
+    ) -> pd.DataFrame:
+        """
+        Computes correlation matrix of the time binning and temporal resolution
+        across all layers.
+
+        :param is_test: Flag whether to process test dataset, else train.
+        :return: Returns correlation matrix of the time binning and temporal
+        resolution across all layers.
+        """
+        return self.all_plugins[
+            PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
+        ].compute_correlation_matrix(is_test=is_test)
+
 
 if __name__ == "__main__":
     EVALUATION_RESULTS_BASE = "/analysis_results"
