@@ -155,7 +155,7 @@ class SynchronyExperimentsProcessor:
         :param is_test: Flag whether process train or test dataset.
         :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Returns dataset prepared for plotting.
-        The dataframe has columns: `["time", "density", {"time_step"| "subset_id"}: str, "layer"]`
+        The dataframe has columns: `["synchrony", {"time_step"| "subset_id"}: str, "layer"]`
         """
         if original_df is None:
             # Dataframe not specified -> use default one.
@@ -170,12 +170,39 @@ class SynchronyExperimentsProcessor:
             original_df, is_test=is_test
         )
 
-        return SynchronyExperimentsProcessor._create_long_format_for_seaborn(
-            SynchronyExperimentsProcessor._get_synchrony(
-                SynchronyExperimentsProcessor._reformat_original_separate_dataframe(
-                    selected_df, process_subset=process_subset
-                )
+        return DatasetResultsProcessor.ensure_layer_order(
+            SynchronyExperimentsProcessor._create_long_format_for_seaborn(
+                SynchronyExperimentsProcessor._get_synchrony(
+                    SynchronyExperimentsProcessor._reformat_original_separate_dataframe(
+                        selected_df, process_subset=process_subset
+                    )
+                ),
+                process_subset=process_subset,
             )
+        )
+
+    def prepare_for_plotting_subset_full_comparison(
+        self,
+        is_test: bool = False,
+    ) -> pd.DataFrame:
+        """
+        Prepares time bin histogram data for plotting comparison of full
+        and subset datasets.
+
+        :param is_test: Flag whether process train or test dataset.
+        :return: Returns dataset prepared for plotting.
+        The dataframe has columns: `["synchrony", "subset_id": str, "layer", "model_type"]`
+        """
+
+        full_df = DatasetResultsProcessor.replace_time_step_with_subset_full(
+            DatasetResultsProcessor.get_time_step_20_full(
+                self.prepare_for_plotting(is_test=is_test, process_subset=False)
+            )
+        )
+        subset_df = self.prepare_for_plotting(is_test=is_test, process_subset=True)
+
+        return DatasetResultsProcessor.ensure_layer_order(
+            DatasetResultsProcessor.merge_full_and_subset_dataframes(full_df, subset_df)
         )
 
     def compute_synchrony_spearman_correlation(

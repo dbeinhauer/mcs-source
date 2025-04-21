@@ -20,6 +20,7 @@ class PlottingVariants(Enum):
 
     # Subset dataset analyses (for all model subset variants).
     SUBSET_TEMPORAL_SPIKE_DISTRIBUTION = "subset_temporal_spike_distribution"
+    SUBSET_SYNCHRONY_TIME_BINS = "subset_synchrony_time_bins"
 
 
 class PluginVariants(Enum):

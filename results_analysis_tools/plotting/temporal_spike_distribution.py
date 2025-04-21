@@ -159,7 +159,7 @@ def plot_temporal_spike_distribution_comparison_full_subset(
         full_df = layer_df[layer_df["model_type"] == "Full model"]
         subset_df = layer_df[layer_df["model_type"] == "Subset"]
 
-        # Plot full model (solid black line)
+        # Plot full model (dashed black line)
         sns.lineplot(
             data=full_df,
             x="time",
@@ -173,7 +173,7 @@ def plot_temporal_spike_distribution_comparison_full_subset(
             label="Full model",
         )
 
-        # Plot subset model (dashed, semi-transparent blue)
+        # Plot subset model (semi-transparent blue)
         sns.lineplot(
             data=subset_df,
             x="time",

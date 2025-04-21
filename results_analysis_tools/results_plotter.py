@@ -14,6 +14,7 @@ from results_analysis_tools.plotting.temporal_spike_distribution import (
 )
 from results_analysis_tools.plotting.synchrony_comparison import (
     plot_synchrony_boxplot_across_layers_full,
+    plot_synchrony_boxplot_jitter_subset_full_comparison,
 )
 from results_analysis_tools.fields.experiment_analyses import PlottingVariants
 
@@ -29,6 +30,7 @@ class ResultsPlotter:
         PlottingVariants.FULL_CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET: plot_temporal_spiking_correlation_heatmap_for_each_bin_size_full,
         PlottingVariants.FULL_SYNCHRONY_TIME_BINS: plot_synchrony_boxplot_across_layers_full,
         PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION: plot_temporal_spike_distribution_comparison_full_subset,
+        PlottingVariants.SUBSET_SYNCHRONY_TIME_BINS: plot_synchrony_boxplot_jitter_subset_full_comparison,
     }
 
     @staticmethod

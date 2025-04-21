@@ -288,11 +288,13 @@ class TemporalEvolutionProcessor:
             original_df, is_test=is_test
         )
 
-        return TemporalEvolutionProcessor._create_long_format_for_seaborn(
-            TemporalEvolutionProcessor._reformat_normalize_and_map_time_distribution(
-                selected_df, process_subset=process_subset
-            ),
-            process_subset=process_subset,
+        return DatasetResultsProcessor.ensure_layer_order(
+            TemporalEvolutionProcessor._create_long_format_for_seaborn(
+                TemporalEvolutionProcessor._reformat_normalize_and_map_time_distribution(
+                    selected_df, process_subset=process_subset
+                ),
+                process_subset=process_subset,
+            )
         )
 
     def _prepare_full_dataset_for_subset_comparison(
@@ -316,13 +318,11 @@ class TemporalEvolutionProcessor:
         selected_df = DatasetResultsProcessor.get_dataset_type(
             original_df, is_test=is_test
         )
-        # Select only time steps 20.
-        selected_df = selected_df[selected_df["time_step"] == 20]
 
-        # Replace #"time_step" with "subset_id" for processing as subset dataset.
-        selected_df = selected_df.rename(columns={"time_step": "subset_id"})
-        # Set subset_id to -1 for full dataset. Use string for consistency.
-        selected_df["subset_id"] = "-1"
+        # Select only 20ms time binning, get rid of "time_step" column and assign "-1" to "subset_id".
+        selected_df = DatasetResultsProcessor.replace_time_step_with_subset_full(
+            DatasetResultsProcessor.get_time_step_20_full(selected_df)
+        )
         # Process full dataset as the subset dataset.
         selected_df = self.prepare_for_plotting(
             selected_df,
@@ -348,13 +348,9 @@ class TemporalEvolutionProcessor:
         full_df = self._prepare_full_dataset_for_subset_comparison(is_test=is_test)
         subset_df = self.prepare_for_plotting(is_test=is_test, process_subset=True)
 
-        combined_df = pd.concat([subset_df, full_df], ignore_index=True)
-        # Ensure subset_id is string
-        combined_df["subset_id"] = combined_df["subset_id"].astype(str)
-
-        # Create a new column to distinguish full vs subset for plotting
-        combined_df["model_type"] = combined_df["subset_id"].apply(
-            lambda x: "Full model" if x == "-1" else "Subset"
+        # Merge full and subset dataset.
+        combined_df = DatasetResultsProcessor.merge_full_and_subset_dataframes(
+            full_df, subset_df
         )
 
         # Mapping of the 20 ms time steps to original 1ms resolution.
@@ -368,19 +364,8 @@ class TemporalEvolutionProcessor:
         last_entries["time"] = 711
         combined_df = pd.concat([combined_df, last_entries], ignore_index=True)
 
-        desired_order = [
-            "X_ON",
-            "X_OFF",
-            "V1_Exc_L4",
-            "V1_Inh_L4",
-            "V1_Exc_L23",
-            "V1_Inh_L23",
-        ]
-
         # Ensure the order of the layers.
-        combined_df["layer"] = pd.Categorical(
-            combined_df["layer"], categories=desired_order, ordered=True
-        )
+        combined_df = DatasetResultsProcessor.ensure_layer_order(combined_df)
 
         return combined_df
 

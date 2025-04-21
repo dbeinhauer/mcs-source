@@ -62,6 +62,28 @@ class DatasetResultsProcessor:
         return df[df["dataset_variant"] == variant_to_take]
 
     @staticmethod
+    def get_time_step_20_full(df: pd.DataFrame, time_step: int = 20) -> pd.DataFrame:
+        """
+        :param df: Dataframe to take the analysis.
+        :param tame_step: Time step to take the analysis (optionally other than 20 ms).
+        :return: Returns dataframe rows that match the selected time step (typically 20 ms).
+        """
+        return df[df["time_step"] == time_step]
+
+    @staticmethod
+    def replace_time_step_with_subset_full(
+        df: pd.DataFrame, subset_id: str = "-1"
+    ) -> pd.DataFrame:
+        """
+        :param df: Full dataset Dataframe to take the analysis.
+        :param subset_id: Subset id to assign to the full dataset (typically `"-1"`).
+        :return: Returns dataframe with "time_step" column replaced with "subset_id" column.
+        """
+        df = df.rename(columns={"time_step": "subset_id"})
+        df["subset_id"] = "-1"
+        return df[df["subset_id"] == subset_id]
+
+    @staticmethod
     def reformat_dataset_dataframe(
         original_df: pd.DataFrame,
         function_to_process_results,
@@ -108,3 +130,49 @@ class DatasetResultsProcessor:
                     )
 
         return pd.DataFrame(flat_data)
+
+    @staticmethod
+    def merge_full_and_subset_dataframes(
+        full_df: pd.DataFrame, subset_df: pd.DataFrame, full_id: str = "-1"
+    ) -> pd.DataFrame:
+        """
+        Merges the full and subset dataframes into a single dataframe. Differentiates
+        between full and subset data by adding a new column `model_type` that indicates
+        whether the data is from the full model or the subset.
+
+        :param full_df: Full dataset preprocessed dataframe.
+        :param subset_df: Subset dataset preprocessed dataframe.
+        :return: Returns the combined dataframe with an additional column `model_type`
+        indicating the type of model (full or subset).
+        """
+        combined_df = pd.concat([subset_df, full_df], ignore_index=True)
+        # Ensure subset_id is string
+        combined_df["subset_id"] = combined_df["subset_id"].astype(str)
+
+        # Create a new column to distinguish full vs subset for plotting
+        combined_df["model_type"] = combined_df["subset_id"].apply(
+            lambda x: "Full model" if x == "-1" else "Subset"
+        )
+
+        return combined_df
+
+    @staticmethod
+    def ensure_layer_order(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        :param df: Dataframe to modify.
+        :return: Returns dataframe with the layer column ordered in a specific way for plotting.
+        """
+        desired_order = [
+            "X_ON",
+            "X_OFF",
+            "V1_Exc_L4",
+            "V1_Inh_L4",
+            "V1_Exc_L23",
+            "V1_Inh_L23",
+        ]
+
+        # Ensure the order of the layers.
+        df["layer"] = pd.Categorical(
+            df["layer"], categories=desired_order, ordered=True
+        )
+        return df

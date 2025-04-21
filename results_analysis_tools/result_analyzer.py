@@ -107,6 +107,11 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
             ].prepare_for_plotting_subset_full_comparison(is_test=is_test)
+        if variant == PlottingVariants.SUBSET_SYNCHRONY_TIME_BINS:
+            # Plotting variant not implement yet.
+            return self.all_plugins[
+                PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
+            ].prepare_for_plotting_subset_full_comparison(is_test=is_test)
 
         # Plotting variant not implement yet.
         return None
@@ -214,14 +219,7 @@ if __name__ == "__main__":
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
 
-    subset_df = result_analyzer.prepare_dataframe_for_plot(
-        variant=PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION
-    )
-
-    print(
-        result_analyzer.get_mean_spike_counts(
-            is_test=False,
-            process_subset=True,
-            format_to_latex=True,
-        )
+    synchrony_exp_proc = SynchronyExperimentsProcessor(result_analyzer.get_all_results)
+    subset_df = synchrony_exp_proc.prepare_for_plotting(
+        is_test=False, process_subset=True
     )

@@ -163,11 +163,13 @@ class DatasetHistogramProcessor:
         selected_df = DatasetResultsProcessor.get_dataset_type(
             original_df, is_test=is_test
         )
-        return DatasetHistogramProcessor._normalize_histogram_for_plotting(
-            DatasetHistogramProcessor._reformat_histogram_dataframe(
-                selected_df, process_subset=process_subset
-            ),
-            process_subset=process_subset,
+        return DatasetResultsProcessor.ensure_layer_order(
+            DatasetHistogramProcessor._normalize_histogram_for_plotting(
+                DatasetHistogramProcessor._reformat_histogram_dataframe(
+                    selected_df, process_subset=process_subset
+                ),
+                process_subset=process_subset,
+            )
         )
 
     def compute_spike_count_distribution(
