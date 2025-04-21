@@ -83,18 +83,31 @@ class ResultAnalyzer:
         self, variant: PlottingVariants, is_test: bool = False
     ) -> pd.DataFrame:
 
-        if variant == PlottingVariants.TIME_BIN_COUNT_RATIO:
+        if variant == PlottingVariants.FULL_TIME_BIN_COUNT_RATIO:
             return self.all_plugins[
                 PluginVariants.DATASET_HISTOGRAM_PROCESSOR
-            ].prepare_for_plotting(is_test=is_test)
-        if variant == PlottingVariants.TEMPORAL_SPIKE_DISTRIBUTION:
+            ].prepare_for_plotting(is_test=is_test, process_subset=False)
+        if variant == PlottingVariants.FULL_TEMPORAL_SPIKE_DISTRIBUTION:
             return self.all_plugins[
                 PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
-            ].prepare_for_plotting(is_test=is_test)
-        if variant == PlottingVariants.SYNCHRONY_TIME_BINS:
+            ].prepare_for_plotting(is_test=is_test, process_subset=False)
+        if (
+            variant
+            == PlottingVariants.FULL_CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET
+        ):
+            return self.all_plugins[
+                PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
+            ].compute_correlation_matrix_full(is_test=is_test)
+        if variant == PlottingVariants.FULL_SYNCHRONY_TIME_BINS:
             return self.all_plugins[
                 PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
-            ].prepare_for_plotting(is_test=is_test)
+            ].prepare_for_plotting(is_test=is_test, process_subset=False)
+        if variant == PlottingVariants.SUBSET_TIME_BIN_COUNT_RATIO:
+            # Plotting variant not implement yet.
+            return None
+        if variant == PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION:
+            # Plotting variant not implement yet.
+            return None
 
         # Plotting variant not implement yet.
         return None
@@ -102,58 +115,65 @@ class ResultAnalyzer:
     def get_mean_spike_counts(
         self,
         is_test: bool,
+        process_subset: bool = False,
         format_to_latex: bool = False,
-    ) -> Union[Dict[int, List[Tuple[int, float]]] | str]:
+    ) -> Union[pd.DataFrame | str]:
         """
         Retrieve ratios of each spike count across all time bins.
 
         :param is_test: Flag whether to process test dataset, else train.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :param format_to_latex: Flag whether to return the results as LaTeX table.
         :return: Returns ratios of each spike count for each time binning as either
         dictionary of LaTeX table representation.
         """
-        distribution = self.all_plugins[
-            PluginVariants.DATASET_HISTOGRAM_PROCESSOR
-        ].compute_spike_count_distribution(is_test=is_test)
-
-        if format_to_latex:
-            # Format distribution to LaTeX
-            return DatasetHistogramProcessor.format_distribution_as_latex_table(
-                distribution
-            )
-
-        return distribution
-
-    def dataset_time_binning_temporal_resolution_correlation_matrix(
-        self, is_test: bool = False
-    ) -> pd.DataFrame:
-        """
-        Computes correlation matrix of the time binning and temporal resolution
-        across all layers.
-
-        :param is_test: Flag whether to process test dataset, else train.
-        :return: Returns correlation matrix of the time binning and temporal
-        resolution across all layers.
-        """
         return self.all_plugins[
-            PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
-        ].compute_correlation_matrix(is_test=is_test)
+            PluginVariants.DATASET_HISTOGRAM_PROCESSOR
+        ].compute_spike_count_distribution(
+            is_test=is_test,
+            process_subset=process_subset,
+            format_to_latex=format_to_latex,
+        )
 
     def get_synchrony_spearman_correlation(
-        self, is_test: bool = False, return_latex: bool = False
+        self,
+        is_test: bool = False,
+        process_subset: bool = False,
+        return_latex: bool = False,
     ) -> Union[pd.DataFrame, str]:
         """
         Computes Spearman rank correlation of each layer across time bins
         to determine the correlation of synchrony rise with time bin size.
 
         :param is_test: Whether compute for test dataset, else train.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :param return_latex: Whether return LaTeX table representation, else pd.Dataframe.
         :return: Returns correlations and p-values for each layer and overall across all layers.
         """
         return self.all_plugins[
             PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
         ].compute_synchrony_spearman_correlation(
-            is_test=is_test, return_latex=return_latex
+            is_test=is_test, process_subset=process_subset, return_latex=return_latex
+        )
+
+    def get_synchrony_summary(
+        self,
+        is_test: bool = False,
+        process_subset: bool = False,
+        return_latex: bool = False,
+    ) -> Union[pd.DataFrame, str]:
+        """
+        Computes mean and variance of synchrony of each layer across time bins.
+
+        :param is_test: Whether compute for test dataset, else train.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
+        :param return_latex: Whether return LaTeX table representation, else pd.Dataframe.
+        :return: Returns mean and variance for each layer and overall across all layers.
+        """
+        return self.all_plugins[
+            PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
+        ].compute_synchrony_summary(
+            is_test=is_test, process_subset=process_subset, return_latex=return_latex
         )
 
 
@@ -167,14 +187,4 @@ if __name__ == "__main__":
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
 
-    # result_analyzer.prepare_dataframe_for_plot(PlottingVariants.SYNCHRONY_TIME_BINS)
-    print(
-        result_analyzer.get_synchrony_spearman_correlation(
-            is_test=False, return_latex=True
-        )
-    )
-    print(
-        result_analyzer.get_synchrony_spearman_correlation(
-            is_test=True, return_latex=True
-        )
-    )
+    print(result_analyzer.get_mean_spike_counts(False, format_to_latex=True))

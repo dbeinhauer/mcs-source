@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def plot_temporal_spike_distribution_for_dataset_data(
+def plot_temporal_spike_distribution_for_dataset_data_full(
     df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
 ):
     """
-    Plots temporal distribution of the spike counts overlaid for all time bin size variants.
+    Plots temporal distribution of the spike counts overlaid for all time bin size variants on full dataset.
 
     :param df: Data to plot from `temporal_evolution_processor.py`.
     :param is_test: Whether we are plotting the test dataset.
@@ -56,14 +56,14 @@ def plot_temporal_spike_distribution_for_dataset_data(
         plt.show()
 
 
-def plot_temporal_spiking_correlation_heatmap_for_each_bin_size(
+def plot_temporal_spiking_correlation_heatmap_for_each_bin_size_full(
     train_test_tuple: Tuple[pd.DataFrame, pd.DataFrame],
     is_test: bool = False,
     save_fig: str = "",
 ):
     """
     Plots the correlation matrix of the spike counts across all time steps
-    across all layers for all time bin sizes for both train and test datasets.
+    across all layers for all time bin sizes for both train and test datasets on full dataset.
 
     :param train_test_tuple: Tuple of correlation matrices for train and test datasets.
     :param is_test: Just placeholder to work properly with plotting function.

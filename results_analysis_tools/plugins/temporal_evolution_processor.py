@@ -26,14 +26,37 @@ class TemporalEvolutionProcessor:
         self.time_evolution_full_dataset_df = (
             TemporalEvolutionProcessor._get_all_full_dataset_time_evolution(all_results)
         )
+        self.time_evolution_subset_dataset_df = (
+            TemporalEvolutionProcessor._get_all_subset_dataset_time_evolution(
+                all_results
+            )
+        )
 
     @staticmethod
     def _get_all_full_dataset_time_evolution(
         all_results: Dict[EvaluationProcessorChoices, pd.DataFrame],
     ):
+        """
+        :param all_results: All results.
+        :return: Returns all results for full datasets.
+        """
 
         return DatasetResultsProcessor.get_analysis_type(
             DatasetResultsProcessor.get_full_dataset_variant(all_results),
+            AnalysisFields.TIME_BIN_SPIKE_COUNTS,
+        )
+
+    @staticmethod
+    def _get_all_subset_dataset_time_evolution(
+        all_results: Dict[EvaluationProcessorChoices, pd.DataFrame],
+    ):
+        """
+        :param all_results: All results.
+        :return: Returns all results for subset datasets.
+        """
+
+        return DatasetResultsProcessor.get_analysis_type(
+            DatasetResultsProcessor.get_subset_dataset_variant(all_results),
             AnalysisFields.TIME_BIN_SPIKE_COUNTS,
         )
 
@@ -50,13 +73,19 @@ class TemporalEvolutionProcessor:
         }
 
     @staticmethod
-    def _reformat_time_evolution_dataframe(original_df: pd.DataFrame) -> pd.DataFrame:
+    def _reformat_time_evolution_dataframe(
+        original_df: pd.DataFrame,
+        process_subset: bool = False,
+    ) -> pd.DataFrame:
         """
         :param original_df: Original dataframe as a results from analysis tools.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Dataframe reformated for easier manipulation while plotting.
         """
         return DatasetResultsProcessor.reformat_dataset_dataframe(
-            original_df, TemporalEvolutionProcessor._time_count_reformating_row
+            original_df,
+            TemporalEvolutionProcessor._time_count_reformating_row,
+            process_subset=process_subset,
         )
 
     @staticmethod
@@ -113,7 +142,10 @@ class TemporalEvolutionProcessor:
         return pd.Series([common_time, padded])
 
     @staticmethod
-    def _map_counts_to_time(df: pd.DataFrame) -> pd.DataFrame:
+    def _map_counts_to_time(
+        df: pd.DataFrame,
+        process_subset: bool = False,
+    ) -> pd.DataFrame:
         """
         Interpolates all count sequences for the time resolution 1ms. The aim of this
         function is to spread the time interval spiking information to 1ms bin resolution
@@ -121,9 +153,16 @@ class TemporalEvolutionProcessor:
         time bin sizes.
 
         :param df: Dataframe to be interpolated.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Returns the dataframe with new columns `"padded_time"` symbolizing
         the time at which the count from the `"padded_counts"` belong.
         """
+        if process_subset:
+            # In case of processing subset dataset, just add the columns to maintain
+            # the format but then skip every other steps.
+            df[["padded_time", "padded_counts"]] = None
+            return df
+
         # Find experiment duration in the maximal resolution.
         df["duration"] = df.apply(
             lambda row: len(row["counts"]) * row["time_step"], axis=1
@@ -145,7 +184,10 @@ class TemporalEvolutionProcessor:
         return df
 
     @staticmethod
-    def _reformat_normalize_and_map_time_distribution(df: pd.DataFrame) -> pd.DataFrame:
+    def _reformat_normalize_and_map_time_distribution(
+        df: pd.DataFrame,
+        process_subset: bool = False,
+    ) -> pd.DataFrame:
         """
         From dataset in original format for given type (train, test) it first reformats
         the dataframe, then normalizes the counts to be ratios across the time interval and
@@ -153,76 +195,101 @@ class TemporalEvolutionProcessor:
         duration for comparison of the temporal behavior in the plot.
 
         :param df: Original dataset to be formatted.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
+
         :return: Returns dataframe with columns
-        `['time_step', 'layer', 'counts', 'normalized_counts', 'duration', 'padded_time', 'padded_counts']`
+        `[{'time_step' | "subset_id"}, 'layer', 'counts', 'normalized_counts', 'duration', 'padded_time', 'padded_counts']`
         """
         return TemporalEvolutionProcessor._map_counts_to_time(
             TemporalEvolutionProcessor._normalize_counts_in_time(
-                TemporalEvolutionProcessor._reformat_time_evolution_dataframe(df)
-            )
+                TemporalEvolutionProcessor._reformat_time_evolution_dataframe(
+                    df, process_subset=process_subset
+                )
+            ),
+            process_subset=process_subset,
         )
 
     @staticmethod
-    def _create_long_format_for_seaborn(df: pd.DataFrame) -> pd.DataFrame:
+    def _create_long_format_for_seaborn(
+        df: pd.DataFrame,
+        process_subset: bool = False,
+    ) -> pd.DataFrame:
         """
         Converts and filters the dataframe to long format (each values of the list in new row)
         for plotting in seaborn.
 
         :param df: Dataframe to be converted.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Returns long format of the provided dataframe with columns customized for
         plotting in format: `["time", "density", "time_step": str, "layer"]`
         """
         long_df = []
 
-        for _, row in df.iterrows():
-            time_step = row["time_step"]
-            layer = row["layer"]
-            times = row["padded_time"]
-            counts = row["padded_counts"] / time_step
-            # counts[-1] = counts[-2]
+        time_step_or_subset_id_column_key = (
+            "time_step" if not process_subset else "subset_id"
+        )
 
-            for t, c in zip(times, counts):
-                long_df.append(
-                    {
-                        "time": t,
-                        "density": c,
-                        "time_step": f"{time_step} ms",  # string for hue
-                        "layer": layer,
-                    }
-                )
+        for _, row in df.iterrows():
+            time_step_or_subset_id = row[time_step_or_subset_id_column_key]
+            layer = row["layer"]
+
+            # Process subset of models -> it is not necessary to take interpolated counts (all results have same time binning)
+            counts = row["normalized_counts"]
+            times = np.arange(0, len(counts))
+            if not process_subset:
+                # Processing full dataset -> select correct time binning.
+                times = row["padded_time"]
+                counts = row["padded_counts"] / time_step_or_subset_id
+
+                for t, c in zip(times, counts):
+                    long_df.append(
+                        {
+                            "time": t,
+                            "density": c,
+                            time_step_or_subset_id_column_key: f"{time_step_or_subset_id} ms",  # string for hue
+                            "layer": layer,
+                        }
+                    )
 
         return pd.DataFrame(long_df)
 
     def prepare_for_plotting(
-        self, original_df: pd.DataFrame = None, is_test: bool = False
+        self,
+        original_df: pd.DataFrame = None,
+        is_test: bool = False,
+        process_subset: bool = False,
     ) -> pd.DataFrame:
         """
-        Prepares time bin histogram data for plotting.
+        Prepares time bin histogram data for plotting on full dataset.
 
         :param original_df: Original histogram data, if `None` then default.
         :param is_test: Flag whether process train or test dataset.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Returns dataset prepared for plotting.
-        The dataframe has columns: `["time", "density", "time_step": str, "layer"]`
+        The dataframe has columns: `["time", "density", {"time_step" | "subset_id"}: str, "layer"]`
         """
-        if not original_df:
+
+        if original_df is None:
             # Dataframe not specified -> use default one.
-            original_df = self.time_evolution_full_dataset_df
+            if process_subset:
+                # Processing dataset subset variants.
+                original_df = self.time_evolution_subset_dataset_df
+            else:
+                # Processing dataset full variant for multiple time bin sizes.
+                original_df = self.time_evolution_full_dataset_df
 
         selected_df = DatasetResultsProcessor.get_dataset_type(
             original_df, is_test=is_test
         )
 
         return TemporalEvolutionProcessor._create_long_format_for_seaborn(
-            TemporalEvolutionProcessor._map_counts_to_time(
-                TemporalEvolutionProcessor._normalize_counts_in_time(
-                    TemporalEvolutionProcessor._reformat_time_evolution_dataframe(
-                        selected_df
-                    )
-                )
-            )
+            TemporalEvolutionProcessor._reformat_normalize_and_map_time_distribution(
+                selected_df, process_subset=process_subset
+            ),
+            process_subset=process_subset,
         )
 
-    def compute_correlation_matrix(
+    def compute_correlation_matrix_full(
         self, original_df: pd.DataFrame = None, is_test: bool = False
     ) -> pd.DataFrame:
         """
@@ -234,8 +301,17 @@ class TemporalEvolutionProcessor:
         :return: Returns Pearson correlation matrix of the count densities across all
         time steps across all layers. The matrix is in the format for `seaborn.heatmap`.
         """
+        if original_df is None:
+            # Dataframe not specified -> use default one.
+            original_df = self.time_evolution_full_dataset_df
+
+        selected_df = DatasetResultsProcessor.get_dataset_type(
+            original_df, is_test=is_test
+        )
         # Pivot: rows = time, columns = time_step, values = density
-        long_df = self.prepare_for_plotting(original_df, is_test=is_test)
+        long_df = self.prepare_for_plotting(
+            original_df=selected_df, is_test=is_test, process_subset=False
+        )
 
         # Aggregate across layers: average density at each (time, time_step)
         aggregated = (

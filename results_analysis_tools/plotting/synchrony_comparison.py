@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def plot_synchrony_boxplot_across_layers(
+def plot_synchrony_boxplot_across_layers_full(
     df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
 ):
     """
-    Plots box plots of the synchrony across all layers for each time bin size variant.
+    Plots box plots of the synchrony across all layers for each time bin size variant on full dataset.
 
     :param df: Data to plot from.
     :param is_test: Whether we are plotting the test dataset.

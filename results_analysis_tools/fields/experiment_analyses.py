@@ -10,10 +10,17 @@ class PlottingVariants(Enum):
     All variants of plots.
     """
 
-    TIME_BIN_COUNT_RATIO = "time_bin_count_ratio"
-    TEMPORAL_SPIKE_DISTRIBUTION = "temporal_spike_distribution"
-    CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET = "correlation_bin_size_temporal"
-    SYNCHRONY_TIME_BINS = "synchrony_time_bins"
+    # Full dataset analyses (for all time bins).
+    FULL_TIME_BIN_COUNT_RATIO = "full_time_bin_count_ratio"
+    FULL_TEMPORAL_SPIKE_DISTRIBUTION = "full_temporal_spike_distribution"
+    FULL_CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET = (
+        "full_correlation_bin_size_temporal"
+    )
+    FULL_SYNCHRONY_TIME_BINS = "full_synchrony_time_bins"
+
+    # Subset dataset analyses (for all model subset variants).
+    SUBSET_TIME_BIN_COUNT_RATIO = "subset_time_bin_count_ratio"
+    SUBSET_TEMPORAL_SPIKE_DISTRIBUTION = "subset_temporal_spike_distribution"
 
 
 class PluginVariants(Enum):

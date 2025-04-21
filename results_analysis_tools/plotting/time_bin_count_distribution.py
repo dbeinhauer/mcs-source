@@ -10,11 +10,11 @@ import matplotlib.cm as cm
 from evaluation_tools.fields.dataset_parameters import ALL_TIME_STEP_VARIANTS
 
 
-def plot_dataset_variant_all_time_bins(
+def plot_dataset_variant_all_time_bins_full(
     normalized_df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
 ):
     """
-    Plots line plot of spike counts is each time bin for each time step size.
+    Plots line plot of spike counts is each time bin for each time step size on full dataset.
 
     :param normalized_df: Dataframe prepared for plotting.
     :param is_test: Flag whether plotting test or train dataset.

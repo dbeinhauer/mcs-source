@@ -63,25 +63,31 @@ class DatasetResultsProcessor:
 
     @staticmethod
     def reformat_dataset_dataframe(
-        original_df: pd.DataFrame, function_to_process_results
+        original_df: pd.DataFrame,
+        function_to_process_results,
+        process_subset: bool = False,
     ) -> pd.DataFrame:
         """
         Takes original dataframe of analysis results on the dataset and converts it to the format
-        with columns `["time_step", "layer", "analysis_results"]`. Where `"analysis_results"`
+        with columns `[{"time_step"|"subset_id"}, "layer", "analysis_results"]`. Where `"analysis_results"`
         are the specific results for each different analysis type from `AnalysisFields`.
 
         :param original_df: Original analysis results from evaluation tools.
         :param function_to_process_results: Function to be called on each of the row of the
         `"analysis_results"` column that should retrieve the information of our interest as dictionary
         pairs for the new dataframe.
-        :return: Returns reformated dataframe with columns
-        `["time_step", "layer", {columns_from_provided_function}]`.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
+        :return: Returns reformated dataframe with columns (`"subset_id"` or `"time_step"` depends on `process_subset`),
+        `[{"time_step"|"subset_id"}, "layer", {columns_from_provided_function}]`.
         """
 
         flat_data = []
+        time_step_or_subset_id_column_key = (
+            "time_step" if not process_subset else "subset_id"
+        )
 
         for _, row in original_df.iterrows():
-            time_step = row["time_step"]
+            time_step_or_subset_id = row[time_step_or_subset_id_column_key]
             analysis_results = row["analysis_results"]
 
             if isinstance(analysis_results, pd.DataFrame):
@@ -95,7 +101,7 @@ class DatasetResultsProcessor:
 
                     flat_data.append(
                         {
-                            "time_step": time_step,
+                            time_step_or_subset_id_column_key: time_step_or_subset_id,
                             "layer": layer,
                             **function_to_process_results(subrow),
                         }

@@ -2,7 +2,7 @@
 This script defines class for processing the dataset histograms.
 """
 
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Union
 
 import numpy as np
 import pandas as pd
@@ -30,6 +30,11 @@ class DatasetHistogramProcessor:
                 all_results
             )
         )
+        self.time_bin_histograms_subset_dataset = (
+            DatasetHistogramProcessor._get_all_subset_dataset_time_bin_histograms(
+                all_results
+            )
+        )
 
     @staticmethod
     def _get_all_full_dataset_time_bin_histograms(
@@ -37,11 +42,25 @@ class DatasetHistogramProcessor:
     ) -> pd.DataFrame:
         """
         :param all_results: All analyses results.
-        :return: Returns time bins counts histograms for all variants.
+        :return: Returns time bins counts histograms for all variants in full dataset.
         """
 
         return DatasetResultsProcessor.get_analysis_type(
             DatasetResultsProcessor.get_full_dataset_variant(all_results),
+            AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES,
+        )
+
+    @staticmethod
+    def _get_all_subset_dataset_time_bin_histograms(
+        all_results: Dict[EvaluationProcessorChoices, pd.DataFrame],
+    ) -> pd.DataFrame:
+        """
+        :param all_results: All analyses results.
+        :return: Returns time bins counts histograms for all variants in subset dataset.
+        """
+
+        return DatasetResultsProcessor.get_analysis_type(
+            DatasetResultsProcessor.get_subset_dataset_variant(all_results),
             AnalysisFields.HISTOGRAM_TIME_BIN_SPIKE_RATES,
         )
 
@@ -53,18 +72,26 @@ class DatasetHistogramProcessor:
         }
 
     @staticmethod
-    def _reformat_histogram_dataframe(original_df: pd.DataFrame) -> pd.DataFrame:
+    def _reformat_histogram_dataframe(
+        original_df: pd.DataFrame,
+        process_subset: bool = False,
+    ) -> pd.DataFrame:
         """
         :param original_df: Original dataframe as a results from analysis tools.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Histogram dataframe reformated for easier manipulation while plotting.
         """
         return DatasetResultsProcessor.reformat_dataset_dataframe(
-            original_df, DatasetHistogramProcessor._histogram_reformating_row
+            original_df,
+            DatasetHistogramProcessor._histogram_reformating_row,
+            process_subset=process_subset,
         )
 
     @staticmethod
     def _normalize_histogram_for_plotting(
-        reformated_df: pd.DataFrame, bins_to_plot: int = 6
+        reformated_df: pd.DataFrame,
+        bins_to_plot: int = 6,
+        process_subset: bool = False,
     ) -> pd.DataFrame:
         """
         Normalizes the count data to ratios, selects only subset of counts
@@ -73,14 +100,20 @@ class DatasetHistogramProcessor:
         :param reformated_df: Already reformatted dataframe from function
         `cls._reformat_histogram_dataframe` for easier manipulation.
         :param bins_to_plot: How many count bins to take (typically for trimming the always 0 counts).
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Returns trimmed and normalized counts to ratios.
         The dataframe has columns: `["layer", "time_step", "bin", "density"]`
+        or "subset_id" instead of "time_step" in case `process_subset` is `True`.
         """
         normalized_data = []
 
+        time_step_or_subset_id_column_key = (
+            "time_step" if not process_subset else "subset_id"
+        )
         for idx, row in reformated_df.iterrows():
             layer = row["layer"]
-            time_step = row["time_step"]
+            # Determine the time step or subset ID based on the process_subset flag.
+            time_step_or_subset_id = row[time_step_or_subset_id_column_key]
             counts = np.array(row["counts"])[:bins_to_plot]
             bins = np.array(row["bins"])[:bins_to_plot]
 
@@ -94,7 +127,7 @@ class DatasetHistogramProcessor:
                 normalized_data.append(
                     {
                         "layer": layer,
-                        "time_step": time_step,
+                        time_step_or_subset_id_column_key: time_step_or_subset_id,
                         "bin": float(bin),
                         "density": float(norm_count),
                         "count": int(count),
@@ -104,49 +137,77 @@ class DatasetHistogramProcessor:
         return pd.DataFrame(normalized_data)
 
     def prepare_for_plotting(
-        self, original_df: pd.DataFrame = None, is_test: bool = False
+        self,
+        original_df: pd.DataFrame = None,
+        is_test: bool = False,
+        process_subset: bool = False,
     ) -> pd.DataFrame:
         """
-        Prepares time bin histogram data for plotting.
+        Prepares full dataset time bin histogram data for plotting.
 
         :param original_df: Original histogram data, if `None` then default.
         :param is_test: Flag whether process train or test dataset.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
         :return: Returns dataset prepared for plotting.
         The dataframe has columns: `["layer", "time_step", "bin", "density"]`
         """
-        if not original_df:
+        if original_df is None:
             # Dataframe not specified -> use default one.
-            original_df = self.time_bin_histograms_full_dataset
+            if process_subset:
+                # Processing dataset subset variants.
+                original_df = self.time_bin_histograms_subset_dataset
+            else:
+                # Processing dataset full variant for multiple time bin sizes.
+                original_df = self.time_bin_histograms_full_dataset
 
         selected_df = DatasetResultsProcessor.get_dataset_type(
             original_df, is_test=is_test
         )
         return DatasetHistogramProcessor._normalize_histogram_for_plotting(
-            DatasetHistogramProcessor._reformat_histogram_dataframe(selected_df)
+            DatasetHistogramProcessor._reformat_histogram_dataframe(
+                selected_df, process_subset=process_subset
+            ),
+            process_subset=process_subset,
         )
 
     def compute_spike_count_distribution(
-        self, df: pd.DataFrame = None, is_test: bool = False
-    ) -> Dict[int, List[Tuple[int, float]]]:
+        self,
+        df: pd.DataFrame = None,
+        is_test: bool = False,
+        process_subset: bool = False,
+        format_to_latex: bool = False,
+    ) -> Union[pd.DataFrame, str]:
         """
-        Computes spike count distribution across all time bins.
+        Computes spike count distribution across all time bins on full dataset.
 
         :param df: Data to compute spike distribution from.
         :param is_test: Flag whether we want to count distribution from test dataset.
-        :return: Returns dictionary of bin size and their distributions of counts.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
+        :param format_to_latex: Whether convert to latex table.
+        :return: Returns pandas or LaTeX table representation of the bin count distribution.
         """
 
         if df is None:
             # DataFrame not specified -> use default one.
-            df = self.prepare_for_plotting(is_test=is_test)
+            df = self.prepare_for_plotting(
+                is_test=is_test, process_subset=process_subset
+            )
+
+        time_step_or_subset_id_column_key = (
+            "time_step" if not process_subset else "subset_id"
+        )
 
         # Group by time_step and bin, summing the counts in each bin
-        grouped = df.groupby(["time_step", "bin"])["count"].sum().reset_index()
+        grouped = (
+            df.groupby([time_step_or_subset_id_column_key, "bin"])["count"]
+            .sum()
+            .reset_index()
+        )
 
         # Normalize within each time_step
         distributions = {}
-        for ts in grouped["time_step"].unique():
-            ts_data = grouped[grouped["time_step"] == ts]
+        for ts in grouped[time_step_or_subset_id_column_key].unique():
+            ts_data = grouped[grouped[time_step_or_subset_id_column_key] == ts]
 
             total_count = ts_data["count"].sum()
             if total_count == 0:
@@ -159,47 +220,49 @@ class DatasetHistogramProcessor:
             ]
             distributions[ts] = dist
 
-        return distributions
+        return DatasetHistogramProcessor.convert_mean_counts_to_pandas_or_latex(
+            distributions,
+            format_to_latex=format_to_latex,
+            process_subset=process_subset,
+        )
 
     @staticmethod
-    def format_distribution_as_latex_table(
-        variant_dict: Dict[int, List[Tuple[int, float]]],
-    ) -> str:
+    def convert_mean_counts_to_pandas_or_latex(
+        distributions: Dict[int, List[Tuple[int, float]]],
+        format_to_latex: bool = False,
+        process_subset: bool = False,
+    ) -> Union[pd.DataFrame, str]:
         """
-        Formats spike count distribution to a Latex Table representation.
+        Converts mean count distribution to either pandas or latex table.
 
-        :param variant_dict: Distribution in format: {num_spikes: {time_bin_size: ratio}}
-        :return: Returns LaTex table representation of the time bin count distribution.
+        :param distribution: Distribution to be converted.
+        :param format_to_latex: Whether convert to latex table.
+        :param process_subset: Flag whether to process subset dataset or not ("subset_id" instead of "time_step")
+        :return: Returns distribution representation in either pandas or latex table.
         """
-        # Step 1: Get all time_steps and all bins (assumes bins are the same for all)
-        time_steps = sorted(variant_dict.keys())
-        bins = sorted({b for counts in variant_dict.values() for b, _ in counts})
-
-        # Step 2: Build a dictionary: bin → list of densities per time_step
-        bin_to_densities = {b: [] for b in bins}
-        for b in bins:
-            for ts in time_steps:
-                density_dict = dict(variant_dict[ts])
-                bin_to_densities[b].append(
-                    density_dict.get(b, 0.0)
-                )  # default to 0 if missing
-
-        # Step 3: Format as LaTeX
-        header = " & ".join(
-            ["\\textbf{Bin}"] + [f"\\textbf{{{ts} ms}}" for ts in time_steps]
+        time_step_or_subset_id_column_key = (
+            "time_step" if not process_subset else "subset_id"
         )
-        lines = [
-            "\\begin{tabular}{r | " + " ".join(["r"] * len(time_steps)) + "}",
-        ]
-        lines.append(header + " \\\\ \\hline")
+        # Convert to DataFrame
+        rows = []
+        for time_step_or_subset, bin_density_list in distributions.items():
+            for spike_count_bin, density in bin_density_list:
+                rows.append(
+                    {
+                        time_step_or_subset_id_column_key: int(time_step_or_subset),
+                        "spike_count_bin": int(spike_count_bin),
+                        "normalized_density": round(density, 6),  # round for clarity
+                    }
+                )
 
-        for b in bins:
-            row = (
-                f"{b} & "
-                + " & ".join([f"{d:.4f}" for d in bin_to_densities[b]])
-                + " \\\\"
-            )
-            lines.append(row)
+        df = pd.DataFrame(rows)
 
-        lines.append("\\end{tabular}")
-        return "\n".join(lines)
+        if format_to_latex:
+            # Covert to LaTeX table
+            return df.pivot(
+                index="spike_count_bin",
+                columns=time_step_or_subset_id_column_key,
+                values="normalized_density",
+            ).to_latex(index=True, float_format="%.4f")
+
+        return df
