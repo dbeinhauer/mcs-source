@@ -124,3 +124,107 @@ def plot_temporal_spiking_correlation_heatmap_for_each_bin_size_full(
         fig.savefig(save_fig, format="pdf", bbox_inches="tight")
     else:
         plt.show()
+
+
+def plot_temporal_spike_distribution_comparison_full_subset(
+    combined_df: pd.DataFrame,
+    is_test: bool = False,
+    save_fig: str = "",
+):
+    """
+    Plots the comparison of the subset and full dataset temporal spike distributions
+    across all layers. Plots Error bars for mean ± SD of the subset dataset and overlays
+    it with the full dataset temporal dynamics.
+
+    :param combined_df: Prepared DataFrame containing the full and subset data.
+    :param is_test: Just placeholder to work properly with plotting function.
+    :param save_fig: Path where to store the figure, if `""` then do not store.
+    """
+    # Create FacetGrid
+    g = sns.FacetGrid(
+        combined_df,
+        col="layer",
+        col_wrap=2,
+        height=4,
+        aspect=1.5,
+        sharex=True,
+        sharey=True,
+    )
+
+    # Plot subset: mean ± SD
+    for ax, (layer_name, layer_df) in zip(
+        g.axes.flatten(), combined_df.groupby("layer")
+    ):
+        # Split full vs subset
+        full_df = layer_df[layer_df["model_type"] == "Full model"]
+        subset_df = layer_df[layer_df["model_type"] == "Subset"]
+
+        # Plot full model (solid black line)
+        sns.lineplot(
+            data=full_df,
+            x="time",
+            y="density",
+            estimator="mean",
+            errorbar="sd",
+            color="black",
+            linewidth=2,
+            linestyle="--",
+            ax=ax,
+            label="Full model",
+        )
+
+        # Plot subset model (dashed, semi-transparent blue)
+        sns.lineplot(
+            data=subset_df,
+            x="time",
+            y="density",
+            estimator="mean",
+            errorbar="sd",
+            color="dodgerblue",
+            linewidth=1.5,
+            linestyle="-",
+            alpha=0.7,
+            ax=ax,
+            label="Subset",
+        )
+
+        ax.set_title(layer_name, fontsize=18)
+        ax.set_xlabel("Time (ms)", fontsize=16)
+        ax.set_ylabel("Spike Density", fontsize=16)
+        ax.tick_params(axis="both", labelsize=12)
+        ax.grid(True, linestyle="--", alpha=0.3)
+        ax.legend_.remove()  # Hide subplot legends
+
+    # Global legend
+    custom_lines = [
+        plt.Line2D(
+            [0],
+            [0],
+            color="dodgerblue",
+            lw=1.5,
+            linestyle="--",
+            alpha=0.7,
+            label="Subset mean ± SD",
+        ),
+        plt.Line2D([0], [0], color="black", lw=1.5, label="Full model"),
+    ]
+    g.figure.legend(
+        handles=custom_lines,
+        loc="upper right",
+        title="Model",
+        title_fontsize=16,
+        fontsize=14,
+        frameon=True,
+    )
+
+    dataset_label = "Test" if is_test else "Train"
+    # Supertitle
+    plt.subplots_adjust(top=0.88, right=0.95)
+    g.figure.suptitle(
+        f"Temporal Dynamics of All Layers\n in {dataset_label} Dataset", fontsize=24
+    )
+
+    if save_fig:
+        g.figure.savefig(save_fig, format="pdf", bbox_inches="tight")
+    else:
+        plt.show()

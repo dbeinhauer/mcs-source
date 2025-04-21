@@ -295,6 +295,95 @@ class TemporalEvolutionProcessor:
             process_subset=process_subset,
         )
 
+    def _prepare_full_dataset_for_subset_comparison(
+        self,
+        original_df: pd.DataFrame = None,
+        is_test: bool = False,
+    ):
+        """
+        Prepares full dataset for plotting temporal dynamics comparison with the subset dataset.
+        Renames "time_step" to "subset_id" and sets it to `"-1"`. Takes only binning of 20ms.
+
+        :param original_df: Full dataset dataframe to be processed.
+        :param is_test: Flag whether to process test dataset.
+        :return: Returns dataframe with columns
+        `["time", "density", "subset_id": str = "-1": str, "layer"]`
+        """
+        if original_df is None:
+            # Dataframe not specified -> use default one.
+            original_df = self.time_evolution_full_dataset_df
+
+        selected_df = DatasetResultsProcessor.get_dataset_type(
+            original_df, is_test=is_test
+        )
+        # Select only time steps 20.
+        selected_df = selected_df[selected_df["time_step"] == 20]
+
+        # Replace #"time_step" with "subset_id" for processing as subset dataset.
+        selected_df = selected_df.rename(columns={"time_step": "subset_id"})
+        # Set subset_id to -1 for full dataset. Use string for consistency.
+        selected_df["subset_id"] = "-1"
+        # Process full dataset as the subset dataset.
+        selected_df = self.prepare_for_plotting(
+            selected_df,
+            process_subset=True,
+            is_test=False,
+        )
+
+        return selected_df
+
+    def prepare_for_plotting_subset_full_comparison(
+        self, is_test: bool = False
+    ) -> pd.DataFrame:
+        """
+        Prepares data of both full and subset dataset for plotting comparison of the temporal
+        dynamics across all layers. The full dataset is processed as subset dataset with
+        `"subset_id"` set to `"-1"`.
+
+        :param is_test: Flag whether to process test dataset.
+        :return: Returns dataframe with columns of both full and subset dataset in format
+        `["time", "density", "subset_id": str, "layer"]`
+        """
+
+        full_df = self._prepare_full_dataset_for_subset_comparison(is_test=is_test)
+        subset_df = self.prepare_for_plotting(is_test=is_test, process_subset=True)
+
+        combined_df = pd.concat([subset_df, full_df], ignore_index=True)
+        # Ensure subset_id is string
+        combined_df["subset_id"] = combined_df["subset_id"].astype(str)
+
+        # Create a new column to distinguish full vs subset for plotting
+        combined_df["model_type"] = combined_df["subset_id"].apply(
+            lambda x: "Full model" if x == "-1" else "Subset"
+        )
+
+        # Mapping of the 20 ms time steps to original 1ms resolution.
+        combined_df["time"] *= 20
+        # Pad the rest of the plot with the artificial last entry to 711 ms with the last value.
+        last_entries = (
+            combined_df.groupby(["layer", "subset_id"])
+            .apply(lambda df: df[df["time"] == df["time"].max()])
+            .reset_index(drop=True)
+        )
+        last_entries["time"] = 711
+        combined_df = pd.concat([combined_df, last_entries], ignore_index=True)
+
+        desired_order = [
+            "X_ON",
+            "X_OFF",
+            "V1_Exc_L4",
+            "V1_Inh_L4",
+            "V1_Exc_L23",
+            "V1_Inh_L23",
+        ]
+
+        # Ensure the order of the layers.
+        combined_df["layer"] = pd.Categorical(
+            combined_df["layer"], categories=desired_order, ordered=True
+        )
+
+        return combined_df
+
     def compute_correlation_matrix_full(
         self, original_df: pd.DataFrame = None, is_test: bool = False
     ) -> pd.DataFrame:

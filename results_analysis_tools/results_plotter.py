@@ -10,6 +10,7 @@ from results_analysis_tools.plotting.time_bin_count_distribution import (
 from results_analysis_tools.plotting.temporal_spike_distribution import (
     plot_temporal_spike_distribution_for_dataset_data_full,
     plot_temporal_spiking_correlation_heatmap_for_each_bin_size_full,
+    plot_temporal_spike_distribution_comparison_full_subset,
 )
 from results_analysis_tools.plotting.synchrony_comparison import (
     plot_synchrony_boxplot_across_layers_full,
@@ -27,7 +28,7 @@ class ResultsPlotter:
         PlottingVariants.FULL_TEMPORAL_SPIKE_DISTRIBUTION: plot_temporal_spike_distribution_for_dataset_data_full,
         PlottingVariants.FULL_CORRELATION_MATRIX_BIN_SIZE_TEMPORAL_DATASET: plot_temporal_spiking_correlation_heatmap_for_each_bin_size_full,
         PlottingVariants.FULL_SYNCHRONY_TIME_BINS: plot_synchrony_boxplot_across_layers_full,
-        PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION: None,
+        PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION: plot_temporal_spike_distribution_comparison_full_subset,
     }
 
     @staticmethod
