@@ -102,13 +102,11 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
             ].prepare_for_plotting(is_test=is_test, process_subset=False)
-        if variant == PlottingVariants.SUBSET_TIME_BIN_COUNT_RATIO:
-            # Plotting variant not implement yet.
-            return None
         if variant == PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION:
             # Plotting variant not implement yet.
-            return None
-
+            return self.all_plugins[
+                PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
+            ].prepare_for_plotting(is_test=is_test, process_subset=True)
         # Plotting variant not implement yet.
         return None
 
@@ -127,6 +125,34 @@ class ResultAnalyzer:
         :return: Returns ratios of each spike count for each time binning as either
         dictionary of LaTeX table representation.
         """
+
+        if process_subset:
+            # If process subset dataset -> compare mean subset vs full dataset.
+            full_df = self.all_plugins[
+                PluginVariants.DATASET_HISTOGRAM_PROCESSOR
+            ].compute_spike_count_distribution(
+                is_test=is_test,
+                process_subset=False,
+                format_to_latex=False,
+            )
+            subset_df = self.all_plugins[
+                PluginVariants.DATASET_HISTOGRAM_PROCESSOR
+            ].compute_spike_count_distribution(
+                is_test=is_test,
+                process_subset=True,
+                format_to_latex=False,
+            )
+
+            full_df = full_df[full_df["time_step"] == 20]
+
+            return self.all_plugins[
+                PluginVariants.DATASET_HISTOGRAM_PROCESSOR
+            ].summarize_global_density_vs_full(
+                subset_df,
+                full_df,
+                format_to_latex=format_to_latex,
+            )
+
         return self.all_plugins[
             PluginVariants.DATASET_HISTOGRAM_PROCESSOR
         ].compute_spike_count_distribution(
@@ -187,4 +213,6 @@ if __name__ == "__main__":
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
 
-    print(result_analyzer.get_mean_spike_counts(False, format_to_latex=True))
+    subset_df = result_analyzer.prepare_dataframe_for_plot(
+        variant=PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION
+    )

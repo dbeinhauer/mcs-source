@@ -19,7 +19,6 @@ class PlottingVariants(Enum):
     FULL_SYNCHRONY_TIME_BINS = "full_synchrony_time_bins"
 
     # Subset dataset analyses (for all model subset variants).
-    SUBSET_TIME_BIN_COUNT_RATIO = "subset_time_bin_count_ratio"
     SUBSET_TEMPORAL_SPIKE_DISTRIBUTION = "subset_temporal_spike_distribution"
 
 

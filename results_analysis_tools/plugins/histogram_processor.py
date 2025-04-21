@@ -266,3 +266,56 @@ class DatasetHistogramProcessor:
             ).to_latex(index=True, float_format="%.4f")
 
         return df
+
+    def summarize_global_density_vs_full(
+        self,
+        subset_df: pd.DataFrame,
+        full_df: pd.DataFrame,
+        format_to_latex: bool = False,
+    ) -> Union[pd.DataFrame, str]:
+        """
+        Computes the average density of spike counts across all layers of all subsets
+        and compares it to the full dataset density of time step 20.
+
+        :param subset_df: Dataframe of subset dataset.
+        :param full_df: Dataframe of full dataset.
+        :param format_to_latex: Flag whether to return LaTeX table.
+        :return: Returns summary of spike count density across all layers
+        and subsets as dataframe of LaTeX table.
+        """
+
+        # Average full model densities across layers
+        full_avg = (
+            full_df.groupby("spike_count_bin")["normalized_density"]
+            .mean()
+            .reset_index()
+            .rename(columns={"normalized_density": "full_density"})
+        )
+
+        # Average subset densities across subset_id AND layer
+        subset_avg = (
+            subset_df.groupby(["subset_id", "spike_count_bin"])["normalized_density"]
+            .mean()  # average across layers for each subset
+            .reset_index()
+            .groupby("spike_count_bin")["normalized_density"]
+            .agg(subset_mean="mean", subset_std="std")
+            .reset_index()
+        )
+
+        # Merge both summaries
+        summary = pd.merge(full_avg, subset_avg, on="spike_count_bin")
+        summary = summary[
+            ["spike_count_bin", "full_density", "subset_mean", "subset_std"]
+        ]
+        summary = summary.round(4)
+
+        if format_to_latex:
+            # Return LaTeX table.
+            return summary.to_latex(
+                index=False,
+                float_format="%.4f",
+                caption="Spike Count Density Summary Averaged Across All Layers",
+                label="tab:spike_density_global",
+            )
+
+        return summary

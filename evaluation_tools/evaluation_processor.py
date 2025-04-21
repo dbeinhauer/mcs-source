@@ -308,7 +308,7 @@ class EvaluationProcessor:
             subset_variant=(
                 # Make sure we do not specify subset ID if full dataset analysis.
                 -1
-                if EvaluationProcessorChoices.FULL_DATASET_ANALYSIS
+                if arguments.action == EvaluationProcessorChoices.FULL_DATASET_ANALYSIS
                 else arguments.dataset_subset_id
             ),
         )

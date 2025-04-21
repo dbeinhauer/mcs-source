@@ -241,15 +241,21 @@ class TemporalEvolutionProcessor:
                 times = row["padded_time"]
                 counts = row["padded_counts"] / time_step_or_subset_id
 
-                for t, c in zip(times, counts):
-                    long_df.append(
-                        {
-                            "time": t,
-                            "density": c,
-                            time_step_or_subset_id_column_key: f"{time_step_or_subset_id} ms",  # string for hue
-                            "layer": layer,
-                        }
-                    )
+            time_or_subset_string = (
+                f"{time_step_or_subset_id} ms"
+                if not process_subset
+                else time_step_or_subset_id
+            )
+
+            for t, c in zip(times, counts):
+                long_df.append(
+                    {
+                        "time": t,
+                        "density": c,
+                        time_step_or_subset_id_column_key: time_or_subset_string,  # string for hue
+                        "layer": layer,
+                    }
+                )
 
         return pd.DataFrame(long_df)
 
