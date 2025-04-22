@@ -18,6 +18,7 @@ from results_analysis_tools.plotting.synchrony_comparison import (
 )
 from results_analysis_tools.plotting.model_variants_comparison import (
     plot_model_types_pearson_normalized_box_plot,
+    plot_model_variant_p_value_heatmap_cc_norm,
 )
 from results_analysis_tools.fields.experiment_analyses import PlottingVariants
 
@@ -35,6 +36,7 @@ class ResultsPlotter:
         PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION: plot_temporal_spike_distribution_comparison_full_subset,
         PlottingVariants.SUBSET_SYNCHRONY_TIME_BINS: plot_synchrony_boxplot_jitter_subset_full_comparison,
         PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON: plot_model_types_pearson_normalized_box_plot,
+        PlottingVariants.MODEL_TYPES_P_VALUES_HEATMAP: plot_model_variant_p_value_heatmap_cc_norm,
     }
 
     @staticmethod

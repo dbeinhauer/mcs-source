@@ -2,9 +2,14 @@
 This encapsulates the processing of the weights and biases results.
 """
 
-from typing import Dict
+from typing import Dict, Union
 
+import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import mannwhitneyu
+from itertools import product
 
 from evaluation_tools.fields.evaluation_processor_fields import (
     EvaluationProcessorChoices,
@@ -21,6 +26,8 @@ class WandbSummaryProcessor:
 
     # Mapping of the metric names to be used in the plot.
     metric_name_mapping_for_plot = {"CC_ABS": "Pearson CC", "CC_NORM": "Normalized CC"}
+    # Mapping of metric name for tables (compressed versions).
+    metric_name_mapping_for_table = {"Pearson CC": "P-CC", "Normalized CC": "N-CC"}
 
     # Mapping of evaluation hyperparameters for the table of overview.
     evaluation_hyperparameters_name_mapping = {
@@ -79,6 +86,8 @@ class WandbSummaryProcessor:
             WandbSummaryProcessor.metric_name_mapping_for_plot
         )
 
+        df_melted = EvaluationResultsProcessor.ensure_model_type_order(df_melted)
+
         return df_melted
 
     def prepare_latex_evaluation_setup_table(
@@ -101,7 +110,7 @@ class WandbSummaryProcessor:
             original_df
         )
 
-        # Step 1: Filter for subset_variant == 0
+        # Filter for subset_variant == 0
         filtered_df = original_df[original_df["subset_variant"] == 0]
 
         table_df = filtered_df[
@@ -117,7 +126,7 @@ class WandbSummaryProcessor:
             columns=WandbSummaryProcessor.evaluation_hyperparameters_name_mapping
         )
 
-        # Step 4: Convert to LaTeX
+        # Convert to LaTeX
         latex_table = table_df.to_latex(
             index=False,
             escape=True,
@@ -127,3 +136,92 @@ class WandbSummaryProcessor:
         )
 
         return latex_table
+
+    def prepare_evaluation_results_summary(
+        self, return_latex: bool = False
+    ) -> Union[pd.DataFrame, str]:
+        """
+        :param return_latex: Flag whether return LaTeX table summary.
+        :return: Returns summary of model evaluation results.
+        """
+
+        df = self.prepare_model_comparison_summary_for_plotting()
+        df["Correlation Type"] = df["Correlation Type"].map(
+            WandbSummaryProcessor.metric_name_mapping_for_table
+        )
+
+        summary_stats = (
+            df.groupby(["model_variant", "Correlation Type"])["Correlation Value"]
+            .agg(["mean", "std"])
+            .reset_index()
+        )
+
+        # Pivot to wide format
+        summary_table = summary_stats.pivot(
+            index="model_variant", columns="Correlation Type", values=["mean", "std"]
+        )
+
+        # Flatten MultiIndex columns
+        summary_table.columns = [
+            f"{metric} ({stat})" for stat, metric in summary_table.columns
+        ]
+        summary_table = summary_table.reset_index()
+
+        # Round values
+        summary_table = summary_table.round(4)
+
+        # Sort (by normalized CC mean)
+        summary_table = summary_table.sort_values(by="N-CC (mean)", ascending=False)
+
+        if return_latex:
+            # Export to LaTeX
+            return summary_table.to_latex(
+                index=False,
+                escape=True,
+                float_format="%.4f",
+                caption="Summary of Model Performance Metrics:",
+                label="tab:model_summary_extended",
+                column_format="lrrrrrrrr",
+            )
+
+        return summary_table
+
+    def mann_whitney_paired_evaluation_models_test_cc_norm(
+        self, original_df: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """
+        Runs pair-wise one-sided paired Mann-Whitney U-test between the normalized
+        cross correlation values of the model variants.
+        The test assumes hypothesis:
+            H_0: x <= y
+            H_1: x > y
+
+        :param original_df: Dataframe of model results.
+        :return: Returns paired p-value matrix of each ordered pairs of model variants.
+        """
+
+        original_df = self.prepare_model_comparison_summary_for_plotting()
+
+        # Filter for Normalized CC
+        ncc_df = original_df[original_df["Correlation Type"] == "Normalized CC"]
+
+        # Prepare model list
+        models = sorted(ncc_df["model_variant"].unique())
+
+        # Initialize p-value matrix
+        pval_matrix = pd.DataFrame(index=models, columns=models, dtype=float)
+
+        # Pairwise one-sided Mann-Whitney U tests
+        for model_i, model_j in product(models, repeat=2):
+            if model_i == model_j:
+                pval_matrix.loc[model_i, model_j] = np.nan
+                continue
+
+            x = ncc_df[ncc_df["model_variant"] == model_i]["Correlation Value"]
+            y = ncc_df[ncc_df["model_variant"] == model_j]["Correlation Value"]
+
+            # One-sided test: H0: x <= y, H1: x > y
+            stat, p = mannwhitneyu(x, y, alternative="greater")
+            pval_matrix.loc[model_i, model_j] = p
+
+        return pval_matrix

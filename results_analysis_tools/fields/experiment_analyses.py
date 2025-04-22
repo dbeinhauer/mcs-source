@@ -24,6 +24,7 @@ class PlottingVariants(Enum):
 
     # Evaluation results plotting.
     MODEL_TYPES_CORRELATION_COMPARISON = "model_types_correlation_comparison"
+    MODEL_TYPES_P_VALUES_HEATMAP = "model_types_p_values_heatmap"
 
 
 class PluginVariants(Enum):

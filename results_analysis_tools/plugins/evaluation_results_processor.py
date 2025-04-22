@@ -158,3 +158,26 @@ class EvaluationResultsProcessor:
         )
 
         return df
+
+    @staticmethod
+    def ensure_model_type_order(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        :param df: Dataframe to modify.
+        :return: Returns dataframe with the model type column ordered in a specific way for plotting.
+        """
+        desired_order = [
+            "simple (tanh)",
+            "simple (leakytanh)",
+            "dnn joint",
+            "dnn separate",
+            "rnn (5 steps)",
+            "rnn (10 steps)",
+            "syn adapt lgn (5 steps)",
+            "syn adapt lgn (10 steps)",
+        ]
+
+        # Ensure the order of the layers.
+        df["model_variant"] = pd.Categorical(
+            df["model_variant"], categories=desired_order, ordered=True
+        )
+        return df

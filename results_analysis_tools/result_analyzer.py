@@ -120,6 +120,10 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.WANDB_SUMMARY_PROCESSOR
             ].prepare_model_comparison_summary_for_plotting()
+        if variant == PlottingVariants.MODEL_TYPES_P_VALUES_HEATMAP:
+            return self.all_plugins[
+                PluginVariants.WANDB_SUMMARY_PROCESSOR
+            ].mann_whitney_paired_evaluation_models_test_cc_norm()
 
         # Plotting variant not implement yet.
         return None
@@ -224,6 +228,17 @@ class ResultAnalyzer:
             PluginVariants.WANDB_SUMMARY_PROCESSOR
         ].prepare_latex_evaluation_setup_table()
 
+    def get_evaluation_results_summary(
+        self, return_latex: bool = False
+    ) -> Union[pd.DataFrame, str]:
+        """
+        :param return_latex: Whether to return summary as LaTeX table.
+        :return: Return model variant evaluation summary as table.
+        """
+        return self.all_plugins[
+            PluginVariants.WANDB_SUMMARY_PROCESSOR
+        ].prepare_evaluation_results_summary(return_latex=return_latex)
+
 
 if __name__ == "__main__":
     EVALUATION_RESULTS_BASE = "/analysis_results"
@@ -236,5 +251,5 @@ if __name__ == "__main__":
     result_analyzer = ResultAnalyzer(analysis_paths)
 
     plot_data = result_analyzer.prepare_dataframe_for_plot(
-        PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON
+        PlottingVariants.MODEL_TYPES_P_VALUES_HEATMAP
     )
