@@ -22,6 +22,9 @@ class PlottingVariants(Enum):
     SUBSET_TEMPORAL_SPIKE_DISTRIBUTION = "subset_temporal_spike_distribution"
     SUBSET_SYNCHRONY_TIME_BINS = "subset_synchrony_time_bins"
 
+    # Evaluation results plotting.
+    MODEL_TYPES_CORRELATION_COMPARISON = "model_types_correlation_comparison"
+
 
 class PluginVariants(Enum):
     """
@@ -31,3 +34,4 @@ class PluginVariants(Enum):
     DATASET_HISTOGRAM_PROCESSOR = "dataset_histogram_processor"
     TEMPORAL_EVOLUTION_PROCESSOR = "temporal_evolution_processor"
     SYNCHRONY_TIME_BINS_PROCESSOR = "synchrony_time_bins_processor"
+    WANDB_SUMMARY_PROCESSOR = "wandb_summary_processor"

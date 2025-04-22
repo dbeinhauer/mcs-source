@@ -144,7 +144,7 @@ class EvaluationProcessor:
             ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
             ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
             ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
-            ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10,
+            # ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10,
         ],
         WandbExperimentVariants.ADDITIONAL: [
             AdditionalExperiments.DATASET_SUBSET_SIZE,

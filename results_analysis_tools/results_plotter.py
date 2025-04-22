@@ -16,6 +16,9 @@ from results_analysis_tools.plotting.synchrony_comparison import (
     plot_synchrony_boxplot_across_layers_full,
     plot_synchrony_boxplot_jitter_subset_full_comparison,
 )
+from results_analysis_tools.plotting.model_variants_comparison import (
+    plot_model_types_pearson_normalized_box_plot,
+)
 from results_analysis_tools.fields.experiment_analyses import PlottingVariants
 
 
@@ -31,6 +34,7 @@ class ResultsPlotter:
         PlottingVariants.FULL_SYNCHRONY_TIME_BINS: plot_synchrony_boxplot_across_layers_full,
         PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION: plot_temporal_spike_distribution_comparison_full_subset,
         PlottingVariants.SUBSET_SYNCHRONY_TIME_BINS: plot_synchrony_boxplot_jitter_subset_full_comparison,
+        PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON: plot_model_types_pearson_normalized_box_plot,
     }
 
     @staticmethod

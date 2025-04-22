@@ -46,6 +46,7 @@ from results_analysis_tools.plugins.temporal_evolution_processor import (
 from results_analysis_tools.plugins.synchrony_experiments_processor import (
     SynchronyExperimentsProcessor,
 )
+from results_analysis_tools.plugins.wandb_summary_processor import WandbSummaryProcessor
 
 
 class ResultAnalyzer:
@@ -68,6 +69,9 @@ class ResultAnalyzer:
                 self.all_results
             ),
             PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR: SynchronyExperimentsProcessor(
+                self.all_results
+            ),
+            PluginVariants.WANDB_SUMMARY_PROCESSOR: WandbSummaryProcessor(
                 self.all_results
             ),
         }
@@ -112,6 +116,10 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
             ].prepare_for_plotting_subset_full_comparison(is_test=is_test)
+        if variant == PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON:
+            return self.all_plugins[
+                PluginVariants.WANDB_SUMMARY_PROCESSOR
+            ].prepare_model_comparison_summary_for_plotting()
 
         # Plotting variant not implement yet.
         return None
@@ -208,18 +216,25 @@ class ResultAnalyzer:
             is_test=is_test, process_subset=process_subset, return_latex=return_latex
         )
 
+    def get_latex_evaluation_setup(self) -> str:
+        """
+        :return: Returns prepared LaTeX table representation of the model evaluation setup.
+        """
+        return self.all_plugins[
+            PluginVariants.WANDB_SUMMARY_PROCESSOR
+        ].prepare_latex_evaluation_setup_table()
+
 
 if __name__ == "__main__":
     EVALUATION_RESULTS_BASE = "/analysis_results"
     analysis_paths = {
         EvaluationProcessorChoices.FULL_DATASET_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.FULL_DATASET_ANALYSIS.value}/",
         EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS.value}/",
-        # EvaluationProcessorChoices.WANDB_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.WANDB_ANALYSIS.value}/",
+        EvaluationProcessorChoices.WANDB_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.WANDB_ANALYSIS.value}/results.pkl",
         EvaluationProcessorChoices.PREDICTION_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.PREDICTION_ANALYSIS.value}/",
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
 
-    synchrony_exp_proc = SynchronyExperimentsProcessor(result_analyzer.get_all_results)
-    subset_df = synchrony_exp_proc.prepare_for_plotting(
-        is_test=False, process_subset=True
+    plot_data = result_analyzer.prepare_dataframe_for_plot(
+        PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON
     )

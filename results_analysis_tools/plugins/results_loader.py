@@ -56,6 +56,7 @@ class ResultsLoader:
         """
         self.load_full_dataset()
         self.load_subset_dataset()
+        self.load_wandb_results()
         self.load_evaluation_analyses()
 
         return self.all_results
@@ -138,6 +139,22 @@ class ResultsLoader:
             ],
         )
 
+    def load_wandb_results(self, path: str = "") -> pd.DataFrame:
+        """
+        Loads all weights and biases results from extracted pickled dataframe.
+
+        :param path: Path to pickled wandb data. If `""` then load from the default path.
+        :return: Returns loaded wandb results in pandas dataframe.
+        """
+        if not path:
+            # Load default path to wandb results.
+            path = self.results_to_load[EvaluationProcessorChoices.WANDB_ANALYSIS]
+
+        wandb_results = load_pickle_file(path)
+        self.all_results[EvaluationProcessorChoices.WANDB_ANALYSIS] = wandb_results
+
+        return wandb_results
+
     def load_evaluation_analyses(self, base_path: str = "") -> pd.DataFrame:
         """
         Loads all analyses of the evaluation results of all model variants.
@@ -158,6 +175,7 @@ class ResultsLoader:
                         ModelEvaluationRunVariant.DNN_SEPARATE,
                         ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
                         ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
+                        ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
                     ],
                 )
             ],
