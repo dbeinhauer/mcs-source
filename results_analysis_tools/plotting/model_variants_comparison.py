@@ -8,7 +8,9 @@ import seaborn as sns
 
 
 def plot_model_types_pearson_normalized_box_plot(
-    df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
+    df: pd.DataFrame,
+    is_test: bool = False,
+    save_fig: str = "",
 ):
     """
     Plots box plot of pearson and normalized cross correlations of each model

@@ -22,9 +22,17 @@ class PlottingVariants(Enum):
     SUBSET_TEMPORAL_SPIKE_DISTRIBUTION = "subset_temporal_spike_distribution"
     SUBSET_SYNCHRONY_TIME_BINS = "subset_synchrony_time_bins"
 
-    # Evaluation results plotting.
+    # Evaluation results overview.
     MODEL_TYPES_CORRELATION_COMPARISON = "model_types_correlation_comparison"
     MODEL_TYPES_P_VALUES_HEATMAP = "model_types_p_values_heatmap"
+
+    # Evaluation results separate model plotting:
+    SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION = (
+        "separate_temporal_behavior_target_prediction"
+    )
+    SEPARATE_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED = (
+        "separate_temporal_behavior_teacher_forced_included"
+    )
 
 
 class PluginVariants(Enum):
@@ -36,3 +44,4 @@ class PluginVariants(Enum):
     TEMPORAL_EVOLUTION_PROCESSOR = "temporal_evolution_processor"
     SYNCHRONY_TIME_BINS_PROCESSOR = "synchrony_time_bins_processor"
     WANDB_SUMMARY_PROCESSOR = "wandb_summary_processor"
+    BATCH_PREDICTION_PROCESSOR = "batch_prediction_processor"

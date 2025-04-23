@@ -45,6 +45,24 @@ class EvaluationResultsProcessor:
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10: "syn adapt lgn (10 steps)",
     }
 
+    desired_model_order = [
+        "simple (tanh)",
+        "simple (leakytanh)",
+        "dnn joint",
+        "dnn separate",
+        "rnn (5 steps)",
+        "rnn (10 steps)",
+        "syn adapt lgn (5 steps)",
+        "syn adapt lgn (10 steps)",
+    ]
+
+    desired_layer_order = [
+        "V1_Exc_L4",
+        "V1_Inh_L4",
+        "V1_Exc_L23",
+        "V1_Inh_L23",
+    ]
+
     # WANDB RESULTS LOADING:
     @staticmethod
     def get_wandb_results(
@@ -128,18 +146,18 @@ class EvaluationResultsProcessor:
         return df[df["analysis_name"] == analysis_name]
 
     @staticmethod
-    def get_data_variant(
-        df: pd.DataFrame, data_variant: PredictionAnalysisVariants
+    def get_variant_type(
+        df: pd.DataFrame, variant_type: PredictionAnalysisVariants
     ) -> pd.DataFrame:
         """
         :param df: Dataframe to take the analysis.
-        :param data_variant: Type of the data variant of the analysis (either target, prediction,
+        :param variant_type: Type of the data variant of the analysis (either target, prediction,
         teacher-forced predictions or appropriate pairs based on the analysis type). Note that one
         needs to be careful when using this function as the data variant is not always defined for the
         selected analysis.
         :return: Returns dataframe rows that match the selected data variant.
         """
-        return df[df["data_variant"] == data_variant]
+        return df[df["variant_type"] == variant_type]
 
     @staticmethod
     def map_model_name_for_plotting(
@@ -160,24 +178,42 @@ class EvaluationResultsProcessor:
         return df
 
     @staticmethod
+    def map_eval_to_values(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+        """
+        :param df: Dataframe.
+        :param column_name: Name of the column to map the values.
+        :return: Returns dataframe with selected column with enum values.
+        """
+        df[column_name] = df[column_name].apply(lambda x: x.value)
+
+        return df
+
+    @staticmethod
     def ensure_model_type_order(df: pd.DataFrame) -> pd.DataFrame:
         """
         :param df: Dataframe to modify.
         :return: Returns dataframe with the model type column ordered in a specific way for plotting.
         """
-        desired_order = [
-            "simple (tanh)",
-            "simple (leakytanh)",
-            "dnn joint",
-            "dnn separate",
-            "rnn (5 steps)",
-            "rnn (10 steps)",
-            "syn adapt lgn (5 steps)",
-            "syn adapt lgn (10 steps)",
-        ]
 
         # Ensure the order of the layers.
         df["model_variant"] = pd.Categorical(
-            df["model_variant"], categories=desired_order, ordered=True
-        )
+            df["model_variant"],
+            categories=EvaluationResultsProcessor.desired_model_order,
+            ordered=True,
+        ).remove_unused_categories()
+        return df
+
+    @staticmethod
+    def ensure_layer_type_order(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        :param df: Dataframe to modify.
+        :return: Returns dataframe with the model type column ordered in a specific way for plotting.
+        """
+
+        # Ensure the order of the layers.
+        df["layer_name"] = pd.Categorical(
+            df["layer_name"],
+            categories=EvaluationResultsProcessor.desired_layer_order,
+            ordered=True,
+        ).remove_unused_categories()
         return df

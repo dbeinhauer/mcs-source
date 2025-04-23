@@ -47,6 +47,14 @@ from results_analysis_tools.plugins.synchrony_experiments_processor import (
     SynchronyExperimentsProcessor,
 )
 from results_analysis_tools.plugins.wandb_summary_processor import WandbSummaryProcessor
+from results_analysis_tools.plugins.batch_prediction_analysis_processor import (
+    BatchPredictionAnalysisProcessor,
+)
+from evaluation_tools.fields.prediction_analysis_fields import (
+    BatchSummaryFields,
+    EvaluationPairsVariants,
+)
+from nn_model.type_variants import EvaluationFields
 
 
 class ResultAnalyzer:
@@ -74,6 +82,9 @@ class ResultAnalyzer:
             PluginVariants.WANDB_SUMMARY_PROCESSOR: WandbSummaryProcessor(
                 self.all_results
             ),
+            PluginVariants.BATCH_PREDICTION_PROCESSOR: BatchPredictionAnalysisProcessor(
+                self.all_results
+            ),
         }
 
     @property
@@ -84,7 +95,10 @@ class ResultAnalyzer:
         return self.all_results
 
     def prepare_dataframe_for_plot(
-        self, variant: PlottingVariants, is_test: bool = False
+        self,
+        variant: PlottingVariants,
+        is_test: bool = False,
+        synchrony_curve_kwargs: Dict = {},
     ) -> pd.DataFrame:
 
         if variant == PlottingVariants.FULL_TIME_BIN_COUNT_RATIO:
@@ -124,6 +138,16 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.WANDB_SUMMARY_PROCESSOR
             ].mann_whitney_paired_evaluation_models_test_cc_norm()
+        if variant == PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION:
+            return self.all_plugins[
+                PluginVariants.BATCH_PREDICTION_PROCESSOR
+            ].prepare_for_plotting_synchrony_curves(
+                variants_to_plot=[
+                    EvaluationFields.PREDICTIONS,
+                    EvaluationFields.TARGETS,
+                ],
+                **synchrony_curve_kwargs,  # Kwargs specifying model and optionally layers.
+            )
 
         # Plotting variant not implement yet.
         return None
@@ -251,5 +275,8 @@ if __name__ == "__main__":
     result_analyzer = ResultAnalyzer(analysis_paths)
 
     plot_data = result_analyzer.prepare_dataframe_for_plot(
-        PlottingVariants.MODEL_TYPES_P_VALUES_HEATMAP
+        PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION,
+        synchrony_curve_kwargs={
+            "model_variants": [ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10],
+        },
     )

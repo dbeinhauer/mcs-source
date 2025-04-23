@@ -6,8 +6,7 @@ from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+
 from scipy.stats import mannwhitneyu
 from itertools import product
 
