@@ -6,6 +6,8 @@ from typing import Dict, Union, List
 
 import numpy as np
 import pandas as pd
+from scipy.stats import pearsonr
+
 
 from evaluation_tools.fields.evaluation_processor_fields import (
     EvaluationProcessorChoices,
@@ -23,6 +25,7 @@ from evaluation_tools.fields.experiment_parameters_fields import (
     ModelEvaluationRunVariant,
     AdditionalExperiments,
 )
+from results_analysis_tools.plugins.wandb_summary_processor import WandbSummaryProcessor
 
 from nn_model.type_variants import LayerType
 import nn_model.globals
@@ -32,10 +35,17 @@ class BatchPredictionAnalysisProcessor:
 
     num_trials = 20
 
+    models_tbptt = [
+        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
+        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
+        ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
+    ]
+
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
         self.all_batch_evaluation_results = (
             EvaluationResultsProcessor.get_evaluation_results(all_results)
         )
+        self.wandb_processor = WandbSummaryProcessor(all_results)
 
     @staticmethod
     def _mean_synchrony(df: pd.DataFrame) -> pd.DataFrame:
@@ -128,7 +138,9 @@ class BatchPredictionAnalysisProcessor:
             .assign(time=-1)  # artificial time step
         )
 
-        return pd.concat([mean_rows, df], ignore_index=True)
+        df = pd.concat([mean_rows, df], ignore_index=True)
+        df["time"] += 1
+        return df
 
     def prepare_for_plotting_synchrony_curves(
         self,
@@ -179,4 +191,124 @@ class BatchPredictionAnalysisProcessor:
                     )
                 )
             )
+        )
+
+    def prepare_pearson_cc_synchrony(
+        self,
+        df: pd.DataFrame = None,
+        prediction_variants=("predictions", "train_like_predictions"),
+        target_variant="targets",
+    ) -> pd.DataFrame:
+        """
+        Computes Pearson CC for synchrony curves between specified predictions and target.
+
+        :param df: Input DataFrame with columns: model_variant, layer_name, variant_type, subset_index, time, synchrony
+        :param prediction_variants: Tuple of prediction variant types to compare (default: free + TF)
+        :param target_variant: Label for the target synchrony curves
+        :return: DataFrame with columns: model_variant, layer_name, subset_variant, variant_type, pearson_synchrony
+        """
+        df = self.prepare_for_plotting_synchrony_curves(df)
+
+        all_results = []
+
+        for pred_variant in prediction_variants:
+            df_filtered = df[df["variant_type"].isin([pred_variant, target_variant])]
+
+            sync_wide = (
+                df_filtered.pivot_table(
+                    index=["model_variant", "layer_name", "subset_index", "time"],
+                    columns="variant_type",
+                    values="synchrony",
+                )
+                .dropna()
+                .reset_index()
+            )
+
+            for (model, layer, trial), group in sync_wide.groupby(
+                ["model_variant", "layer_name", "subset_index"]
+            ):
+                pred = group[pred_variant].values
+                target = group[target_variant].values
+                pearson, _ = pearsonr(pred, target)
+
+                all_results.append(
+                    {
+                        "model_variant": model,
+                        "layer_name": layer,
+                        "subset_variant": trial,
+                        "variant_type": pred_variant,
+                        "pearson_synchrony": pearson,
+                    }
+                )
+
+        return pd.DataFrame(all_results)
+
+    def combine_overall_and_synchrony_pearson_for_plotting(self) -> pd.DataFrame:
+        """
+        :return: Returns dataframe with both synchrony and overall pearson CC.
+        """
+        synchrony_pearson = self.prepare_pearson_cc_synchrony()
+        overall_pearson = self.wandb_processor.prepare_raw_for_plotting()
+
+        synchrony_pearson = synchrony_pearson[
+            synchrony_pearson["variant_type"].isin(["predictions"])
+        ]
+
+        df_combined = pd.merge(
+            synchrony_pearson[
+                ["model_variant", "layer_name", "subset_variant", "pearson_synchrony"]
+            ],
+            overall_pearson.rename(columns={"CC_ABS": "pearson_overall"})[
+                ["model_variant", "subset_variant", "pearson_overall"]
+            ],
+            on=["model_variant", "subset_variant"],
+        )
+
+        # Melt:
+        df_combined = df_combined.melt(
+            id_vars=["model_variant", "layer_name", "subset_variant"],
+            value_vars=["pearson_overall", "pearson_synchrony"],
+            var_name="Metric",
+            value_name="Value",
+        )
+
+        # Compute mean across layers:
+        return (
+            df_combined.groupby(["model_variant", "subset_variant", "Metric"])["Value"]
+            .mean()
+            .reset_index()
+        )
+
+    def prepare_for_free_forced_drift_plot(self) -> pd.DataFrame:
+        """ "
+        :return: Prepared drift free-forced data for plotting temporal behavior.
+        """
+        drift_df = EvaluationResultsProcessor.get_analysis_type(
+            self.all_batch_evaluation_results,
+            BatchSummaryFields.DRIFT_FREE_FORCED,
+        )
+
+        drift_df = drift_df[
+            drift_df["model_variant"].isin(
+                BatchPredictionAnalysisProcessor.models_tbptt
+            )
+        ]
+
+        rows = []
+
+        for _, row in drift_df.iterrows():
+            model = row["model_variant"]
+            layer = row["layer_name"]
+            drift = row["value"]  # shape: [num_subsets, num_batches, batch_size, time]
+
+            # Collapse all trials into one big pool
+            mean_drift = drift.mean(axis=(0, 1, 2))  # → shape: [time]
+
+            for t, d in enumerate(mean_drift):
+                rows.append(
+                    {"model_variant": model, "layer_name": layer, "time": t, "drift": d}
+                )
+
+        return EvaluationResultsProcessor.map_model_name_for_plotting(
+            pd.DataFrame(rows)
         )

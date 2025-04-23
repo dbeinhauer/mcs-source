@@ -34,7 +34,7 @@ def plot_multiple_models_teacher_forced(df: pd.DataFrame, save_fig: str = ""):
     # Add vertical line to each subplot at stimulus change time
     def add_vline(data, color, **kwargs):
         plt.axvline(
-            nn_model.globals.IMAGE_DURATION // 20 - 1,
+            nn_model.globals.IMAGE_DURATION // 20,
             color="gray",
             linestyle="--",
             linewidth=1,
@@ -52,7 +52,7 @@ def plot_multiple_models_teacher_forced(df: pd.DataFrame, save_fig: str = ""):
     # Adjust titles and axis labels
     # g.set_titles(col_template="{col_name}", size=18)
     g.set_titles(row_template="{row_name}", col_template="{col_name}", size=20)
-    g.set_axis_labels("Time Step (20 ms)", "Fraction of Neurons Spiking", size=18)
+    g.set_axis_labels("Time Step (20 ms)", "Fraction of Neurons Spiking", size=17)
 
     # Adjust tick sizes
     for ax in g.axes.flat:
@@ -123,7 +123,7 @@ def plot_single_model_synchrony_curves_across_layers(
     # Add vertical line for stimulus transition
     def add_vline(data, color, **kwargs):
         plt.axvline(
-            nn_model.globals.IMAGE_DURATION // 20 - 1,
+            nn_model.globals.IMAGE_DURATION // 20,
             color="gray",
             linestyle="--",
             linewidth=1.5,
@@ -179,6 +179,131 @@ def plot_single_model_synchrony_curves_across_layers(
         frameon=True,
     )
 
+    if save_fig:
+        g.figure.savefig(save_fig, format="pdf", bbox_inches="tight")
+    else:
+        plt.show()
+
+
+def plot_pearson_boxplot_synchrony_overall(df: pd.DataFrame, save_fig: str = ""):
+    """
+    Plot boxplot comparison of synchrony and overall Pearson CC for all models,
+    averaged across layers.
+
+    :param df: Melted dataframe with columns:
+               ['model_variant', 'layer_name', 'subset_variant', 'Metric', 'Value']
+    :param save_fig: Path where to store the figure, if `""` then do not store.
+    """
+
+    # Step 2: Plot
+    g = sns.catplot(
+        data=df,
+        x="model_variant",
+        y="Value",
+        hue="Metric",
+        kind="box",
+        height=6,
+        aspect=1.5,
+    )
+
+    # Tick and label styling
+    for ax in g.axes.flat:
+        ax.tick_params(axis="x", labelrotation=20, labelsize=13)
+        ax.tick_params(axis="y", labelsize=13)
+
+    g.set_axis_labels("Model Variant", "Pearson Correlation", fontsize=18)
+
+    # Grid lines
+    g.map(
+        lambda *args, **kwargs: plt.grid(
+            True, which="both", linestyle=":", linewidth=0.5, alpha=0.7
+        )
+    )
+
+    # Legend styling
+    g._legend.set_title("Metric", prop={"size": 13})
+    for text in g._legend.texts:
+        text.set_fontsize(12)
+    g._legend.set_bbox_to_anchor((0.97, 0.92))
+    g._legend.set_frame_on(True)
+
+    label_map = {
+        "pearson_overall": "Overall Pearson CC",
+        "pearson_synchrony": "Synchrony Pearson CC",
+    }
+
+    for text in g._legend.texts:
+        new_label = label_map.get(text.get_text(), text.get_text())
+        text.set_text(new_label)
+
+    # Title
+    plt.suptitle("Overall vs Synchrony Pearson CC\nin Different Models", fontsize=22)
+
+    plt.tight_layout(rect=[0, 0, 0.99, 0.99])
+    if save_fig:
+        g.figure.savefig(save_fig, format="pdf", bbox_inches="tight")
+    else:
+        plt.show()
+
+
+def plot_pearson_synchrony_boxplot_layers(df: pd.DataFrame, save_fig: str = ""):
+    """
+    Plots boxplot comparison synchrony across layers for all models and with
+    teacher-forced variant.
+
+    :param df: Dataset to plot.
+    :param save_fig: Path where to store the figure, if `""` then do not store.
+    """
+    g = sns.catplot(
+        data=df,
+        x="model_variant",
+        y="pearson_synchrony",
+        hue="variant_type",
+        col="layer_name",
+        kind="box",
+        col_wrap=2,
+        height=4,
+        aspect=1.4,
+        sharey=True,
+    )
+
+    g._legend.set_title("Prediction type:", prop={"size": 13})
+    for text in g._legend.texts:
+        text.set_fontsize(12)
+    g._legend.set_bbox_to_anchor((0.97, 0.92))
+    g._legend.set_frame_on(True)
+
+    label_map = {
+        "predictions": "Free",
+        "train_like_predictions": "Teacher-Forced",
+    }
+
+    for text in g._legend.texts:
+        new_label = label_map.get(text.get_text(), text.get_text())
+        text.set_text(new_label)
+
+    # === Style: Font sizes and tick rotation ===
+    for ax in g.axes.flat:
+        ax.tick_params(axis="x", labelrotation=25, labelsize=12)
+        ax.tick_params(axis="y", labelsize=12)
+
+    # Add grid lines
+    g.map(
+        lambda *args, **kwargs: plt.grid(
+            True, which="both", linestyle=":", linewidth=0.5, alpha=0.7
+        )
+    )
+
+    g.set_axis_labels("Model Variant", "Synchrony Pearson CC", fontsize=16)
+    g.set_titles("{col_name}", size=18)
+
+    # === Suptitle ===
+    plt.suptitle(
+        "Comparison Synchrony Pearson CC\nBetween Free and Teacher-Forced Evaluation",
+        fontsize=22,
+    )
+
+    plt.tight_layout(rect=[0, 0, 0.99, 0.99])
     if save_fig:
         g.figure.savefig(save_fig, format="pdf", bbox_inches="tight")
     else:

@@ -25,6 +25,10 @@ class PlottingVariants(Enum):
     # Evaluation results overview.
     MODEL_TYPES_CORRELATION_COMPARISON = "model_types_correlation_comparison"
     MODEL_TYPES_P_VALUES_HEATMAP = "model_types_p_values_heatmap"
+    MODEL_TYPES_SYNCHRONY_PEARSON_LAYERS = "model_types_synchrony_pearson_layers"
+    MODEL_TYPES_SYNCHRONY_PEARSON_OVERALL_PEARSON = (
+        "model_types_synchrony_pearson_overall_pearson"
+    )
 
     # Evaluation results separate model plotting:
     SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION = (
@@ -33,6 +37,9 @@ class PlottingVariants(Enum):
     TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED = (
         "tbptt_models_temporal_behavior_teacher_forced_included"
     )
+
+    # Teacher-forced - free comparison:
+    DRIFT_TEACHER_FORCED_FREE_TEMPORAL = "drift_teacher_forced_free_temporal"
 
 
 class PluginVariants(Enum):

@@ -50,6 +50,19 @@ class WandbSummaryProcessor:
     def get_results(self) -> pd.DataFrame:
         return self.all_wandb_results
 
+    def prepare_raw_for_plotting(self) -> pd.DataFrame:
+        """
+        :return: Retrieved raw wandb data ready for plotting.
+        """
+
+        # If dataframe not provided -> take the evaluation results from the default one.
+        original_df = EvaluationResultsProcessor.get_wandb_evaluation_results(
+            self.all_wandb_results
+        )
+
+        # Map model types with their strings for plotting.
+        return EvaluationResultsProcessor.map_model_name_for_plotting(original_df)
+
     def prepare_model_comparison_summary_for_plotting(
         self, original_df: pd.DataFrame = None
     ) -> pd.DataFrame:

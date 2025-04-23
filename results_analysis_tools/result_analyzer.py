@@ -101,6 +101,7 @@ class ResultAnalyzer:
         synchrony_curve_kwargs: Dict = {},
     ) -> pd.DataFrame:
 
+        # Dataset plotting time bins.
         if variant == PlottingVariants.FULL_TIME_BIN_COUNT_RATIO:
             return self.all_plugins[
                 PluginVariants.DATASET_HISTOGRAM_PROCESSOR
@@ -120,16 +121,18 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
             ].prepare_for_plotting(is_test=is_test, process_subset=False)
+
+        # Dataset plotting model subsets.
         if variant == PlottingVariants.SUBSET_TEMPORAL_SPIKE_DISTRIBUTION:
-            # Plotting variant not implement yet.
             return self.all_plugins[
                 PluginVariants.TEMPORAL_EVOLUTION_PROCESSOR
             ].prepare_for_plotting_subset_full_comparison(is_test=is_test)
         if variant == PlottingVariants.SUBSET_SYNCHRONY_TIME_BINS:
-            # Plotting variant not implement yet.
             return self.all_plugins[
                 PluginVariants.SYNCHRONY_TIME_BINS_PROCESSOR
             ].prepare_for_plotting_subset_full_comparison(is_test=is_test)
+
+        # Overall model evaluation.
         if variant == PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON:
             return self.all_plugins[
                 PluginVariants.WANDB_SUMMARY_PROCESSOR
@@ -138,6 +141,16 @@ class ResultAnalyzer:
             return self.all_plugins[
                 PluginVariants.WANDB_SUMMARY_PROCESSOR
             ].mann_whitney_paired_evaluation_models_test_cc_norm()
+        if variant == PlottingVariants.MODEL_TYPES_SYNCHRONY_PEARSON_OVERALL_PEARSON:
+            return self.all_plugins[
+                PluginVariants.BATCH_PREDICTION_PROCESSOR
+            ].combine_overall_and_synchrony_pearson_for_plotting()
+        if variant == PlottingVariants.MODEL_TYPES_SYNCHRONY_PEARSON_LAYERS:
+            return self.all_plugins[
+                PluginVariants.BATCH_PREDICTION_PROCESSOR
+            ].prepare_pearson_cc_synchrony()
+
+        # Separate model evaluation.
         if variant == PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION:
             return self.all_plugins[
                 PluginVariants.BATCH_PREDICTION_PROCESSOR
@@ -148,6 +161,12 @@ class ResultAnalyzer:
                 ],
                 **synchrony_curve_kwargs,  # Kwargs specifying model and optionally layers.
             )
+        if variant == PlottingVariants.DRIFT_TEACHER_FORCED_FREE_TEMPORAL:
+            return self.all_plugins[
+                PluginVariants.BATCH_PREDICTION_PROCESSOR
+            ].prepare_for_free_forced_drift_plot()
+
+        # Additional model analysis.
         if (
             variant
             == PlottingVariants.TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED
