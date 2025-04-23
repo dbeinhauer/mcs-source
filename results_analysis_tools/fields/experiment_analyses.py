@@ -30,8 +30,8 @@ class PlottingVariants(Enum):
     SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION = (
         "separate_temporal_behavior_target_prediction"
     )
-    SEPARATE_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED = (
-        "separate_temporal_behavior_teacher_forced_included"
+    TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED = (
+        "tbptt_models_temporal_behavior_teacher_forced_included"
     )
 
 

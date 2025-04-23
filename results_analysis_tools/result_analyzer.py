@@ -148,6 +148,15 @@ class ResultAnalyzer:
                 ],
                 **synchrony_curve_kwargs,  # Kwargs specifying model and optionally layers.
             )
+        if (
+            variant
+            == PlottingVariants.TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED
+        ):
+            return self.all_plugins[
+                PluginVariants.BATCH_PREDICTION_PROCESSOR
+            ].prepare_for_plotting_synchrony_curves(
+                **synchrony_curve_kwargs,  # Kwargs specifying model and optionally layers.
+            )
 
         # Plotting variant not implement yet.
         return None
@@ -274,9 +283,15 @@ if __name__ == "__main__":
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
 
+    # All TBPTT models
+    models_tbptt = [
+        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
+        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
+        ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
+    ]
     plot_data = result_analyzer.prepare_dataframe_for_plot(
-        PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION,
+        PlottingVariants.TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED,
         synchrony_curve_kwargs={
-            "model_variants": [ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10],
+            "model_variants": models_tbptt,
         },
     )

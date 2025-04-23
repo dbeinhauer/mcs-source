@@ -24,6 +24,7 @@ from results_analysis_tools.plotting.model_variants_comparison import (
 )
 from results_analysis_tools.plotting.synchrony_curve_plotting import (
     plot_single_model_synchrony_curves_across_layers,
+    plot_multiple_models_teacher_forced,
 )
 from results_analysis_tools.fields.experiment_analyses import PlottingVariants
 
@@ -43,6 +44,7 @@ class ResultsPlotter:
         PlottingVariants.MODEL_TYPES_CORRELATION_COMPARISON: plot_model_types_pearson_normalized_box_plot,
         PlottingVariants.MODEL_TYPES_P_VALUES_HEATMAP: plot_model_variant_p_value_heatmap_cc_norm,
         PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION: plot_single_model_synchrony_curves_across_layers,
+        PlottingVariants.TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED: plot_multiple_models_teacher_forced,
     }
 
     @staticmethod

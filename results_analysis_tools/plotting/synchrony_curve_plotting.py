@@ -10,12 +10,12 @@ import matplotlib.lines as mlines
 import nn_model.globals
 
 
-def plot_multiple_models_target_prediction(
-    df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
-):
-    # TODO: implement
+def plot_multiple_models_teacher_forced(df: pd.DataFrame, save_fig: str = ""):
     """
-    Plot all model synchrony in one large grid.
+    Plots synchrony curves for all TBPTT models including the teacher-forced predictions.
+
+    :param df: Dataframe used for plotting.
+    :param save_fig: Path where to store the figure, if `""` then do not store.
     """
 
     g = sns.relplot(
@@ -24,11 +24,11 @@ def plot_multiple_models_target_prediction(
         y="synchrony",
         kind="line",
         hue="variant_type",
-        col="model_variant",
         row="layer_name",
+        col="model_variant",
         facet_kws={"sharey": True, "sharex": True},
-        height=3.5,
-        aspect=1.5,
+        height=4,
+        aspect=1.2,
     )
 
     # Add vertical line to each subplot at stimulus change time
@@ -42,10 +42,54 @@ def plot_multiple_models_target_prediction(
 
     g.map_dataframe(add_vline)
 
-    g.set_titles(row_template="Layer: {row_name}", col_template="Model: {col_name}")
-    g.set_axis_labels("Time Step", "Fraction of Neurons Spiking")
-    g._legend.set_title("Type")
-    plt.tight_layout()
+    # Add grid lines
+    g.map(
+        lambda *args, **kwargs: plt.grid(
+            True, which="both", linestyle=":", linewidth=0.5, alpha=0.7
+        )
+    )
+
+    # Adjust titles and axis labels
+    # g.set_titles(col_template="{col_name}", size=18)
+    g.set_titles(row_template="{row_name}", col_template="{col_name}", size=20)
+    g.set_axis_labels("Time Step (20 ms)", "Fraction of Neurons Spiking", size=18)
+
+    # Adjust tick sizes
+    for ax in g.axes.flat:
+        ax.tick_params(axis="both", labelsize=13)
+
+    # Add supertitle
+    g.figure.suptitle(
+        f"Synchrony Dynamics Across Layers of TBPTT Models\nwith Teacher-Forced Predictions Included",
+        fontsize=24,
+    )
+    g.figure.tight_layout(rect=[0, 0, 0.98, 0.96])  # Leave space at the top
+
+    # Create a custom dashed line legend entry
+    stimulus_line = mlines.Line2D(
+        [],
+        [],
+        color="gray",
+        linestyle="--",
+        linewidth=1,
+        label="Stimulus change",
+    )
+
+    # Get current legend handles and labels
+    handles, labels = g.axes.flat[0].get_legend_handles_labels()
+    # Add the new dashed line to the legend
+    g._legend.remove()  # Remove default legend
+
+    g.figure.legend(
+        handles + [stimulus_line],
+        ["Predictions", "Target", "Teacher-Forced Predictions", "Stimulus change"],
+        loc="upper right",
+        fontsize=14,
+        title="Variant Type + Marker",
+        title_fontsize=15,
+        frameon=True,
+        ncol=1,
+    )
 
     if save_fig:
         g.figure.savefig(save_fig, format="pdf", bbox_inches="tight")
@@ -97,14 +141,6 @@ def plot_single_model_synchrony_curves_across_layers(
     # Adjust titles and axis labels
     g.set_titles(col_template="{col_name}", size=18)
     g.set_axis_labels("Time Step (20 ms)", "Fraction of Neurons Spiking", size=16)
-
-    # Adjust legend position and styling
-    g._legend.set_title("Variant Type")
-    g._legend.set_bbox_to_anchor((0.98, 0.95))  # move to center right
-    g._legend.set_frame_on(True)
-    for text in g._legend.texts:
-        text.set_fontsize(13)
-    g._legend.set_title("Variant Type", prop={"size": 14})
 
     # Adjust tick sizes
     for ax in g.axes.flat:
