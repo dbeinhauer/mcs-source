@@ -5,6 +5,16 @@ This script defines all enums of variants (layers, weights, models, etc.) used i
 from enum import Enum
 
 
+class LayerParent(Enum):
+    """
+    All possible layers.
+    """
+
+    LGN = "LGN"
+    L4 = "L4"
+    L23 = "L23"
+
+
 class LayerType(Enum):
     """
     All possible layers.
@@ -107,6 +117,8 @@ class LayerConstraintFields(Enum):
 
     SIZE = "size"
     TYPE = "type"
+    NAME = "name"
+    TIMESTEP = "timestep"
 
 
 class PredictionTypes(Enum):

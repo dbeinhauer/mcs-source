@@ -39,6 +39,7 @@ def init_wandb(
     Initializes Weights and Biases tracking.
 
     :param arguments: Command line arguments.
+    :param project_name: Name of wandb project.
     """
 
     config = {
@@ -64,6 +65,7 @@ def init_wandb(
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
         "synaptic_adaptation_num_layers": arguments.synaptic_adaptation_num_layers,
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
+        "param_red": arguments.parameter_reduction
     }
 
     if arguments.best_model_evaluation or arguments.debug:
@@ -441,6 +443,13 @@ def init_parser() -> argparse.ArgumentParser:
         "--synaptic_adaptation_only_lgn",
         action="store_true",
         help="Whether we want to use synaptic adaptation RNN module only on LGN layer.",
+    )
+    # Parameter reduction
+    parser.set_defaults(parameter_reduction=False)
+    parser.add_argument(
+        "--parameter_reduction",
+        action="store_true",
+        help="Model will run with reduced number of trainable parameters.",
     )
     # Dataset analysis:
     parser.add_argument(

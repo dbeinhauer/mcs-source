@@ -13,7 +13,7 @@ from nn_model.type_variants import (
     LayerType,
     PathDefaultFields,
     PathPlotDefaults,
-    ModelTypes,
+    ModelTypes, LayerParent,
 )
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -39,6 +39,15 @@ TIME_STEP = 20
 # Batch sizes:
 TRAIN_BATCH_SIZE = 50
 TEST_BATCH_SIZE = 10
+
+LAYER_TO_PARENT = {
+    LayerType.X_ON.value: LayerParent.LGN.value,
+    LayerType.X_OFF.value: LayerParent.LGN.value,
+    LayerType.V1_EXC_L4.value: LayerParent.L4.value,
+    LayerType.V1_INH_L4.value: LayerParent.L4.value,
+    LayerType.V1_EXC_L23.value: LayerParent.L23.value,
+    LayerType.V1_INH_L23.value: LayerParent.L23.value,
+}
 
 # Will return values as its names
 EXCITATORY_LAYERS = {
