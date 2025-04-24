@@ -546,6 +546,7 @@ class ModelExecuter:
             arguments.num_hidden_time_steps,
             arguments.model,
             arguments.weight_initialization,
+            arguments.parameter_reduction,
             model_modules_kwargs={
                 **ModelExecuter._get_neuron_model_kwargs(arguments),
                 **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
