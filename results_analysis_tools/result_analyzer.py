@@ -176,6 +176,10 @@ class ResultAnalyzer:
             ].prepare_for_plotting_synchrony_curves(
                 **synchrony_curve_kwargs,  # Kwargs specifying model and optionally layers.
             )
+        if variant == PlottingVariants.TRAIN_SUBSET_SIZE_ON_NORM_CC:
+            return self.all_plugins[
+                PluginVariants.WANDB_SUMMARY_PROCESSOR
+            ].prepare_for_plotting_dataset_size_dependency_on_cc_norm()
 
         # Plotting variant not implement yet.
         return None
@@ -291,6 +295,16 @@ class ResultAnalyzer:
             PluginVariants.WANDB_SUMMARY_PROCESSOR
         ].prepare_evaluation_results_summary(return_latex=return_latex)
 
+    def get_grid_search_summary_table(self) -> Dict[str, str]:
+        """
+        Prepares LaTeX table of grid search summary.
+
+        :return: Grid search summary per model variant.
+        """
+        return self.all_plugins[
+            PluginVariants.WANDB_SUMMARY_PROCESSOR
+        ].generate_latex_gridsearch_tables_per_model()
+
 
 if __name__ == "__main__":
     EVALUATION_RESULTS_BASE = "/analysis_results"
@@ -308,9 +322,9 @@ if __name__ == "__main__":
         ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
     ]
-    plot_data = result_analyzer.prepare_dataframe_for_plot(
-        PlottingVariants.TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED,
-        synchrony_curve_kwargs={
-            "model_variants": models_tbptt,
-        },
-    )
+
+    grid_search_results = result_analyzer.get_grid_search_summary_table()
+    for model, table in grid_search_results.items():
+        print(model)
+        print(table)
+        print()

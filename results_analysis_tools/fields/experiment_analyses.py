@@ -41,6 +41,9 @@ class PlottingVariants(Enum):
     # Teacher-forced - free comparison:
     DRIFT_TEACHER_FORCED_FREE_TEMPORAL = "drift_teacher_forced_free_temporal"
 
+    # Train subset size:
+    TRAIN_SUBSET_SIZE_ON_NORM_CC = "train_subset_size_on_norm_cc"
+
 
 class PluginVariants(Enum):
     """

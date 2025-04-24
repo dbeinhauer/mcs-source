@@ -45,6 +45,14 @@ class EvaluationResultsProcessor:
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10: "syn adapt lgn (10 steps)",
     }
 
+    model_names_mapping_grid_search = {
+        GridSearchRunVariants.SIMPLE_TANH: "simple (tanh)",
+        GridSearchRunVariants.SIMPLE_LEAKYTANH: "simple (leakytanh)",
+        GridSearchRunVariants.DNN: "dnn joint",
+        GridSearchRunVariants.RNN: "rnn separate",
+        GridSearchRunVariants.SYNAPTIC_ADAPTATION: "synaptic adaptation",
+    }
+
     desired_model_order = [
         "simple (tanh)",
         "simple (leakytanh)",
@@ -62,6 +70,12 @@ class EvaluationResultsProcessor:
         "V1_Exc_L23",
         "V1_Inh_L23",
     ]
+    # desired_layer_order = [
+    #     "V1_Exc_L4",
+    #     "V1_Exc_L23",
+    #     "V1_Inh_L4",
+    #     "V1_Inh_L23",
+    # ]
 
     # WANDB RESULTS LOADING:
     @staticmethod
@@ -173,6 +187,24 @@ class EvaluationResultsProcessor:
         """
         df[variant_string] = df[variant_string].map(
             EvaluationResultsProcessor.model_names_mapping_for_plotting
+        )
+
+        return df
+
+    @staticmethod
+    def map_model_name_for_plotting_grid_search(
+        df: pd.DataFrame, variant_string: str = "model_variant"
+    ) -> pd.DataFrame:
+        """
+        Maps model variants with their appropriate names used in the plots.
+
+        :param df: Dataframe for plotting.
+        :param variant_string: Name of the column specifying the model variant,
+        defaults to "model_variant"
+        :return: Returns dataframe with model variant column values mapped to their plot names.
+        """
+        df[variant_string] = df[variant_string].map(
+            EvaluationResultsProcessor.model_names_mapping_grid_search
         )
 
         return df

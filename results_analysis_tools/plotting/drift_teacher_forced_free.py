@@ -9,6 +9,21 @@ def plot_teacher_forced_free_drift(
     df: pd.DataFrame,
     save_fig: str = "",
 ):
+    """
+    Plot drift between teacher-forced and free predictions.
+
+    :param df: Dataset to plot.
+    :param save_fig: Path where to store the figure, if `""` then do not store.
+    """
+
+    ordered_layers = ["V1_Exc_L4", "V1_Exc_L23", "V1_Inh_L4", "V1_Inh_L23"]
+
+    df["layer_name"] = pd.Categorical(
+        df["layer_name"],
+        categories=ordered_layers,
+        ordered=True,
+    ).remove_unused_categories()
+
     g = sns.relplot(
         data=df,
         x="time",
@@ -19,11 +34,33 @@ def plot_teacher_forced_free_drift(
         col_wrap=2,
         height=4,
         aspect=1.5,
-        facet_kws={"sharey": True, "sharex": True},
+        facet_kws={"sharey": False, "sharex": True},
     )
 
+    # Group the axes
+    axes = g.axes.flat  # flat list of axes
+
+    # Map layer names to axis (from your ordered categories)
+    layer_to_ax = dict(zip(df["layer_name"].cat.categories, axes))
+
+    # Function to unify y-axis limits across given layers
+    def unify_ylim(layer_group):
+        ymins, ymaxs = [], []
+        for layer in layer_group:
+            ax = layer_to_ax[layer]
+            ymin, ymax = ax.get_ylim()
+            ymins.append(ymin)
+            ymaxs.append(ymax)
+        unified_ylim = (min(ymins), max(ymaxs))
+        for layer in layer_group:
+            layer_to_ax[layer].set_ylim(unified_ylim)
+
+    # Apply for both groups
+    unify_ylim(ordered_layers[0:2])
+    unify_ylim(ordered_layers[2:])
+
     # === Axes labels and facet titles ===
-    g.set_axis_labels("Time Step (20 ms)", "Drift (FR - TF)", fontsize=16)
+    g.set_axis_labels("Time Step (20 ms)", "Drift (TF - FP)", fontsize=16)
     g.set_titles("{col_name}", size=18)
 
     # === Grid and tick styling ===

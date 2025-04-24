@@ -31,6 +31,9 @@ from results_analysis_tools.plotting.synchrony_curve_plotting import (
 from results_analysis_tools.plotting.drift_teacher_forced_free import (
     plot_teacher_forced_free_drift,
 )
+from results_analysis_tools.plotting.train_size_dependency import (
+    plot_dataset_size_dependency_on_norm_cc,
+)
 from results_analysis_tools.fields.experiment_analyses import PlottingVariants
 
 
@@ -58,6 +61,7 @@ class ResultsPlotter:
         # Additional analyses:
         PlottingVariants.TBPTT_MODELS_TEMPORAL_BEHAVIOR_TEACHER_FORCED_INCLUDED: plot_multiple_models_teacher_forced,
         PlottingVariants.DRIFT_TEACHER_FORCED_FREE_TEMPORAL: plot_teacher_forced_free_drift,
+        PlottingVariants.TRAIN_SUBSET_SIZE_ON_NORM_CC: plot_dataset_size_dependency_on_norm_cc,
     }
 
     @staticmethod

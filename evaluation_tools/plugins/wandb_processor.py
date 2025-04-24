@@ -39,6 +39,7 @@ class WandbProcessor:
         "synaptic_adaptation_size",
         "synaptic_adaptation_num_layers",
         "num_backpropagation_time_steps",
+        "train_subset_size",
     ]
 
     def __init__(

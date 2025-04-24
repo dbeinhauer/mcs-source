@@ -237,3 +237,61 @@ class WandbSummaryProcessor:
             pval_matrix.loc[model_i, model_j] = p
 
         return pval_matrix
+
+    def prepare_for_plotting_dataset_size_dependency_on_cc_norm(self):
+        """
+        Prepares dataframe for plotting dependency of cc norm on dataset subset size.
+        """
+        return EvaluationResultsProcessor.get_wandb_dataset_subset_results(
+            self.all_wandb_results
+        )
+
+    def generate_latex_gridsearch_tables_per_model(self) -> Dict[str, str]:
+        """
+        Generates latex tables for grid search overview per model.
+
+        :param df: Dataframe with all grid search results.
+        :return: Returns grid search results overview as LaTeX table.
+        """
+        df = self.all_wandb_results
+        df = df.copy()
+
+        df = EvaluationResultsProcessor.map_model_name_for_plotting_grid_search(df)
+        # Step 2: Process each model_variant separately
+        model_variants = df["model_variant"].unique()
+
+        model_variant_tables = {}
+
+        for model in model_variants:
+            model_df = df[df["model_variant"] == model]
+
+            # Identify columns that vary within this model
+            varying_cols = model_df.nunique() > 1
+            varying_columns = varying_cols[varying_cols].index.tolist()
+
+            # Always include performance metrics + model + subset_variant
+            always_include = ["CC_NORM", "CC_ABS"]
+            selected_columns = [
+                col for col in varying_columns if col not in always_include
+            ] + [col for col in always_include if col in model_df.columns]
+
+            # Prepare final table
+            table = (
+                model_df[selected_columns]
+                .drop_duplicates()
+                .sort_values("CC_NORM", ascending=False)
+            )
+            table = table.rename(
+                columns=WandbSummaryProcessor.evaluation_hyperparameters_name_mapping
+            )
+
+            table = table.rename(
+                columns=WandbSummaryProcessor.metric_name_mapping_for_plot
+            ).rename(columns=WandbSummaryProcessor.metric_name_mapping_for_table)
+
+            # Convert to LaTeX
+            latex = table.to_latex(index=False, escape=False)
+
+            model_variant_tables[model] = latex
+
+        return model_variant_tables

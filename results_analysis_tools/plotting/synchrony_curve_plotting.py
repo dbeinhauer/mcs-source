@@ -3,6 +3,7 @@ This script defines plotting function for plotting the temporal synchrony across
 """
 
 import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
@@ -26,10 +27,26 @@ def plot_multiple_models_teacher_forced(df: pd.DataFrame, save_fig: str = ""):
         hue="variant_type",
         row="layer_name",
         col="model_variant",
-        facet_kws={"sharey": True, "sharex": True},
+        facet_kws={"sharey": False, "sharex": True},
         height=4,
         aspect=1.2,
     )
+
+    # Group axes by row (layer)
+    layer_names = df["layer_name"].unique()
+    axes_grid = g.axes  # 2D array of axes: [rows][columns]
+
+    # Ensure axes is 2D (even if 1 row or 1 col)
+    axes_grid = np.atleast_2d(axes_grid)
+
+    # Set y-axis limits equal for all subplots in the same row
+    for i, row_axes in enumerate(axes_grid):
+        # Filter out None axes in incomplete grids
+        row_axes = [ax for ax in row_axes if ax is not None]
+        ymins, ymaxs = zip(*(ax.get_ylim() for ax in row_axes))
+        shared_ylim = (min(ymins), max(ymaxs))
+        for ax in row_axes:
+            ax.set_ylim(shared_ylim)
 
     # Add vertical line to each subplot at stimulus change time
     def add_vline(data, color, **kwargs):
@@ -107,6 +124,15 @@ def plot_single_model_synchrony_curves_across_layers(
     :param model_variant: Model variant label to display in the plot.
     :param save_fig: Path where to store the figure, if `""` then do not store.
     """
+
+    ordered_layers = ["V1_Exc_L4", "V1_Exc_L23", "V1_Inh_L4", "V1_Inh_L23"]
+
+    df["layer_name"] = pd.Categorical(
+        df["layer_name"],
+        categories=ordered_layers,
+        ordered=True,
+    ).remove_unused_categories()
+
     g = sns.relplot(
         data=df,
         x="time",
@@ -115,10 +141,32 @@ def plot_single_model_synchrony_curves_across_layers(
         hue="variant_type",
         col="layer_name",
         col_wrap=2,
-        facet_kws={"sharey": True, "sharex": True},
+        facet_kws={"sharey": False, "sharex": True},
         height=4,
         aspect=1.5,
     )
+
+    # Group the axes
+    axes = g.axes.flat  # flat list of axes
+
+    # Map layer names to axis (from your ordered categories)
+    layer_to_ax = dict(zip(df["layer_name"].cat.categories, axes))
+
+    # Function to unify y-axis limits across given layers
+    def unify_ylim(layer_group):
+        ymins, ymaxs = [], []
+        for layer in layer_group:
+            ax = layer_to_ax[layer]
+            ymin, ymax = ax.get_ylim()
+            ymins.append(ymin)
+            ymaxs.append(ymax)
+        unified_ylim = (min(ymins), max(ymaxs))
+        for layer in layer_group:
+            layer_to_ax[layer].set_ylim(unified_ylim)
+
+    # Apply for both groups
+    unify_ylim(ordered_layers[0:2])
+    unify_ylim(ordered_layers[2:])
 
     # Add vertical line for stimulus transition
     def add_vline(data, color, **kwargs):
@@ -299,7 +347,7 @@ def plot_pearson_synchrony_boxplot_layers(df: pd.DataFrame, save_fig: str = ""):
 
     # === Suptitle ===
     plt.suptitle(
-        "Comparison Synchrony Pearson CC\nBetween Free and Teacher-Forced Evaluation",
+        "Comparison Synchrony Pearson CC Between\nTargets and Free/Teacher-Forced Predictions",
         fontsize=22,
     )
 
