@@ -32,6 +32,12 @@ Main Components of the repository:
 - `run_evaluation.sh` - Script used to execute model evaluation as a background process on the CGG servers.
 
 # Installation
+In order to run the model properly it is necessary to work on the machine with GPU available. 
+Currently, it is not supported to run the project on CPUs as it also does not make sense in
+regard to complexity of the network.
+
+Apart from that current version also does not support model execution without the [Weights and 
+Biases](https://wandb.ai/site/) account logged in.
 
 ## Metacentrum Installation
 The recommended installation approach is 
@@ -42,39 +48,24 @@ that also enables grid search analysis of the hyperparameters. More information 
 proper files or directories described in the repository structure part.
 
 ## Local Installation
+It is also possible to run model locally using [Poetry](https://python-poetry.org/) package 
+manager. Once Poetry is installed successfully it should be sufficient to run the following 
+commands from the root directory to install and activate the virtual environment:
 
-## Installation of the Mozaik
-In order to run properly the scripts for dataset preparation located in `dataset_processor/` one
-needs to install Mozaik project from CSNG MFF CUNI. For more information please see: [Mozaik](https://github.com/CSNG-MFF/mozaik)
-
-# Run Metacentrum Grid Search
-First, we need to have grid search settings file defined. 
-Example of such settings file can be found in 
-`metacentrum_scripts/thesis_analysis/settings_template.conf`
-
-We typically store these config files in directory:
-`thesis_experiment_setups/`
-
-To run the metacentrum grid search just run command:
 ```bash
-python run_experiments_from_settings_metacentrum.py {experiment_config_file_path}
+poetry install
+poetry add wandb
+poetry shell
 ```
 
-## Model and Evaluation Tools
-Since now, we have run the model only on the CGG machines (more info: 
-https://docs.google.com/document/d/14CQrXu_OyqsMmzB67pJ4B1ALnhUaVJZZHYwrFupxEug/edit?tab=t.0#heading=h.z1jj4ypggaiz).
-The installation steps are relevant only for those machines, and it is not assured 
-they will work on other machines. Also note that the model has been executed only on
-the machines with GPUs (as it almost does not any sense to run it on CPUs). In case
-anyone would like to install the model on other machine, additional steps in the 
-installation procedure might be needed.
+## CGG Servers Installation
+The model has been also tested on the CGG MFF CUNI machines providing various GPU machines.
+For more info please refer to the [documentation](https://docs.google.com/document/d/14CQrXu_OyqsMmzB67pJ4B1ALnhUaVJZZHYwrFupxEug/edit?tab=t.0#heading=h.z1jj4ypggaiz).
 
-Currently, we run the project using python version `python=3.8.9`. Newer python 
-versions should work too (not tested though).
-
-We run the model using the Conda environment (as it is recommended in the 
-documentation for the CGG machines). It should be enough to run only the following
-commands to install the proper environment:
+For these machines we have been using python version `python=3.8.9`. Other tested
+versions has been problematic on these servers. To install the environment we use Conda 
+(as it is recommended in the documentation for the CGG machines). It should be enough 
+to run only the following commands to install the proper environment:
 
 ```bash
 conda create --name neural_model python=3.8
@@ -83,23 +74,22 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 ```
 
 Also note that there is a target cuda device defined in the file `execute_model.py`.
-To change the cuda device one needs to change the following environment variable:
+To change the cuda device one needs to change the following environment variable or 
+set appropriate environment variable:
 
 ```python
 os.environ["CUDA_VISIBLE_DEVICES"] = "{target_device}"
 ```
 
-In the repository, there is also `requirements.txt` file that specifies all 
-requirements to run the model (and evaluation tools) correctly. This file might be 
-helpful in case there are problems with the installation.
+## Installation of the Mozaik
+In order to run properly the scripts for dataset preparation located in `dataset_processor/` one
+needs to install Mozaik project from CSNG MFF CUNI. For more information please see: [Mozaik](https://github.com/CSNG-MFF/mozaik)
 
-## Dataset Processor
-IMPORTANT NOTE: If one would like to generate additional dataset data it is needed 
-to do so using the Mozaik environment 
-(more info: https://github.com/CSNG-MFF/mozaik) and on the Wintermute cluster 
-of the Neuroscience Group (CSNG).
+IMPORTANT NOTE: If one would like to generate additional dataset data it is needed to do so 
+using the Mozaik environment and on the Wintermute cluster of the Neuroscience Group (CSNG).
 
-# Executing Model
+
+# Execution of the Model
 To run the model (either for training or evaluation) it should be enough just to 
 run the following command in the working environment:
 
@@ -113,6 +103,30 @@ To see all possible arguments run:
 python execute_model.py --help
 ```
 
+Optionally one can test the model runs properly even when they do not have dataset available
+by renaming the `testing_dataset/` directory and running the model (either in debug or full 
+format). The steps are the following:
+
+```bash
+mv testing_dataset/ dataset
+python execute_model.py [--debug]
+```
+
+## Execution of the Model in Metacentrum
+In order to run the model in Metacentrum cluster one would first need to properly setup the 
+environment described in `metacentrum_scripts/`. After everything is properly setup then execution
+of the jobs using config files is available. One can run multiple jobs using config file in a way:
+
+```bash
+python run_metacentrum_experiments.py {path_to_config_file}
+```
+
+Example of the config file can be found in `metacentrum_scripts/` or in `thesis_experiment_setups/`
+directories. These config files also facilitates grid search running and different model variants
+runs.
+
+## Execution of the on CGG Machines
+
 In case one would like to run the program using background job on CGG machines, it
 is possible to do so while running the command:
 
@@ -120,11 +134,17 @@ is possible to do so while running the command:
 ./run_model.sh {required_arguments}
 ```
 
-## Required Files
-Alongside with the source code there needs to be several files provided to execute
-the model. Especially there needs to be proper paths to dataset defined (for more information about the dataset structure please inspect documentation in `dataset_processor/` directory). If you run the model on CGG machine with already generated setups, it 
-should not be problem using the default paths. Otherwise, the appropriate files
-should be provided.
+Or potentially run evaluation on CGG machine as background job as:
+```bash
+./run_evaluation.sh {required_arguments}
+```
+
+# Dataset and Other Required Files
+In order to run the model properly there needs to be several files provided to execute
+the model. Especially there needs to be proper paths to dataset defined 
+(for more information about the dataset structure please inspect documentation in 
+`dataset_processor/` directory). Ideally one would locate the dataset and model subset files
+to the default paths to facilitate the whole workflow.
 
 The required files are specified using the following arguments:
 - `--train_dir` - The directory containing the train dataset.
@@ -136,6 +156,12 @@ evaluation).
 
 The rest of the paths are used in optional tools of the model. In case you would
 like to use these, please inspect the functionality closer in the source code.
+
+## Dataset Location
+Currently the dataset is stored in Wintermute cluster in location:
+```bash
+/home/beinhaud/diplomka/mcs-source/dataset
+```
 
 ## Useful Arguments and Setup
 Apart from the already mentioned path arguments there are several other parameters
@@ -161,32 +187,19 @@ For the rest of the variables from the file `nn_model/globals`, it is
 not expected to change their values unless we want to do some major 
 modification in the program functionality.
 
-## Weights and Biases tool
-During training it is also possible to use `Weights and Biases` tool 
-to track the training procedure and model performance. To use such
-tool one needs to create an account in for this tool and properly 
-log in. For further information please check the source code 
-(look specifically in the `wand` parts).
+# Evaluation Tools and Result Analysis Tools
+In case one is interested in execution of the evaluation tool and results analysis tools
+please refer to corresponding directories `evaluation_tools/` and `results_analysis_tools/`
+where more detailed description is provided.
 
-# Dataset Processing and Evaluation Tools
-In case you are interested in dataset processing including the 
-description of the dataset structure please see documentation in 
-directory `dataset_processor/`. For all kinds of evaluation tools 
-please inspect the `evaluation_tools/` directory.
-
-## Running evaluation predictions
-To plot the evaluation results you need to first run the full
-evaluation and store its predictions for future analysis. 
-It can be done by running the model with the appropriate 
-arguments and two additional switches:
+What is worth noting though is option for running only evaluation on the model parameters
+and of the best performing model in terms of normalized CC and storing the evaluation predictions
+to files for further analysis. For this it is necessary to set the
+exactly same parameters as the best performing model and add the following two switched while
+executing `execute_model.py`. The switches to include are:
 
 ```bash
 --best_model_evaluation
 --save_all_predictions
 ```
 
-To plot the results you can inspect the implementation of the
-current version in the `evaluation_tools/` directory. To
-have a notion of the usage of these tools please have a look 
-at `evaluation_tools/response_analysis.ipynb` Jupyter notebook,
-where a few examples are located.
