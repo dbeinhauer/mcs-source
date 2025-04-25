@@ -77,7 +77,7 @@ def plot_multiple_models_teacher_forced(df: pd.DataFrame, save_fig: str = ""):
 
     # Add supertitle
     g.figure.suptitle(
-        f"Synchrony Dynamics Across Layers of TBPTT Models\nwith Teacher-Forced Predictions Included",
+        f"Temporal Spiking Dynamics Across Layers of TBPTT\nModels with Teacher-Forced Predictions Included",
         fontsize=24,
     )
     g.figure.tight_layout(rect=[0, 0, 0.98, 0.96])  # Leave space at the top
@@ -196,7 +196,7 @@ def plot_single_model_synchrony_curves_across_layers(
 
     # Add supertitle
     g.figure.suptitle(
-        f"Synchrony Dynamics Across Layers\nModel: {model_variant}", fontsize=22
+        f"Temporal Spiking Dynamics Across Layers\nModel: {model_variant}", fontsize=22
     )
     g.figure.tight_layout(rect=[0, 0, 0.98, 0.96])  # Leave space at the top
 
@@ -277,7 +277,7 @@ def plot_pearson_boxplot_synchrony_overall(df: pd.DataFrame, save_fig: str = "")
 
     label_map = {
         "pearson_overall": "Overall Pearson CC",
-        "pearson_synchrony": "Synchrony Pearson CC",
+        "pearson_synchrony": "Temporal Spiking\nPearson CC",
     }
 
     for text in g._legend.texts:
@@ -285,7 +285,9 @@ def plot_pearson_boxplot_synchrony_overall(df: pd.DataFrame, save_fig: str = "")
         text.set_text(new_label)
 
     # Title
-    plt.suptitle("Overall vs Synchrony Pearson CC\nin Different Models", fontsize=22)
+    plt.suptitle(
+        "Overall vs Temporal Spiking\nPearson CC in Different Models", fontsize=22
+    )
 
     plt.tight_layout(rect=[0, 0, 0.99, 0.99])
     if save_fig:
@@ -342,12 +344,12 @@ def plot_pearson_synchrony_boxplot_layers(df: pd.DataFrame, save_fig: str = ""):
         )
     )
 
-    g.set_axis_labels("Model Variant", "Synchrony Pearson CC", fontsize=16)
+    g.set_axis_labels("Model Variant", "Pearson CC", fontsize=16)
     g.set_titles("{col_name}", size=18)
 
     # === Suptitle ===
     plt.suptitle(
-        "Comparison Synchrony Pearson CC Between\nTargets and Free/Teacher-Forced Predictions",
+        "Comparison Temporal Spiking Pearson CC Between\nTargets and Free/Teacher-Forced Predictions",
         fontsize=22,
     )
 

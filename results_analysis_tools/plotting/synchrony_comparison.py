@@ -21,7 +21,7 @@ def plot_synchrony_boxplot_across_layers_full(
     g.map_dataframe(sns.boxplot, x="time_step", y="synchrony")
 
     # Set axis labels and titles
-    g.set_axis_labels("Time bin (ms)", "Synchrony", size=14)
+    g.set_axis_labels("Time bin (ms)", "Temporal Spiking Activity", size=14)
     g.set_titles(col_template="{col_name}", size=16)
 
     # Set tick label font size for all subplots
@@ -32,7 +32,7 @@ def plot_synchrony_boxplot_across_layers_full(
     dataset_label = "Test" if is_test else "Train"
 
     g.figure.suptitle(
-        f"Synchrony Distributions by Time Bin and Layer - {dataset_label} Dataset",
+        f"Temporal Spiking Dynamics Distributions by Time Bin and Layer - {dataset_label} Dataset",
         fontsize=18,
     )
 
@@ -82,9 +82,9 @@ def plot_synchrony_boxplot_jitter_subset_full_comparison(
         linewidth=1.5,
         fliersize=2,
     )
-    axes[0].set_title("Boxplot of Synchrony", fontsize=titlesize)
+    axes[0].set_title("Boxplot of Temporal Spiking Dynamics", fontsize=titlesize)
     axes[0].set_xlabel("Layer", fontsize=labelsize)
-    axes[0].set_ylabel("Mean Synchrony", fontsize=labelsize)
+    axes[0].set_ylabel("Mean Temporal Spiking Activity", fontsize=labelsize)
     axes[0].tick_params(axis="x", labelsize=ticksize, rotation=15)
     axes[0].tick_params(axis="y", labelsize=ticksize)
 
@@ -116,7 +116,7 @@ def plot_synchrony_boxplot_jitter_subset_full_comparison(
         ax=axes[1],
         rasterized=True,
     )
-    axes[1].set_title("Jittered Synchrony Points", fontsize=titlesize)
+    axes[1].set_title("Jittered Temporal Spiking Dynamics Points", fontsize=titlesize)
     axes[1].set_xlabel("Layer", fontsize=labelsize)
     axes[1].set_ylabel("")  # share y-axis with boxplot
     axes[1].tick_params(axis="x", labelsize=ticksize, rotation=15)
@@ -137,7 +137,7 @@ def plot_synchrony_boxplot_jitter_subset_full_comparison(
 
     # Supertitle
     fig.suptitle(
-        f"Synchrony Comparison: Full vs All Subset Models for {dataset_label} Dataset",
+        f"Temporal Spiking Dynamics Comparison: Full vs All Subset Models for {dataset_label} Dataset",
         fontsize=suptitlesize,
     )
 
