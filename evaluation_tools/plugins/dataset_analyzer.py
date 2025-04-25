@@ -2,7 +2,7 @@
 Definition of a plugin that prepares histograms and does operations with them.
 """
 
-from typing import Dict, Tuple, Any, List
+from typing import Dict, Any, List
 
 import numpy as np
 import pandas as pd
@@ -250,6 +250,7 @@ class DatasetAnalyzer:
                 )
 
                 if AnalysisFields.TIME_BIN_SPIKE_COUNTS in self.fields_to_analyze:
+                    # Count spikes in all time bins.
                     self.time_bin_spike_counts = (
                         TimeBinSpikeCounter.batch_time_bin_update(
                             data, layer, self.time_bin_spike_counts
@@ -260,6 +261,7 @@ class DatasetAnalyzer:
                     AnalysisFields.SEPARATE_EXPERIMENT_ANALYSIS
                     in self.fields_to_analyze
                 ):
+                    # Compute the statistics on experiments separately.
                     self.separate_experiment_statistics = (
                         SeparateExperimentProcessor.batch_separate_experiments_update(
                             data,
@@ -269,11 +271,13 @@ class DatasetAnalyzer:
                     )
 
                 if AnalysisFields.NEURON_SPIKE_COUNT in self.fields_to_analyze:
+                    # Count number of spikes per neuron.
                     self.neurons_spike_counts = NeuronSummarizer.batch_neuron_sum(
                         data, layer, self.neurons_spike_counts
                     )
 
                 if AnalysisFields.FANO_FACTOR in self.fields_to_analyze:
+                    # Compute fano factor - TODO: not tested
                     self.fano_factors = FanoFactorProcessor.batch_fano_computation(
                         data, layer, is_test, self.fano_factors
                     )

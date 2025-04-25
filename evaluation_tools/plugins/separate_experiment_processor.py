@@ -3,7 +3,7 @@ This script serves for processing the data in single experiment
 (and trials) manner.
 """
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -14,7 +14,6 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
     StatisticsFields,
     DatasetVariantField,
     DatasetDimensions,
-    # SEPARATE_EXPERIMENT_ANALYSES,
 )
 from evaluation_tools.fields.dataset_parameters import DATASET_SIZES
 
@@ -165,6 +164,14 @@ class SeparateExperimentProcessor:
         layer: str,
         all_analysis_data: Dict[StatisticsFields, Dict[str, List[torch.Tensor]]],
     ) -> Dict[StatisticsFields, Dict[str, List[torch.Tensor]]]:
+        """
+        Processes batch of evaluation results data experiment per experiment.
+
+        :param data: Raw evaluation batch results.
+        :param layer: Layer of the results.
+        :param all_analysis_data: All processes evaluation results.
+        :return: Updated processed evaluation results from `all_analysis_data`.
+        """
         for statistics_type in all_analysis_data:
             if layer not in all_analysis_data[statistics_type]:
                 all_analysis_data[statistics_type][layer] = []

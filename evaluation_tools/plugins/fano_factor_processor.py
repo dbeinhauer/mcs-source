@@ -18,6 +18,7 @@ from evaluation_tools.fields.dataset_parameters import DATASET_SIZES
 
 
 class FanoFactorProcessor:
+    # TODO: test and document
 
     @staticmethod
     def _init_fano_tensor(is_test: bool) -> torch.Tensor:

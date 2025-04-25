@@ -12,6 +12,9 @@ from evaluation_tools.fields.dataset_analyzer_fields import DatasetDimensions
 
 
 class NeuronSummarizer:
+    """
+    Summarizes the spikes per each neuron in the dataset.
+    """
 
     @staticmethod
     def _count_neuron_spikes(data: torch.Tensor) -> torch.Tensor:

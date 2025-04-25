@@ -493,7 +493,7 @@ def main(arguments):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Execute model training or evaluation."
+        description="Run processing of the either model dataset or the model evaluation results."
     )
     # General settings.
     parser.add_argument(

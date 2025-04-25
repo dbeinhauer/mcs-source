@@ -1,5 +1,5 @@
 """
-This script process the results of the evaluation runs.
+This script processes the results of the evaluation runs.
 """
 
 import os
@@ -70,6 +70,10 @@ class PredictionsAnalyzer:
         evaluation_variants: List[ModelEvaluationRunVariant] = [],
         additional_variants: List[AdditionalExperiments] = [],
     ):
+        """
+        :param evaluation_variants: Evaluation runs that we want to cover.
+        :param additional_variants: Additional experiments that we want to cover.
+        """
         # All evaluation runs on multiple model subsets that we want to run the evaluation on.
         self.evaluation_variants = evaluation_variants
 
@@ -623,27 +627,3 @@ class PredictionsAnalyzer:
                         )
 
         return pd.DataFrame(rows)
-
-
-if __name__ == "__main__":
-    evaluation_results_base_dir = (
-        "/home/david/source/diplomka/thesis_results/evaluation/"
-    )
-    model_variants = [
-        ModelEvaluationRunVariant.DNN_JOINT,
-        ModelEvaluationRunVariant.DNN_SEPARATE,
-    ]
-    additional_experiments = []
-
-    # wandb_variants = {}
-    prediction_analyzer = PredictionsAnalyzer(
-        evaluation_variants=model_variants,
-        additional_variants=additional_experiments,
-    )
-    result = prediction_analyzer.process_all_model_variants_predictions(
-        evaluation_results_base_dir
-    )
-
-    merged_result = prediction_analyzer.merge_all_subsets_and_batches()
-
-    print(merged_result)
