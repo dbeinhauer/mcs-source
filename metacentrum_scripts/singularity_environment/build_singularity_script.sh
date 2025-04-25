@@ -19,11 +19,11 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 # === CREATE SANDBOX ===
-echo "🔧 Building sandbox from $BASE_IMAGE..."
+echo "Building sandbox from $BASE_IMAGE..."
 singularity build --sandbox "$SANDBOX_NAME" "$BASE_IMAGE"
 
 # === INSTALL MINICONDA & ENVIRONMENT INSIDE SANDBOX ===
-echo "📦 Installing Miniconda and creating Conda environment..."
+echo "Installing Miniconda and creating Conda environment..."
 
 singularity exec --writable -B "$(dirname $ENV_YAML_HOST_PATH)":/mnt "$SANDBOX_NAME" bash -c "
     export DEBIAN_FRONTEND=noninteractive

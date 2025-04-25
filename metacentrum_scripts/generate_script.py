@@ -1,3 +1,8 @@
+"""
+This scripts serves for either generating the scripts for executing metacentrum jobs that runs either
+model training or evaluation based on the provided setup or for directly submitting the metacentrum jobs.
+"""
+
 # Model arguments:
 import argparse
 import subprocess
@@ -23,9 +28,7 @@ def submit_job(script_content):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate and submit a PBS job script."
-    )
+    parser = argparse.ArgumentParser(description="Generate or submit a PBS job script.")
     # Input output arguments:
     parser.add_argument(
         "--template", default="job_template.pbs", help="Path to the job script template"

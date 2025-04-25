@@ -186,4 +186,4 @@ python metacentrum_scripts/generate_script.py \
     --model_params "$MODEL_PARAMS" \
     --opt_machine_args $OPT_MACHINE_ARGS \
     --use_opt_arguments \
-    # --submit_job 
+    --submit_job 
