@@ -1,3 +1,9 @@
+"""
+This script serves as interface for job submit of model training with different setup. Enabling
+running the experiment also as grid search, through multiple subset variants and other based on
+the provided experiment setup file.
+"""
+
 import itertools
 import os
 import sys
@@ -61,9 +67,7 @@ def build_command(base_command, settings, keys, combination):
 
 def main():
     if len(sys.argv) < 2:
-        print(
-            "Usage: python metacentrum_scripts/thesis_analysis/run_selected_experiments.py <settings_file>"
-        )
+        print("Usage: python run_metacentrum_experiments.py <settings_file>")
         sys.exit(1)
 
     settings_file = sys.argv[1]
@@ -75,7 +79,7 @@ def main():
     # Load settings
     settings = load_settings(settings_file)
 
-    # Ensure WANDB_NAME is provided
+    # Ensure WANDB_NAME is provided -  project in the weights and biases.
     if "WANDB_NAME" not in settings or not settings["WANDB_NAME"]:
         print("Error: WANDB_NAME is required in the settings file.")
         sys.exit(1)
@@ -88,7 +92,7 @@ def main():
         combinations = [()]
 
     # Base command
-    base_command = "bash metacentrum_scripts/thesis_analysis/job_template.sh"
+    base_command = "bash metacentrum_scripts/run_generate_script.sh"
 
     # Handle SIZE_MULTIPLIER separately
     size_multipliers = settings.get("SIZE_MULTIPLIER", [None])

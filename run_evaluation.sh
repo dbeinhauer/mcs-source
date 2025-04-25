@@ -14,11 +14,8 @@ fi
 
 # Directory to store the output log
 OUTPUT_DIR=$1
-# Assign command-line arguments to variables
-# MODEL=$2
-# LEARNING_RATE=$3
-# NUM_EPOCHS=$4
 
+# Set Parameters
 SUBSET_ID=0
 
 # Set wandb api key if specified

@@ -1,3 +1,7 @@
+"""
+This script serves for random generating of model subsets.
+"""
+
 import argparse
 import random
 import pickle
@@ -52,7 +56,7 @@ def main():
     )
 
     args = parser.parse_args()
-    
+
     ratio_percentage = int(args.subset_ratio * 100)
 
     if args.output_file == "":
