@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Python script containing definition of the class used for extraction of raw 
-data to target dataset. Additionally, it contains script for running the 
+Python script containing definition of the class used for extraction of raw
+data to target dataset. Additionally, it contains script for running the
 single extraction.
 """
 
@@ -40,11 +40,6 @@ NEURONS_IDS_PREFIX = "neuron_ids_"
 SPIKES_PREFIX = "spikes_"
 # Prefix when multiple trials
 TRIALS_PREFIX = "trial_"
-
-# Input directories:
-# INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240117-111742[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-# INPUT_DIR_TRAIN = "/CSNG/baroni/mozaik-models/LSV1M/20240124-093921[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:500}/NewDataset_Images_from_50000_to_50100_ParameterSearch_____baseline:50000_trial:0"
-INPUT_DIR_TEST = "/CSNG/baroni/mozaik-models/LSV1M/20240911-181115[param_nat_img.defaults]CombinationParamSearch{trial:[0],baseline:20}/NewDataset_Images_from_300050_to_300100_ParameterSearch_____baseline:300050_trial:0"
 
 # Default output directory:
 OUTPUT_DIR_TRAIN = "/home/beinhaud/diplomka/mcs-source/dataset/train_dataset"
