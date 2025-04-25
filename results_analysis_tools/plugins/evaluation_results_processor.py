@@ -30,7 +30,8 @@ from evaluation_tools.fields.prediction_analysis_fields import (
 
 class EvaluationResultsProcessor:
     """
-    This class encapsulates the logic for processing all of the evaluation results.
+    This class encapsulates the general logic for processing all of the evaluation
+    results (batched and wandb).
     """
 
     # All model names that we want to use in plotting.
@@ -45,6 +46,7 @@ class EvaluationResultsProcessor:
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10: "syn adapt lgn (10 steps)",
     }
 
+    # Grid search experiment names for plotting.
     model_names_mapping_grid_search = {
         GridSearchRunVariants.SIMPLE_TANH: "simple (tanh)",
         GridSearchRunVariants.SIMPLE_LEAKYTANH: "simple (leakytanh)",
@@ -53,6 +55,7 @@ class EvaluationResultsProcessor:
         GridSearchRunVariants.SYNAPTIC_ADAPTATION: "synaptic adaptation",
     }
 
+    # Desired model order for plotting.
     desired_model_order = [
         "simple (tanh)",
         "simple (leakytanh)",
@@ -64,18 +67,13 @@ class EvaluationResultsProcessor:
         "syn adapt lgn (10 steps)",
     ]
 
+    # Desired layer order for plotting.
     desired_layer_order = [
         "V1_Exc_L4",
         "V1_Inh_L4",
         "V1_Exc_L23",
         "V1_Inh_L23",
     ]
-    # desired_layer_order = [
-    #     "V1_Exc_L4",
-    #     "V1_Exc_L23",
-    #     "V1_Inh_L4",
-    #     "V1_Inh_L23",
-    # ]
 
     # WANDB RESULTS LOADING:
     @staticmethod
@@ -249,6 +247,3 @@ class EvaluationResultsProcessor:
             ordered=True,
         ).remove_unused_categories()
         return df
-
-    # @staticmethod
-    # def combine_overall_cc_norm_and_

@@ -68,7 +68,7 @@ class ResultAnalyzer:
         self.results_loader = ResultsLoader(results_to_load)
         self.all_results = self.results_loader.load_all_results()
 
-        # Plugins
+        # All plugins for results analysis:
         self.all_plugins = {
             PluginVariants.DATASET_HISTOGRAM_PROCESSOR: DatasetHistogramProcessor(
                 self.all_results
@@ -100,6 +100,15 @@ class ResultAnalyzer:
         is_test: bool = False,
         synchrony_curve_kwargs: Dict = {},
     ) -> pd.DataFrame:
+        """
+        Prepares pandas dataframe in format necessary for specified plot.
+
+        :param variant: Plot variant that we want to prepare data for.
+        :param is_test: Flag whether we want to process test dataset.
+        :param synchrony_curve_kwargs: Kwargs used for synchrony curve data preparation.
+        :return: Returns dataframe with prepared data that are ready
+        to be plotted for specified variant.
+        """
 
         # Dataset plotting time bins.
         if variant == PlottingVariants.FULL_TIME_BIN_COUNT_RATIO:
@@ -315,16 +324,3 @@ if __name__ == "__main__":
         EvaluationProcessorChoices.PREDICTION_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.PREDICTION_ANALYSIS.value}/",
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
-
-    # All TBPTT models
-    models_tbptt = [
-        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
-        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
-        ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
-    ]
-
-    grid_search_results = result_analyzer.get_grid_search_summary_table()
-    for model, table in grid_search_results.items():
-        print(model)
-        print(table)
-        print()

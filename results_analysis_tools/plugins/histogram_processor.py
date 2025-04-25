@@ -21,7 +21,8 @@ from results_analysis_tools.plugins.dataset_results_processor import (
 
 class DatasetHistogramProcessor:
     """
-    This class serves for processing the histograms and preparing them for plotting.
+    This class serves for processing the histograms of dataset processing and
+    preparing them for plotting.
     """
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
@@ -66,6 +67,9 @@ class DatasetHistogramProcessor:
 
     @staticmethod
     def _histogram_reformating_row(row: pd.Series) -> Dict[str, Any]:
+        """
+        :return: Row as dictionary for creating pandas dataframe.
+        """
         return {
             "counts": row["counts"],
             "bins": row["bins"],

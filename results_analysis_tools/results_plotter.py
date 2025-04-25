@@ -42,6 +42,7 @@ class ResultsPlotter:
     This class encapsulates all plotting logic.
     """
 
+    # Map of different plot variants and their appropriate plotting functions.
     plotting_map = {
         # Full Dataset on different time bins:
         PlottingVariants.FULL_TIME_BIN_COUNT_RATIO: plot_dataset_variant_all_time_bins_full,
@@ -71,4 +72,12 @@ class ResultsPlotter:
         save_fig: str = "",
         kwargs: Dict = {},
     ):
+        """
+        Plots provided data in selected plot.
+
+        :param data: Data to plot.
+        :param plot_variant: What plot we want to use.
+        :param save_fig: Whether we want to save the figure, if `""` then not save.
+        :param kwargs: Additional plotting kwargs.
+        """
         ResultsPlotter.plotting_map[plot_variant](data, save_fig=save_fig, **kwargs)

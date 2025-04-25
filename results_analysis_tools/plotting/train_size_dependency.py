@@ -19,7 +19,6 @@ def plot_dataset_size_dependency_on_norm_cc(df: pd.DataFrame, save_fig: str = ""
         data=df,
         x="train_subset_size",
         y="CC_NORM",
-        # hue="model_variant",
         alpha=0.7,
     )
     sns.lineplot(

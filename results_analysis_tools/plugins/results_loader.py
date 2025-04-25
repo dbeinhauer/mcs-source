@@ -50,7 +50,7 @@ class ResultsLoader:
 
     def load_all_results(self) -> Dict[EvaluationProcessorChoices, pd.DataFrame]:
         """
-        Loads all possible analysis results
+        Loads all analysis results of all variants.
 
         :return: Returns dictionary of each analysis variant.
         """
@@ -66,8 +66,18 @@ class ResultsLoader:
         base_path: str,
         results_variant: EvaluationProcessorChoices,
         variants_to_iterate: List[Tuple[str, Iterable]],
-    ):
+    ) -> pd.DataFrame:
+        """
+        Base function encapsulating common logic for loading the preprocessed results for analysis.
+
+        :param base_path: Base path containing the preprocessed results, if `""` then load default.
+        :param results_variant: Variant of the results to load.
+        :param variants_to_iterate: What variants corresponds to each encapsulated dictionary
+        structure of the input values.
+        :return: Returns preprocessed analysis results as pandas dataframe.
+        """
         if not base_path:
+            # Path not specified -> use default one.
             base_path = self.results_to_load[results_variant]
 
         all_dfs = []

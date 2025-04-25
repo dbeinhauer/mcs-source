@@ -17,6 +17,9 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
 
 
 class DatasetResultsProcessor:
+    """
+    General class encapsulating common logic while processing dataset analysis results.
+    """
 
     @staticmethod
     def get_full_dataset_variant(

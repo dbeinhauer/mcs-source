@@ -9,7 +9,6 @@ import seaborn as sns
 
 def plot_model_types_pearson_normalized_box_plot(
     df: pd.DataFrame,
-    is_test: bool = False,
     save_fig: str = "",
 ):
     """
@@ -17,7 +16,6 @@ def plot_model_types_pearson_normalized_box_plot(
     type.
 
     :param df: Data to plot from.
-    :param is_test: Placeholder to match the interface.
     :param save_fig: Path where to store the figure, if `""` then do not store.
     """
     # Plot
@@ -46,14 +44,11 @@ def plot_model_types_pearson_normalized_box_plot(
         plt.show()
 
 
-def plot_model_variant_p_value_heatmap_cc_norm(
-    df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
-):
+def plot_model_variant_p_value_heatmap_cc_norm(df: pd.DataFrame, save_fig: str = ""):
     """
     Plots heatmap of p-values of model comparison test on p-value.
 
     :param df: P-value data to plot.
-    :param is_test: Placeholder to match the interface.
     :param save_fig: Path where to store the figure, if `""` then do not store.
     """
     # Custom sort order

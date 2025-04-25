@@ -13,7 +13,8 @@ def plot_temporal_spike_distribution_for_dataset_data_full(
     df: pd.DataFrame, is_test: bool = False, save_fig: str = ""
 ):
     """
-    Plots temporal distribution of the spike counts overlaid for all time bin size variants on full dataset.
+    Plots temporal distribution of the spike counts overlaid for all time bin size
+    variants on full dataset.
 
     :param df: Data to plot from `temporal_evolution_processor.py`.
     :param is_test: Whether we are plotting the test dataset.

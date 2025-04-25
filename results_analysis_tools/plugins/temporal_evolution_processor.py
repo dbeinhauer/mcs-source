@@ -1,5 +1,6 @@
 """
-This script defines class for processing the temporal evolution of the neuronal responses for different time bins.
+This script defines class for processing the temporal evolution of the
+neuronal responses for different time bins.
 """
 
 from typing import Dict, Any
@@ -233,7 +234,8 @@ class TemporalEvolutionProcessor:
             time_step_or_subset_id = row[time_step_or_subset_id_column_key]
             layer = row["layer"]
 
-            # Process subset of models -> it is not necessary to take interpolated counts (all results have same time binning)
+            # Process subset of models -> it is not necessary to take interpolated counts \
+            # (all results have same time binning)
             counts = row["normalized_counts"]
             times = np.arange(0, len(counts))
             if not process_subset:

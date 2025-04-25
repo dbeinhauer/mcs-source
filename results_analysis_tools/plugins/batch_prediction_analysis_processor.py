@@ -32,6 +32,9 @@ import nn_model.globals
 
 
 class BatchPredictionAnalysisProcessor:
+    """
+    Class encapsulating processing batched analysis of evaluation results.
+    """
 
     num_trials = 20
 
@@ -273,10 +276,14 @@ class BatchPredictionAnalysisProcessor:
         )
 
         # Compute mean across layers:
-        return (
-            df_combined.groupby(["model_variant", "subset_variant", "Metric"])["Value"]
-            .mean()
-            .reset_index()
+        return EvaluationResultsProcessor.ensure_model_type_order(
+            (
+                df_combined.groupby(["model_variant", "subset_variant", "Metric"])[
+                    "Value"
+                ]
+                .mean()
+                .reset_index()
+            )
         )
 
     def prepare_for_free_forced_drift_plot(self) -> pd.DataFrame:

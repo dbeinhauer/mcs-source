@@ -1,3 +1,7 @@
+"""
+This script defines plotting functions comparing drift of teacher-forced and free predictions.
+"""
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
