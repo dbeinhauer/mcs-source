@@ -433,7 +433,11 @@ class ModelExecuter:
                     0
                 )  # RNN default (do not save predictions).
                 if (
-                    prediction_type in [PredictionTypes.FULL_PREDICTION, PredictionTypes.TRAIN_LIKE_PREDICTION]
+                    prediction_type
+                    in [
+                        PredictionTypes.FULL_PREDICTION,
+                        PredictionTypes.TRAIN_LIKE_PREDICTION,
+                    ]
                     or save_recurrent_state
                 ):
                     # In case we are doing full prediction or we specified we want RNN linearity
@@ -704,8 +708,8 @@ class ModelExecuter:
         :param hidden_states: _description_
         :param neuron_hidden: _description_
         :param synaptic_adaptation_hidden: _description_
-        :param evaluation_train_like_forward: Whether to run hidden steps resetting while 
-        evaluation run (to test the performance of the model on the prediction of the only one 
+        :param evaluation_train_like_forward: Whether to run hidden steps resetting while
+        evaluation run (to test the performance of the model on the prediction of the only one
         time step - same procedure as in train steps).
         :return: _description_
         """
@@ -716,7 +720,7 @@ class ModelExecuter:
             hidden_states,
             neuron_hidden,
             synaptic_adaptation_hidden,
-            evaluation_train_like_forward=evaluation_train_like_forward
+            evaluation_train_like_forward=evaluation_train_like_forward,
         )
 
         # Take last time step predictions (those are the visible time steps predictions).
@@ -774,7 +778,7 @@ class ModelExecuter:
                 neuron_hidden, synaptic_adaptation_hidden
             )
         )
-        
+
         # Apply weight constrains (excitatory/inhibitory) for all the layers.
         self._apply_model_constraints()
 
@@ -917,62 +921,6 @@ class ModelExecuter:
             torch.load(self.evaluation_results_saver.best_model_path, weights_only=True)
         )
         self.logger.print_best_model_evaluation(self.best_metric)
-        
-    # def _perform_train_like_predictions(self, trial_inputs, all_targets, trial_id: int):
-    #     """
-    #     Performs train like evaluation. After each predicted time step it resets its 
-    #     hidden states based on the previous target value.
-
-    #     :param trial_inputs: All inputs for the trial.
-    #     :param all_targets: All targets across all trials (to be converted to CUDA there for the trial).
-    #     :param trial_id: Trial ID.
-    #     :return: Returns model predictions for the given sequence of inputs while we reset 
-    #     the hidden states using the previous targets (same process as while training).
-    #     """
-        
-    #     # Move all trial hidden states to cuda for train-like evaluation.
-    #     trial_all_hidden =  ModelExecuter._move_data_to_cuda(
-    #         {
-    #             layer: layer_input[:, trial_id, :, :]
-    #             for layer, layer_input in all_targets.items()
-    #         }
-    #     )
-    
-    #     time_length = trial_inputs[LayerType.X_ON.value].size(1)
-        
-    #     # Hidden states of the neuron.
-    #     neuron_hidden, synaptic_adaptation_hidden = (
-    #         ModelExecuter._init_modules_hidden_states()
-    #     )
-        
-    #     # trial_train_like_predictions: Dict[str, List[torch.Tensor]] = {
-    #     #     layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
-    #     # }
-        
-    #     for visible_time in range(
-    #         1, time_length
-    #     ):  # We skip the first time step because we do not have initial hidden values for them.
-    #         # Get data for the current time step.
-    #         # print(visible_time)
-    #         current_input, _, current_hidden = ModelExecuter._get_train_current_time_data(
-    #             visible_time, trial_inputs, trial_all_hidden, trial_all_hidden
-    #         )
-
-    #         # Perform model forward step.
-    #         predictions, neuron_hidden, synaptic_adaptation_hidden = (
-    #             self._model_forward_step(
-    #                 current_input, 
-    #                 current_hidden, 
-    #                 neuron_hidden, 
-    #                 synaptic_adaptation_hidden, 
-    #                 evaluation_train_like_forward=True,
-    #             )
-    #         )
-    #         # trial_train_like_predictions.append(predictions)
-    #         self.model._append_outputs(trial_train_like_predictions, predictions)
-        
-    #     return trial_train_like_predictions
-            
 
     def _get_all_trials_predictions(
         self,
@@ -1026,17 +974,17 @@ class ModelExecuter:
                 neuron_hidden,
                 synaptic_adaptation_hidden,
             )
-            
+
+            # Teacher-forced evaluation results.
             neuron_hidden, synaptic_adaptation_hidden = (
                 ModelExecuter._init_modules_hidden_states()
             )
-            trial_all_hidden =  ModelExecuter._move_data_to_cuda(
+            trial_all_hidden = ModelExecuter._move_data_to_cuda(
                 {
                     layer: layer_input[:, trial, :, :]
                     for layer, layer_input in targets.items()
                 }
             )
-            
             trial_train_like_predictions, _, _, _ = self.model(
                 trial_inputs,
                 trial_all_hidden,
@@ -1044,16 +992,6 @@ class ModelExecuter:
                 synaptic_adaptation_hidden,
                 evaluation_train_like_forward=True,
             )
-            
-            # trial_train_like_predictions = {}
-            # # # Pass all targets to be moved to CUDA inside for the trial (we might have the 
-            # # # option to skip this in the future and later allocation saves GPU memory).
-            # trial_train_like_predictions = self._perform_train_like_predictions(
-            #     trial_inputs, 
-            #     targets,
-            #     trial,
-            # )
-            # print("Trial Done")
 
             # Accumulate all trials predictions.
             ModelExecuter._add_trial_predictions_to_list_of_all_predictions(
@@ -1065,7 +1003,7 @@ class ModelExecuter:
                 all_predictions,
                 self.model.return_recurrent_state,
             )
-            
+
         return all_predictions
 
     def _predict_for_evaluation(

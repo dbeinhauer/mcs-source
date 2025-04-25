@@ -14,17 +14,38 @@ functionalities. The main part of the code is in the Directory `nn_model/`
 where the source code that defines and runs the model is located. 
 
 Main Components of the repository:
+- `execute_model.py` - This file serves as an user interface for execution the model of V1.
+- `nn_model/` - Main project directory. There is all implementation of the model of V1 located.
 - `dataset_processor/` - Directory containing definition of all tools used for dataset processing and preparation.
-- `evaluation_tools/` - Directory containing definition of all tools used for evaluation of the model results.
+- `evaluation_tools/` - Directory containing implementation of the evaluation processing tools that preprocesses raw model predictions or dataset for further analysis. There is also a default location where the evaluation results and best model parameters are stored.
+- `results_analysis_tools/` - Directory containing tools for processing results generated from the `evaluation_tools/`. It entail for the exact statistical analysis and plotting of the results.
+- `testing_dataset/` - Small example of the model dataset and model subset indices that has been used in our thesis. If one renames it to "dataset/", it should be in format in which the model can correctly load this toy example using default parameters without user modifications of the arguments. It may serve for testing correct installation of the model.
+- `run_metacentrum_experiments.sh` - Interface script that entails model execution on Metacentrum server.
+- `metacentrum_scripts/` - Directory necessary scripts to run model on the Metacentrum server.
+- `environment.yaml` - File containing the environment setup necessary for running the model on the Metacentrum server. 
+- `requirements_metacentrum.txt` - Requirements file used for correct installation of the environment on Metacentrum.
+- `thesis_experiment_setups/` - Setup of all experiments that has been run in the thesis analysis.
+- `pyproject.toml` - File for correct project definition while using poetry Poetry package manager.- `poetry.lock` - Poetry lock file for easier environment installation.
 - `neural_simulation/` - Auxiliary directory for correct installation of the Poetry project.
-- `nn_model/` - Directory containing the major part of the source code. It contains the definition of the model and code for its execution. There is also description of the model architecture and dataset structure.
-- `execute_model.py` - The source code used for execution of the model (training/evaluation).
-- `requirements.txt` - Requirements file to execute the model.
-- `run_model.sh` - Script used to execute the model training as a background process on the CGG servers.
-- `metacentrum_scripts/` - directory containing useful scripts and templates for the Metacentrum experiment computing
-- `thesis_experiment_setups/` - list of experiment setups for experiments of the master thesis
-- `subset_generator.py` - script that generates model subsets variants
-- `run_experiments_from_settings_metacentrum.sh` - script that runs grid search on metacentrum
+- `requirements.txt` - Files listing the requirements for correct execution of the model.
+- `run_model.sh` - Script used to execute model training as a background process on the CGG servers.
+- `run_evaluation.sh` - Script used to execute model evaluation as a background process on the CGG servers.
+
+# Installation
+
+## Metacentrum Installation
+The recommended installation approach is 
+installation on the [Metacentrum server](https://metavo.metacentrum.cz/). This computational 
+cluster has been used more majority of our experiments and this repository contains several tools
+facilitating model run on this server such as customized model execution using config files 
+that also enables grid search analysis of the hyperparameters. More information can be found in 
+proper files or directories described in the repository structure part.
+
+## Local Installation
+
+## Installation of the Mozaik
+In order to run properly the scripts for dataset preparation located in `dataset_processor/` one
+needs to install Mozaik project from CSNG MFF CUNI. For more information please see: [Mozaik](https://github.com/CSNG-MFF/mozaik)
 
 # Run Metacentrum Grid Search
 First, we need to have grid search settings file defined. 
@@ -38,8 +59,6 @@ To run the metacentrum grid search just run command:
 ```bash
 python run_experiments_from_settings_metacentrum.py {experiment_config_file_path}
 ```
-
-# Installation
 
 ## Model and Evaluation Tools
 Since now, we have run the model only on the CGG machines (more info: 
