@@ -1,5 +1,5 @@
 """
-This source defines simple class that is used to save and load best model. 
+This source defines simple class that is used to save and load best model.
 And save model evaluation results.
 """
 
@@ -36,7 +36,7 @@ class EvaluationResultsSaver:
     def save_predictions_batch(
         self,
         batch_index: int,
-        all_predictions: Dict[str, Dict[str, torch.Tensor]],
+        all_predictions: Dict[PredictionTypes, Dict[str, torch.Tensor]],
         targets: Dict[str, torch.Tensor],
         filename: str = "",
     ):
@@ -69,12 +69,15 @@ class EvaluationResultsSaver:
         with open(filename, "wb") as f:
             pickle.dump(
                 {
-                    EvaluationFields.PREDICTIONS.value: all_predictions[
-                        PredictionTypes.FULL_PREDICTION.value
+                    EvaluationFields.PREDICTIONS: all_predictions[
+                        PredictionTypes.FULL_PREDICTION
                     ],
-                    EvaluationFields.TARGETS.value: targets,
-                    EvaluationFields.RNN_PREDICTIONS.value: all_predictions[
-                        PredictionTypes.RNN_PREDICTION.value
+                    EvaluationFields.TARGETS: targets,
+                    EvaluationFields.TRAIN_LIKE_PREDICTION: all_predictions[
+                        PredictionTypes.TRAIN_LIKE_PREDICTION
+                    ],
+                    EvaluationFields.RNN_PREDICTIONS: all_predictions[
+                        PredictionTypes.RNN_PREDICTION
                     ],
                 },
                 f,
@@ -83,7 +86,7 @@ class EvaluationResultsSaver:
     def save_full_evaluation(
         self,
         batch_index: int,
-        all_predictions: Dict[str, Dict[str, torch.Tensor]],
+        all_predictions: Dict[PredictionTypes, Dict[str, torch.Tensor]],
         targets: Dict[str, torch.Tensor],
     ):
         """
@@ -100,9 +103,7 @@ class EvaluationResultsSaver:
             batch_index,
             {
                 prediction_type: {
-                    layer: torch.mean(
-                        prediction, dim=0
-                    )  # Trials dimension is the first because we reshape it during prediction step.
+                    layer: torch.mean(prediction, dim=1)
                     for layer, prediction in predictions.items()
                 }
                 for prediction_type, predictions in all_predictions.items()

@@ -1,14 +1,5 @@
-# Run Wintermute
-
-```bash
-srun --cpus-per-task=64 --pty bash
-```
-
 # Sheets
-
-```bash
---sheet=
-```
+Basic information about the layer data from raw SNN dataset.
 
 Variants:
 
@@ -24,6 +15,7 @@ sheet_folders  = ['V1_Exc_L23', 'V1_Inh_L23', 'V1_Exc_L4', 'V1_Inh_L4', 'X_ON' '
 
 
 # Paths
+Paths to raw SNN dataset.
 
 ## Layer Directories
 

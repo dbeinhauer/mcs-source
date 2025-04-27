@@ -1,3 +1,8 @@
+"""
+This scripts serves for either generating the scripts for executing metacentrum jobs that runs either
+model training or evaluation based on the provided setup or for directly submitting the metacentrum jobs.
+"""
+
 # Model arguments:
 import argparse
 import subprocess
@@ -23,9 +28,7 @@ def submit_job(script_content):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate and submit a PBS job script."
-    )
+    parser = argparse.ArgumentParser(description="Generate or submit a PBS job script.")
     # Input output arguments:
     parser.add_argument(
         "--template", default="job_template.pbs", help="Path to the job script template"
@@ -53,6 +56,12 @@ if __name__ == "__main__":
         type=str,
         default=":spec=8.0:gpu_cap=compute_86:osfamily=debian",
         help="Optional machine specification arguments",
+    )
+    parser.add_argument(
+        "--size_multiplier",
+        type=float,
+        default=0.1,
+        help="What model size we want to use (if not default).",
     )
     # Model arguments:
     parser.add_argument(
@@ -84,6 +93,7 @@ if __name__ == "__main__":
         mem=args.mem,
         scratch_local=args.scratch_local,
         opt_machine_args=args.opt_machine_args,
+        size_multiplier=args.size_multiplier,
         model_params=args.model_params,
     )
 

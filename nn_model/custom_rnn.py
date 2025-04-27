@@ -1,6 +1,6 @@
 """
-This script contains definition of the custom RNN class used in the model. 
-It is especially needed due the need to play with custom neuron models instead 
+This script contains definition of the custom RNN class used in the model.
+It is especially needed due the need to play with custom neuron models instead
 of just simple non-linearity function.
 """
 

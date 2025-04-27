@@ -68,7 +68,7 @@ def init_wandb(
         "param_red": arguments.parameter_reduction
     }
 
-    if arguments.best_model_evaluation or arguments.debug:
+    if arguments.debug:
         # Disable weights and biases tracking if there is only evaluation or debugging.
         os.environ["WANDB_DISABLED"] = "true"
     else:
@@ -161,6 +161,24 @@ def set_model_execution_parameters(
     }
 
 
+def get_subset_variant_name(subset_path: str, subset_variant: int = -1) -> str:
+    """
+    Creates subset indices filename based on the selected variant.
+
+    :param subset_path: Path containing model subset indices (without subset specified).
+    :param subset_variant: Variant of the subset (if `-1` then let it be).
+    :return: Returns model subset path with subset specified in format.
+        `{subset_path_without_extension}_variant_{subset_variant}.{extension}"
+    """
+
+    if subset_variant != -1:
+        # Subset variant specified -> add it for the variant to be loaded.
+        splitted_path = subset_path.split(".")
+        return splitted_path[0] + f"_variant_{subset_variant}." + splitted_path[-1]
+
+    return subset_path
+
+
 def main(arguments):
     """
     Perform model training and evaluation for the given setup specified
@@ -176,13 +194,9 @@ def main(arguments):
     # Initialize model path (if not specified in the arguments).
     arguments.model_filename = init_model_path(arguments)
 
-    if args.subset_variant != -1:
-        splitted_path = arguments.subset_dir.split(".")
-        arguments.subset_dir = (
-            splitted_path[0]
-            + f"_variant_{arguments.subset_variant}."
-            + splitted_path[-1]
-        )
+    arguments.subset_dir = get_subset_variant_name(
+        arguments.subset_dir, arguments.subset_variant
+    )
 
     logger = LoggerModel()
     logger.print_experiment_info(arguments)

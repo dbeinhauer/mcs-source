@@ -18,3 +18,4 @@ Where `merged_interval_size` is the size of the interval we want to merge,
 - `run_parallel_time_merger.sh` - script for merging all sheets on Wintermute
 - `run_time_merger.sh` - script for merging specific sheet on Wintermute
 - `time_interval_merger.py` - main python script for merging
+- `metacentrum/` - directory containing set of scripts necessary to run the tool on Metacentrum

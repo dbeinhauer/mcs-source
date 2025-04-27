@@ -14,6 +14,7 @@ from nn_model.type_variants import ModelTypes, LayerType
 from nn_model.custom_rnn import CustomRNNCell
 from nn_model.neurons import SharedNeuronBase
 from nn_model.weights_constraints import WeightConstraint
+from nn_model.activation_functions import LeakyTanh
 
 
 class ModelLayer(nn.Module):
@@ -78,6 +79,8 @@ class ModelLayer(nn.Module):
             weight_initialization_type,
             parameter_reduction
         )
+        self.custom_activation = LeakyTanh()
+
         # Weights constraint object.
         self.constraint = weight_constraint
 
@@ -166,9 +169,9 @@ class ModelLayer(nn.Module):
 
             return complexity_result, neuron_hidden
 
-        # No shared complexity (is `None` -> apply default tanh).
-        return torch.tanh(neuron_model_input), tuple(torch.zeros(0))
-
+        # No shared complexity (is `None` -> apply default LeakyTanh).
+        return self.custom_activation(neuron_model_input), tuple(torch.zeros(0))
+        
     def forward(
         self,
         input_data: torch.Tensor,
