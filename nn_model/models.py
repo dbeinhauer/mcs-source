@@ -236,7 +236,7 @@ class PrimaryVisualCortexModel(nn.Module):
     ) -> Dict[str, Optional[Dict[str, RNNNeuron]]]:
         """
         Initializes synaptic adaptation model.
-        
+
         :param only_lgn: Flag whether we want to apply synaptic adaptation module only on the LGN layer.
 
         :return: Returns synaptic adaptation models for all layers (dictionary of `None`
@@ -245,9 +245,13 @@ class PrimaryVisualCortexModel(nn.Module):
         if self.synaptic_adaptation_kwargs is not None:
             return {
                 layer: {
-                    input_layer: RNNNeuron(**self.synaptic_adaptation_kwargs).to(
-                        nn_model.globals.DEVICE
-                    ) if input_layer in {"X_ON", "X_OFF"} or not only_lgn else None # Decide whether to use synaptic adaptation only for LGN or for all layers.
+                    input_layer: (
+                        RNNNeuron(**self.synaptic_adaptation_kwargs).to(
+                            nn_model.globals.DEVICE
+                        )
+                        if input_layer in {"X_ON", "X_OFF"} or not only_lgn
+                        else None
+                    )  # Decide whether to use synaptic adaptation only for LGN or for all layers.
                     for (
                         input_layer,
                         _,
@@ -618,6 +622,7 @@ class PrimaryVisualCortexModel(nn.Module):
         synaptic_adaptation_hidden: Dict[
             str, Dict[str, Optional[Tuple[torch.Tensor, ...]]]
         ],
+        evaluation_train_like_forward: bool = False,
     ) -> Tuple[
         Dict[str, List[torch.Tensor]],
         Dict[str, List[torch.Tensor]],
@@ -645,7 +650,10 @@ class PrimaryVisualCortexModel(nn.Module):
         `(batch, neurons)` for evaluation (we need only first time step).
         :param neuron_hidden: Tuple of hidden states of the neurons (needed for RNN models).
         :param synaptic_adaptation_hidden: Hidden states of the synaptic adaptation model.
-        :return: Returns model predictions for all time steps.
+        :param evaluation_train_like_forward: Whether to run hidden steps resetting while
+        evaluation run (to test the performance of the model on the prediction of the only one
+        time step - same procedure as in train steps). Also called as teacher-forced predictions.
+        :return: Returns model predictions for all specified time steps.
         """
         # Initialize dictionaries of all model predictions.
         all_recurrent_outputs: Dict[str, List[torch.Tensor]] = {
@@ -655,6 +663,7 @@ class PrimaryVisualCortexModel(nn.Module):
             layer: [] for layer in PrimaryVisualCortexModel.layers_input_parameters
         }
 
+        all_hidden_states = hidden_states
         visible_time_steps = inputs[LayerType.X_ON.value].size(1)
         if self.training:
             # Training mode (only one visible step)
@@ -672,13 +681,19 @@ class PrimaryVisualCortexModel(nn.Module):
             # Define input layers for the current visible time prediction.
             current_inputs = inputs  # Train mode -> only one input state
             if not self.training:
-                # Evaluation mode
+                # Evaluation mode (with full sequence prediction)
                 # -> assign current input state
                 # (we predict all visible time steps in one forward step of the model).
                 current_inputs = {
                     layer: layer_input[:, visible_time, :]
                     for layer, layer_input in inputs.items()
                 }
+                if evaluation_train_like_forward:
+                    # If evaluation train like -> set hidden state based on previous target.
+                    hidden_states = {
+                        layer: tensor[:, visible_time - 1, :]
+                        for layer, tensor in all_hidden_states.items()
+                    }
 
             for _ in range(self.num_hidden_time_steps):
                 # Perform all hidden time steps.

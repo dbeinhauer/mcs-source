@@ -34,6 +34,7 @@ class LoggerModel:
                     "---------------------------------",
                     "Running with parameters:",
                     f"Model size: {nn_model.globals.SIZE_MULTIPLIER}",
+                    f"Time step size: {nn_model.globals.TIME_STEP}",
                     f"Train subset size: {arguments.train_subset}",
                     f"Model subset variant: {arguments.subset_variant}",
                     f"Batch size: {arguments.train_batch_size}",

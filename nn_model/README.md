@@ -76,7 +76,7 @@ corresponding time step of the given neuron.
 
 ### Types of the neuron modules
 Currently, there are 2 variants of the neurons Feed-Forward DNN neurons
-(marked as `dnn_`) and RNN neurons using LSTM cells (marked as `rnn_`). 
+(marked as `dnn_`) and RNN neurons using cells (marked as `rnn_`). 
 We also differentiate between different types of inputs of these 
 models. In case the output of the preceding linear RNN part returns
 joined output for inhibitory and excitatory layers (marked as `joint`)
@@ -88,8 +88,8 @@ Overall there are currently 5 types of models:
 - `simple` - Simple model without the neuron module (tanh non-linearity is applied after linear RNN step).
 - `dnn_joint` - Feed-forward neuron is used as neuron module and linear part of the rnn outputs joint value for both excitatory and inhibitory input part.
 - `dnn_separate` - Feed-forward neuron is used as neuron module and linear part of the rnn outputs separate values for both excitatory and inhibitory input part.
-- `rnn_joint` - LSTM RNN neuron is used as neuron module and linear part of the rnn outputs joint value for both excitatory and inhibitory input part.
-- `rnn_separate` - LSTM RNN neuron is used as neuron module and linear part of the rnn outputs separate value for both excitatory and inhibitory input part.
+- `rnn_joint` - RNN neuron is used as neuron module and linear part of the rnn outputs joint value for both excitatory and inhibitory input part.
+- `rnn_separate` - RNN neuron is used as neuron module and linear part of the rnn outputs separate value for both excitatory and inhibitory input part.
 
 ## Weight constraints
 In our model we differentiate also between the excitatory and inhibitory

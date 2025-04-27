@@ -1,38 +1,39 @@
 """
-Trims the spikes matrix to multiple smaller ones representing smaller time interval 
-and stores them into new destination. 
+Trims the spikes matrix to multiple smaller ones representing smaller time interval
+and stores them into new destination.
 
-It should be used to trim the time intervals the way that there should be 
+It should be used to trim the time intervals the way that there should be
 blank part (typically second half), whole stimuli (image) part and first
-half of the blank part (these can be repeated). To ensure correct format used 
+half of the blank part (these can be repeated). To ensure correct format used
 in the neural simulator model (the sizes depend on the used dataset).
 """
+
+from typing import List
 
 import os
 import argparse
 
 from tqdm import tqdm
 import scipy.sparse as sp
+import numpy as np
 
-# FILE_PREFIX = "spikes_"
 FILE_POSTFIX = ".npz"
 
 
 def trim_sparse_matrix(
-    matrix, interval_size: int = 712, start_offset: int = 151
-):  # TODO: = 76):
+    matrix: np.ndarray, interval_size: int = 712, start_offset: int = 151
+) -> List[np.ndarray]:
     """
-    TODO: Redo description and refine code (skipping first blank part)
-    Trims the sparse matrix into sub-matrices of a given interval size.
+    Trims the sparse matrix into sub-matrices of a given interval size. It skips the first blank
+    stage and trims each pair natural-blank stimulus. The last experiment in the sequence
+    is smaller since there is not last blank stage
+    (should be padded to uniform size in the future processing).
 
-    NOTE: If the matrix cannot be evenly divided, the last sub-matrix will be smaller.
-    The first matrix will be larger than the rest by `start_offset`.
-
-    :param matrix: numpy matrix for trimming in shape `(time_duration, num_neurons)`.
-    :param interval_size: size of the wanted time interval
-    (first and last will have different sizes).
-    :param start_offset: offset from which start trimming (to skip first blank part).
-    :return: returns list of trimmed numpy matrices in different
+    :param matrix: Numpy matrix for trimming in shape `(time_duration, num_neurons)`.
+    :param interval_size: Size of the wanted time interval. Typically one experiment
+    stimulus+blank stage. (first and last will have different sizes).
+    :param start_offset: Offset from which start trimming (to skip first blank part).
+    :return: Returns list of trimmed numpy matrices in different
     shape `(num_neurons, time_duration)`.
     """
     trimmed_matrices = []
@@ -43,11 +44,6 @@ def trim_sparse_matrix(
     for i in range(start_offset, num_time_steps, interval_size):
         # For each new matrix switch dimensions (for future processing).
         trimmed_matrices.append(matrix[i : i + interval_size, :].transpose(1, 0))
-        # if i == start_offset:
-        #     # First matrix (include also part before offset).
-        #     trimmed_matrices.append(matrix[: i + interval_size, :].transpose(1, 0))
-        # else:
-        #     trimmed_matrices.append(matrix[i : i + interval_size, :].transpose(1, 0))
 
     return trimmed_matrices
 
@@ -133,10 +129,12 @@ if __name__ == "__main__":
     ]
 
     if args.sheet:
+        # Trim only selected layer data.
         if args.sheet in SUBDIRECTORIES:
             SUBDIRECTORIES = [args.sheet]
 
     for subdirectory in SUBDIRECTORIES:
+        # Process all layers.
         print(f"Processing subdirectory: {subdirectory}")
         process_directory(
             input_dir=args.input_directory + "/" + subdirectory,

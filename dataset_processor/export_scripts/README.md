@@ -9,6 +9,7 @@ neuron the spike happened.
 ## Running Jobs 
 To export the dataset we need to connect to Wintermute (CSNG) server.
 To export all dataset of specific layer we need to run the command:
+
 ```bash
 ./export_all.sh <sheet> <dataset_variant>
 ```
@@ -22,6 +23,7 @@ If some part of the dataset exported wrongly (typically problem with Wintermute
 job), we can run the following script to determine missing part of the dataset
 and export only those (if we do not want to export the whole layer again). We
 run it as follows:
+
 ```bash
 ./export_missing.sh <sheet> <dataset_variant>
 ```
@@ -51,4 +53,4 @@ The structure is the following:
 - `export_dataset.py` - main python script doing the exact extraction 
 - `export_job.sh` - bash script to submit Slurm job on Wintermute node for extracting subset of dataset from given directory
 - `export_missing.sh` - bash script used to additionally extract the missing parts of dataset (in case regular extraction using script `export_all.sh` fails in some examples)  
-- `export_parameters.md` - markdown file containing basic information about the raw dataset storage
+- `export_parameters.md` - markdown file containing basic information about the raw dataset storage and structure
