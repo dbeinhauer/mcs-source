@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from nn_model.globals import POS_ORI_DICT, INHIBITORY_LAYERS, MODEL_SIZES, LAYER_TO_PARENT
+from nn_model.type_variants import LayerParent
 
 
 def get_features(layer_name_pre, layer_name_post):
@@ -107,13 +108,15 @@ class NeuralConnectionGenerator(nn.Module):
         :param layer_name_post: Name of the layer with post-synaptic neurons.
         """
         super().__init__()
-        assert LAYER_TO_PARENT[layer_name_pre] == LAYER_TO_PARENT[layer_name_post], 'Neurons are expected to some from the same biological layer.'
+        layer_pre_parent = LAYER_TO_PARENT[layer_name_pre]
+        assert layer_pre_parent == LAYER_TO_PARENT[
+            layer_name_post], 'Neurons are expected to some from the same biological layer.'
         self.in_features = MODEL_SIZES[layer_name_pre]
         self.out_features = MODEL_SIZES[layer_name_post]
         self.polarity = -1 if layer_name_pre in INHIBITORY_LAYERS else 1
         # set flags
         self.is_inh = self.polarity < 0
-        self.has_phase = 'L4' in layer_name_pre.upper()
+        self.has_phase = layer_pre_parent == LayerParent.L4.value
         self.has_self_connection = layer_name_pre == layer_name_post
         # prepare features
         x = self.encode_neural_features(layer_name_pre, layer_name_post)
