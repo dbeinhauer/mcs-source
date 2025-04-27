@@ -973,6 +973,7 @@ class ModelExecuter:
                 trial_hidden,
                 neuron_hidden,
                 synaptic_adaptation_hidden,
+                evaluation_train_like_forward=False,
             )
 
             # Teacher-forced evaluation results.
