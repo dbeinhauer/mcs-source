@@ -178,6 +178,8 @@ class ConnectionAffine(nn.Module):
 
     def __init__(self, layer_name_pre: str, layer_name_post: str):
         super().__init__()
+        self.layer_name_pre = layer_name_pre
+        self.layer_name_post = layer_name_post
         self.weight = NeuralConnectionGenerator(layer_name_pre, layer_name_post)
         self.bias = nn.Parameter(torch.zeros(MODEL_SIZES[layer_name_post], ))
 
