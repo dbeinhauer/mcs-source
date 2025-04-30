@@ -72,6 +72,8 @@ def init_wandb(
     else:
         os.environ["WANDB_DISABLED"] = "false"
 
+    wandb_api_key = os.environ["WANDB_API_KEY"]
+    wandb.login(key=wandb_api_key)
     wandb.init(
         # project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
         project=project_name,
