@@ -47,7 +47,7 @@ conda activate metacentrum_env
 
 WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
 
-wandb login "$WANDB_API_KEY" || {{
+wandb login --relogin --non-interactive --api-key "$WANDB_API_KEY" || {{
 echo >&2 "Failed to log into wandb"
 exit 1
 }}
