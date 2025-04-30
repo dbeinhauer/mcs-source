@@ -45,7 +45,8 @@ export PATH=/opt/conda/bin:$PATH
 source /opt/conda/etc/profile.d/conda.sh
 conda activate metacentrum_env
 
-WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
+# WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
+echo $WANDB_API_KEY
 
 echo "Logged in wandb at $(date)"
 
