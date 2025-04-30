@@ -47,11 +47,6 @@ conda activate metacentrum_env
 
 WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
 
-wandb login --relogin --non-interactive --api-key "$WANDB_API_KEY" || {{
-echo >&2 "Failed to log into wandb"
-exit 1
-}}
-
 echo "Logged in wandb at $(date)"
 
 export SIZE_MULTIPLIER={size_multiplier}
