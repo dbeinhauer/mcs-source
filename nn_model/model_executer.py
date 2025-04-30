@@ -502,7 +502,6 @@ class ModelExecuter:
             output_layers,
             is_test=True,
             model_subset_path=arguments.subset_dir,
-            experiment_selection_path=arguments.experiment_selection_path,
         )
 
         return train_dataset, test_dataset
