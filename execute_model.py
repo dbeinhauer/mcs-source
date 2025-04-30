@@ -72,6 +72,12 @@ def init_wandb(
     else:
         os.environ["WANDB_DISABLED"] = "false"
 
+    with open(f"{nn_model.globals.PROJECT_ROOT}/.wandb_api_key", "r") as f:
+        api_key = f.read().strip()
+
+    # Login to W&B using the key
+    wandb.login(key=api_key)
+
     wandb.init(
         # project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
         project=project_name,
