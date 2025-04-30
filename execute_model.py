@@ -72,6 +72,7 @@ def init_wandb(
     else:
         os.environ["WANDB_DISABLED"] = "false"
 
+    # Load wandb API key.
     with open(f"{nn_model.globals.PROJECT_ROOT}/.wandb_api_key", "r") as f:
         api_key = f.read().strip()
 

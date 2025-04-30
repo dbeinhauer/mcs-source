@@ -45,9 +45,6 @@ export PATH=/opt/conda/bin:$PATH
 source /opt/conda/etc/profile.d/conda.sh
 conda activate metacentrum_env
 
-# WANDB_API_KEY=$(cat /mnt/.wandb_api_key)
-echo $WANDB_API_KEY
-
 echo "Logged in wandb at $(date)"
 
 export SIZE_MULTIPLIER={size_multiplier}
@@ -67,7 +64,6 @@ echo "Running inside Singularity at $(date)"
 
 # Bind your project directory as /mnt inside container
 singularity exec \
-    --env WANDB_API_KEY="$WANDB_API_KEY" \
     --nv -B "$DATADIR":/mnt "$SIF_IMAGE" bash run_inside.sh || {{
     echo >&2 "Python script failed"
     exit 1
