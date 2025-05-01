@@ -179,12 +179,12 @@ class ConnectionAffine(nn.Module):
     Calculates X * W^T + b, where W is calculated by the connection learning module.
     """
 
-    def __init__(self, layer_name_pre: str, layer_name_post: str):
+    def __init__(self, layer_name_pre: str, layer_name_post: str, bias: bool = True):
         super().__init__()
         self.layer_name_pre = layer_name_pre
         self.layer_name_post = layer_name_post
         self.weight = NeuralConnectionGenerator(layer_name_pre, layer_name_post)
-        self.bias = nn.Parameter(torch.zeros(MODEL_SIZES[layer_name_post], ))
+        self.bias = nn.Parameter(torch.zeros(MODEL_SIZES[layer_name_post], )) if bias else None
 
     def forward(self, input: Tensor) -> Tensor:
         return nn.functional.linear(input, self.weight(), self.bias)
