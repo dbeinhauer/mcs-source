@@ -85,10 +85,11 @@ class CustomRNNCell(nn.Module):
         ) # Input inhibitory
         # Self-connection
         if self.parameter_reduction:
-            self.weights_hh = ConnectionAffine(layer_name, layer_name)
-            self.weights_lateral = ConnectionAffine(self.lateral_pre, layer_name)
+            # Bias already handled by weights_ih_exc and weights_ih_inh
+            self.weights_hh = ConnectionAffine(layer_name, layer_name, bias=False)
+            self.weights_lateral = ConnectionAffine(self.lateral_pre, layer_name, bias=False)
         else:
-            self.weights_hh = nn.Linear(hidden_size, hidden_size)
+            self.weights_hh = nn.Linear(hidden_size, hidden_size, bias=False)
 
         self._init_weights(weight_initialization_type)
 
