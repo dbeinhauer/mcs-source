@@ -252,7 +252,7 @@ class NormalizedCrossCorrelation:
 
     def calculate(
         self, prediction: torch.Tensor, target: torch.Tensor
-    ) -> Tuple[float, float]:
+    ) -> Metric:
         """
         Calculates normalized cross correlation between predictions and targets.
 
@@ -290,4 +290,5 @@ class NormalizedCrossCorrelation:
             target,
         )
 
-        return self._batch_mean(cc_norm), self._batch_mean(cc_abs)
+        cc_norm, cc_abs = self._batch_mean(cc_norm), self._batch_mean(cc_abs)
+        return Metric(cc_norm=cc_norm, cc_abs=cc_abs)

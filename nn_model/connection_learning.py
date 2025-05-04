@@ -110,7 +110,7 @@ class NeuralConnectionGenerator(nn.Module):
         super().__init__()
         layer_pre_parent = LAYER_TO_PARENT[layer_name_pre]
         assert layer_pre_parent == LAYER_TO_PARENT[
-            layer_name_post], 'Neurons are expected to some from the same biological layer.'
+            layer_name_post], 'Neurons are expected to come from the same biological layer.'
         self.in_features = MODEL_SIZES[layer_name_pre]
         self.out_features = MODEL_SIZES[layer_name_post]
         self.polarity = -1 if layer_name_pre in INHIBITORY_LAYERS else 1
