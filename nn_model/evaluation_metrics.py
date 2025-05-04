@@ -2,11 +2,59 @@
 This source code contains implementations of all evaluation metrics used
 in our model.
 """
-
-from typing import Tuple
+from typing import Tuple, NamedTuple
 
 import torch
 
+
+class Metric(NamedTuple):
+    """
+    Represents correlation metrics (CC_NORM, CC_ABS), with arithmetic operations for easy handling.
+
+    .. Note::
+
+    **Supported operations:**
+
+        >>> Metric(a, b) + Metric(c, d)
+        Metric(a + c, b + d)
+
+        >>> Metric(a, b) - Metric(c, d)
+        Metric(a - c, b - d)
+
+        >>> alpha * Metric(a, b)
+        Metric(alpha * a, alpha * b)
+
+        >>> -Metric(a, b)
+        Metric(-a, -b)
+    """
+    cc_norm: float
+    cc_abs: float
+
+    def __add__(self, other: 'Metric') -> 'Metric':
+        if not isinstance(other, Metric): return NotImplemented
+        return Metric(self.cc_norm + other.cc_norm,
+                      self.cc_abs + other.cc_abs)
+
+    def __sub__(self, other: 'Metric') -> 'Metric':
+        if not isinstance(other, Metric): return NotImplemented
+        return Metric(self.cc_norm - other.cc_norm,
+                      self.cc_abs - other.cc_abs)
+
+    def __neg__(self) -> 'Metric':
+        return Metric(-self.cc_norm,
+                      -self.cc_abs)
+
+    def __mul__(self, scalar: int | float) -> 'Metric':
+        if not isinstance(scalar, (int, float)): return NotImplemented
+        return Metric(self.cc_norm * scalar,
+                      self.cc_abs * scalar)
+
+    __rmul__ = __mul__ # alpha * Metric = Metric * alpha
+
+    def __truediv__(self, scalar: int | float) -> 'Metric':
+        if not isinstance(scalar, (int, float)): return NotImplemented
+        return Metric(self.cc_norm / scalar,
+                      self.cc_abs / scalar)
 
 class NormalizedCrossCorrelation:
     """
