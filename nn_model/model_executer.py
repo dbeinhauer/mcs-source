@@ -8,6 +8,7 @@ from typing import Tuple, Dict, List, Optional, Union
 
 import torch.nn
 import torch.optim as optim
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -18,7 +19,7 @@ from nn_model.type_variants import (
     ModelTypes,
     PredictionTypes,
     OptimizerTypes,
-    ModelModulesFields,
+    ModelModulesFields, LossTypes,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -53,7 +54,7 @@ class ModelExecuter:
 
         # Model initialization.
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
-        self.criterion = self._init_criterion()
+        self.criterion = self._init_criterion(arguments)
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
@@ -557,13 +558,17 @@ class ModelExecuter:
             },  # Pass kwargs to generate neuron and synaptic adaptation modules.
         )
 
-    def _init_criterion(self):
+    def _init_criterion(self, arguments) -> nn.Module:
         """
         Initializes model criterion.
 
         :return: Returns model criterion (loss function).
         """
-        return torch.nn.MSELoss()
+        if arguments.loss == LossTypes.MSE.value:
+            return torch.nn.MSELoss()
+        elif arguments.loss == LossTypes.POISSON.value:
+            return nn.PoissonNLLLoss(log_input=False, full=True, eps=1e-8)
+        raise ValueError(f"Unsupported loss type: {arguments.loss}")
 
     def _init_exc_inh_specific_learning_rate(self, learning_rate):
         """

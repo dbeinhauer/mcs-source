@@ -170,7 +170,7 @@ class LoggerModel:
             # group per-layer metrics by their type (norm or abs)
             wandb.log({"CC_NORM/" + name: metric.cc_norm})
             wandb.log({"CC_ABS/" + name: metric.cc_abs})
-            rows.append({'Layer': layer_name, 'CC_NORM': metric.cc_norm, 'CC_ABS': metric.cc_abs})
+            rows.append({'Layer': name, 'CC_NORM': metric.cc_norm, 'CC_ABS': metric.cc_abs})
         df = pd.DataFrame.from_records(rows).set_index("Layer").sort_index()
         print("\nPer-layer correlation summary")
         print(df.to_string(float_format="%.4f"))

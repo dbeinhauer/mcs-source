@@ -65,7 +65,16 @@ class ModelTypes(Enum):
     DNN_SEPARATE = "dnn_separate"
     RNN_JOINT = "rnn_joint"
     RNN_SEPARATE = "rnn_separate"
-    
+
+
+class LossTypes(Enum):
+    """
+    All possible RNN types.
+    """
+
+    MSE = "mse"
+    POISSON = "poisson"
+
 class RNNTypes(Enum):
     """
     All possible RNN types.

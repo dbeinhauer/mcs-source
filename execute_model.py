@@ -17,7 +17,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     WeightsInitializationTypes,
     NeuronActivationTypes,
-    RNNTypes,
+    RNNTypes, LossTypes,
 )
 
 from nn_model.logger import LoggerModel
@@ -65,7 +65,8 @@ def init_wandb(
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
         "synaptic_adaptation_num_layers": arguments.synaptic_adaptation_num_layers,
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
-        "param_red": arguments.parameter_reduction
+        "param_red": arguments.parameter_reduction,
+        "loss": arguments.loss,
     }
 
     if arguments.debug:
@@ -122,6 +123,8 @@ def init_model_path(arguments) -> str:
                 f"_grad-clip-{arguments.gradient_clip}",
                 f"_optim-{arguments.optimizer_type}",
                 f"_weight-init-{arguments.weight_initialization}",
+                f"_p-red-{arguments.parameter_reduction}",
+                f"_loss-{arguments.loss}",
                 "_synaptic",
                 f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
@@ -427,6 +430,13 @@ def init_parser() -> argparse.ArgumentParser:
         default=RNNTypes.GRU.value,
         help="Variant of the RNN model we use in the neuron and synaptic adaption model.",
     )
+    parser.add_argument(
+        "--loss",
+        type=str,
+        default=LossTypes.MSE.value,
+        help="Loss to use during training.",
+    )
+
     parser.add_argument(
         "--neuron_activation_function",
         type=str,
