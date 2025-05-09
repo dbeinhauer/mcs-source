@@ -3,6 +3,7 @@ This source defines custom logger class used in model execution.
 """
 
 import logging
+from typing import Dict
 
 import pandas as pd
 import wandb
@@ -151,7 +152,7 @@ class LoggerModel:
         )
 
     def print_final_evaluation_results(
-        self, avg_metric: Metric, layer_specific: dict[str, Metric]
+        self, avg_metric: Metric, layer_specific: Dict[str, Metric]
     ):
         """
         Prints final evaluation results and stores them also to `wandb` logs.
@@ -168,7 +169,7 @@ class LoggerModel:
         # log correlation for each layer
         rows = []
         for layer_name, metric in layer_specific.items():
-            name = layer_name.removeprefix("V1_")
+            name = layer_name
             # group per-layer metrics by their type (norm or abs)
             wandb.log({"CC_NORM/" + name: metric.cc_norm})
             wandb.log({"CC_ABS/" + name: metric.cc_abs})

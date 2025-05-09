@@ -2,7 +2,7 @@
 This source code contains implementations of all evaluation metrics used
 in our model.
 """
-from typing import Tuple, NamedTuple
+from typing import Tuple, NamedTuple, Union
 
 import torch
 
@@ -44,14 +44,14 @@ class Metric(NamedTuple):
         return Metric(-self.cc_norm,
                       -self.cc_abs)
 
-    def __mul__(self, scalar: int | float) -> 'Metric':
+    def __mul__(self, scalar: Union[int, float]) -> 'Metric':
         if not isinstance(scalar, (int, float)): return NotImplemented
         return Metric(self.cc_norm * scalar,
                       self.cc_abs * scalar)
 
     __rmul__ = __mul__ # alpha * Metric = Metric * alpha
 
-    def __truediv__(self, scalar: int | float) -> 'Metric':
+    def __truediv__(self, scalar: Union[int, float]) -> 'Metric':
         if not isinstance(scalar, (int, float)): return NotImplemented
         return Metric(self.cc_norm / scalar,
                       self.cc_abs / scalar)
