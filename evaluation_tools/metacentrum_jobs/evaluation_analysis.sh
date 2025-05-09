@@ -28,10 +28,10 @@ RESULTS_SAVE_PATH="$EVALUATION_TOOLS_DIR/evaluation_results/evaluation_analysis/
 echo "Task started at $(date)"
 
 export TMPDIR=$SCRATCHDIR
-if [[ -z "${SCRATCHDIR:-}" ]]; then
-    echo "SCRATCHDIR is not set!" >&2
-    exit 1
-fi
+test -n "$SCRATCHDIR" || {
+echo >&2 "SCRATCHDIR is not set!"
+exit 1
+}
 
 cd "$SCRATCHDIR" || { echo "Failed to enter scratch directory" >&2; exit 1; }
 

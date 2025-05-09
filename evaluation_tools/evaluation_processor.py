@@ -11,25 +11,22 @@ import argparse
 from enum import Enum
 
 import pandas as pd
-import pickle
+
+# import pickle
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-import seaborn as sns
+
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import nn_model.globals
 from nn_model.type_variants import (
-    LayerType,
-    NeuronModulePredictionFields,
-    PathPlotDefaults,
     PathDefaultFields,
-    EvaluationMeanVariants,
 )
-from nn_model.dataset_loader import SparseSpikeDataset  # , different_times_collate_fn
-from nn_model.model_executer import ModelExecuter
+from nn_model.dataset_loader import SparseSpikeDataset
 from nn_model.type_variants import EvaluationFields, PathDefaultFields
 from nn_model.dictionary_handler import DictionaryHandler
 
