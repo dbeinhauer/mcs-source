@@ -19,7 +19,8 @@ from nn_model.type_variants import (
     ModelTypes,
     PredictionTypes,
     OptimizerTypes,
-    ModelModulesFields, LossTypes,
+    ModelModulesFields,
+    LossTypes,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -1073,27 +1074,29 @@ class ModelExecuter:
 
         :param targets: dictionary of targets for all layers.
         :param predictions: dictionary of predictions for all layers.
-        :return: Returns tuple of evaluation score (CC_NORM) and Pearson's CC of the predictions.
+        :return: Returns tuple of overall evaluation score (CC_NORM and CC_ABS) and over each layer separately.
         """
         # Avoid dict insertion order issue
         keys = list(targets.keys())
+
         def cat(tensors: Dict[str, torch.Tensor]):
-            return torch.cat([tensors[k] for k in keys],dim=-1,)
+            return torch.cat(
+                [tensors[k] for k in keys],
+                dim=-1,
+            )
 
         # Concatenate predictions and targets across all layers.
         all_predictions = cat(predictions).to(nn_model.globals.DEVICE)
         all_targets = cat(targets).to(nn_model.globals.DEVICE)
 
         # Run the calculate function once on the concatenated tensors.
-        total = self.evaluation_metrics.calculate(
-            all_predictions, all_targets
-        )
+        total = self.evaluation_metrics.calculate(all_predictions, all_targets)
 
         layer_specific_metrics = {}
         for layer in keys:
             metric = self.evaluation_metrics.calculate(
                 predictions[layer].to(nn_model.globals.DEVICE),
-                targets[layer].to(nn_model.globals.DEVICE)
+                targets[layer].to(nn_model.globals.DEVICE),
             )
             layer_specific_metrics[layer] = metric
 
@@ -1135,7 +1138,7 @@ class ModelExecuter:
 
         self.model.eval()
 
-        metric_sum = Metric(0,0)
+        metric_sum = Metric(0, 0)
         specific_sum = defaultdict(lambda: Metric(0, 0))
 
         with torch.no_grad():
@@ -1183,7 +1186,9 @@ class ModelExecuter:
 
         # Average evaluation metrics calculation
         avg_metric = metric_sum / num_examples
-        avg_specific = DictionaryHandler.apply_function(specific_sum, lambda x: x / num_examples)
+        avg_specific = DictionaryHandler.apply_function(
+            specific_sum, lambda x: x / num_examples
+        )
         self.logger.print_final_evaluation_results(avg_metric, avg_specific)
 
         return avg_metric.cc_norm

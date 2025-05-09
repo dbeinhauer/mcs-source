@@ -24,15 +24,15 @@ class ModelLayer(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size: int,
-            hidden_size: int,
-            layer_name: str,
-            weight_constraint: WeightConstraint,
-            input_constraints: List[Dict],
-            weight_initialization_type: str,
-            neuron_model: Optional[SharedNeuronBase] = None,
-            parameter_reduction: bool = False,
+        self,
+        input_size: int,
+        hidden_size: int,
+        layer_name: str,
+        weight_constraint: WeightConstraint,
+        input_constraints: List[Dict],
+        weight_initialization_type: str,
+        neuron_model: Optional[SharedNeuronBase] = None,
+        parameter_reduction: bool = False,
     ):
         """
         Initializes layer parameters and constraints.
@@ -77,7 +77,7 @@ class ModelLayer(nn.Module):
             input_constraints,
             self.model_type,
             weight_initialization_type,
-            parameter_reduction
+            parameter_reduction,
         )
         self.custom_activation = LeakyTanh()
 
@@ -171,7 +171,7 @@ class ModelLayer(nn.Module):
 
         # No shared complexity (is `None` -> apply default LeakyTanh).
         return self.custom_activation(neuron_model_input), tuple(torch.zeros(0))
-        
+
     def forward(
         self,
         input_data: torch.Tensor,

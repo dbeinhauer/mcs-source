@@ -31,14 +31,14 @@ class CustomRNNCell(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size: int,
-            hidden_size: int,
-            layer_name: str,
-            input_constraints: List[Dict],
-            model_type: str,
-            weight_initialization_type: str,
-            parameter_reduction: bool = False,
+        self,
+        input_size: int,
+        hidden_size: int,
+        layer_name: str,
+        input_constraints: List[Dict],
+        model_type: str,
+        weight_initialization_type: str,
+        parameter_reduction: bool = False,
     ):
         """
         Initializes the custom RNN module.
@@ -67,7 +67,9 @@ class CustomRNNCell(nn.Module):
 
         # Select excitatory and inhibitory indices and determine their sizes.
         self.excitatory_indices, self.inhibitory_indices, self.lateral_indices = (
-            self._get_excitatory_inhibitory_layer_indices(separate_lateral=self.parameter_reduction)
+            self._get_excitatory_inhibitory_layer_indices(
+                separate_lateral=self.parameter_reduction
+            )
         )
 
         # Layer sizes
@@ -82,28 +84,31 @@ class CustomRNNCell(nn.Module):
         )  # Input excitatory
         self.weights_ih_inh = nn.Linear(
             self.inhibitory_size, hidden_size
-        ) # Input inhibitory
+        )  # Input inhibitory
         # Self-connection
         if self.parameter_reduction:
             # Bias already handled by weights_ih_exc and weights_ih_inh
             self.weights_hh = ConnectionAffine(layer_name, layer_name, bias=False)
-            self.weights_lateral = ConnectionAffine(self.lateral_pre, layer_name, bias=False)
+            self.weights_lateral = ConnectionAffine(
+                self.lateral_pre, layer_name, bias=False
+            )
         else:
             self.weights_hh = nn.Linear(hidden_size, hidden_size, bias=False)
 
         self._init_weights(weight_initialization_type)
 
-    def _get_excitatory_inhibitory_layer_indices(self, separate_lateral: bool) -> Tuple[List[int], List[int], List[int]]:
+    def _get_excitatory_inhibitory_layer_indices(
+        self, separate_lateral: bool
+    ) -> Tuple[List[int], List[int], List[int]]:
         """
         Split indices of the input layer to those that belongs to excitatory
         and those that belong to inhibitory part.
 
-        The 3rd return value are lateral indices. For example: for L4_Exc, lateral would be L4_Inh and vice-versa.
-        The lateral indices are filled only when
-
         :param separate_lateral: Handle lateral connections separately if True, return empty list if False.
 
-        :return: Returns tuple on excitatory and inhibitory lists of indices of these parts of input layer (without self-recurrent connection).
+        :return: Returns tuple on excitatory and inhibitory lists of indices of these parts of
+        input layer (without self-recurrent connection). The 3rd return value are lateral indices. For example:
+        for L4_Exc, lateral would be L4_Inh and vice-versa.
         """
         # Lists of indices:
         excitatory_indices: List[int] = []
@@ -117,8 +122,13 @@ class CustomRNNCell(nn.Module):
             layer_size = constraint[LayerConstraintFields.SIZE.value]
             layer_name = constraint[LayerConstraintFields.NAME.value]
             indices_to_add = []  # Placeholder for indices list.
-            if separate_lateral and LAYER_TO_PARENT[layer_name] == LAYER_TO_PARENT[self.layer_name]:
-                assert lateral_indices == [], 'Lateral indices are expected to come from at most 1 layer.'
+            if (
+                separate_lateral
+                and LAYER_TO_PARENT[layer_name] == LAYER_TO_PARENT[self.layer_name]
+            ):
+                assert (
+                    lateral_indices == []
+                ), "Lateral indices are expected to come from at most 1 layer."
                 indices_to_add = lateral_indices
                 self.lateral_pre = layer_name
             elif layer_type == WeightTypes.EXCITATORY.value:
@@ -261,6 +271,7 @@ class CustomRNNCell(nn.Module):
         in_exc_linear = self.weights_ih_exc(input_excitatory)
         in_inh_linear = self.weights_ih_inh(input_inhibitory)
 
+        # Apply parameter reduction.
         if self.parameter_reduction:
             input_lateral = input_data[:, self.lateral_indices]
             lateral = self.weights_lateral(input_lateral)

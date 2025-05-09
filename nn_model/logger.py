@@ -150,7 +150,9 @@ class LoggerModel:
             )
         )
 
-    def print_final_evaluation_results(self, avg_metric: Metric, layer_specific: dict[str, Metric]):
+    def print_final_evaluation_results(
+        self, avg_metric: Metric, layer_specific: dict[str, Metric]
+    ):
         """
         Prints final evaluation results and stores them also to `wandb` logs.
 
@@ -166,11 +168,13 @@ class LoggerModel:
         # log correlation for each layer
         rows = []
         for layer_name, metric in layer_specific.items():
-            name = layer_name.removeprefix('V1_')
+            name = layer_name.removeprefix("V1_")
             # group per-layer metrics by their type (norm or abs)
             wandb.log({"CC_NORM/" + name: metric.cc_norm})
             wandb.log({"CC_ABS/" + name: metric.cc_abs})
-            rows.append({'Layer': name, 'CC_NORM': metric.cc_norm, 'CC_ABS': metric.cc_abs})
+            rows.append(
+                {"Layer": name, "CC_NORM": metric.cc_norm, "CC_ABS": metric.cc_abs}
+            )
         df = pd.DataFrame.from_records(rows).set_index("Layer").sort_index()
         print("\nPer-layer correlation summary")
         print(df.to_string(float_format="%.4f"))

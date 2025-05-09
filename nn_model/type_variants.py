@@ -69,17 +69,18 @@ class ModelTypes(Enum):
 
 class LossTypes(Enum):
     """
-    All possible RNN types.
+    All possible loss types.
     """
 
     MSE = "mse"
     POISSON = "poisson"
 
+
 class RNNTypes(Enum):
     """
     All possible RNN types.
     """
-    
+
     LSTM = "lstm"
     GRU = "gru"
 
@@ -132,13 +133,13 @@ class LayerConstraintFields(Enum):
 
 class PredictionTypes(Enum):
     """
-    All variants of predictions that are provided by the model 
+    All variants of predictions that are provided by the model
     (to distinguish between the predictions).
     """
 
     # General model prediction -> full sequence prediction (without resetting).
     FULL_PREDICTION = "full_prediction"
-    # Predictions where we reset the hidden states based on the target 
+    # Predictions where we reset the hidden states based on the target
     # (same approach as in train).
     TRAIN_LIKE_PREDICTION = "train_like_prediction"
     # Predictions of the outer RNN (not working currently).
