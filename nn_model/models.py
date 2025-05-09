@@ -112,6 +112,7 @@ class PrimaryVisualCortexModel(nn.Module):
         num_hidden_time_steps: int,
         neuron_type: str,
         weight_initialization: str,
+        parameter_reduction: bool,
         model_modules_kwargs: Dict[str, Optional[Dict]],
     ):
         """
@@ -123,6 +124,7 @@ class PrimaryVisualCortexModel(nn.Module):
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
         :param weight_initialization: type of weight initialization that we want to use.
+        :param parameter_reduction: Reduce the number of trainable model parameters if True.
         :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic
         adaptation models.
         """
@@ -133,6 +135,8 @@ class PrimaryVisualCortexModel(nn.Module):
         self.num_hidden_time_steps = num_hidden_time_steps
 
         self.weight_initialization = weight_initialization
+
+        self.parameter_reduction = parameter_reduction
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -312,6 +316,7 @@ class PrimaryVisualCortexModel(nn.Module):
             self.layers_configs[layer].input_constraints,
             self.weight_initialization,
             self.layers_configs[layer].neuron_model,
+            self.parameter_reduction
         )
 
     def _init_model_architecture(self):

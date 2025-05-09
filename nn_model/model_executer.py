@@ -3,11 +3,12 @@ This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
-import re
+from collections import defaultdict
 from typing import Tuple, Dict, List, Optional, Union
 
 import torch.nn
 import torch.optim as optim
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -18,14 +19,14 @@ from nn_model.type_variants import (
     ModelTypes,
     PredictionTypes,
     OptimizerTypes,
-    ModelModulesFields,
+    ModelModulesFields, LossTypes,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
     PrimaryVisualCortexModel,
     ModelLayer,
 )
-from nn_model.evaluation_metrics import NormalizedCrossCorrelation
+from nn_model.evaluation_metrics import NormalizedCrossCorrelation, Metric
 from nn_model.evaluation_results_saver import EvaluationResultsSaver
 from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
@@ -53,7 +54,7 @@ class ModelExecuter:
 
         # Model initialization.
         self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
-        self.criterion = self._init_criterion()
+        self.criterion = self._init_criterion(arguments)
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
@@ -549,19 +550,24 @@ class ModelExecuter:
             arguments.num_hidden_time_steps,
             arguments.model,
             arguments.weight_initialization,
+            arguments.parameter_reduction,
             model_modules_kwargs={
                 **ModelExecuter._get_neuron_model_kwargs(arguments),
                 **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
             },  # Pass kwargs to generate neuron and synaptic adaptation modules.
         )
 
-    def _init_criterion(self):
+    def _init_criterion(self, arguments) -> nn.Module:
         """
         Initializes model criterion.
 
         :return: Returns model criterion (loss function).
         """
-        return torch.nn.MSELoss()
+        if arguments.loss == LossTypes.MSE.value:
+            return torch.nn.MSELoss()
+        elif arguments.loss == LossTypes.POISSON.value:
+            return nn.PoissonNLLLoss(log_input=False, full=True, eps=1e-8)
+        raise ValueError(f"Unsupported loss type: {arguments.loss}")
 
     def _init_exc_inh_specific_learning_rate(self, learning_rate):
         """
@@ -1057,7 +1063,7 @@ class ModelExecuter:
 
     def compute_evaluation_score(
         self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor]
-    ) -> Tuple[float, float]:
+    ) -> Tuple[Metric, Dict[str, Metric]]:
         """
         Computes evaluation score between vectors of all prediction
         and all target layers.
@@ -1069,21 +1075,29 @@ class ModelExecuter:
         :param predictions: dictionary of predictions for all layers.
         :return: Returns tuple of evaluation score (CC_NORM) and Pearson's CC of the predictions.
         """
+        # Avoid dict insertion order issue
+        keys = list(targets.keys())
+        def cat(tensors: Dict[str, torch.Tensor]):
+            return torch.cat([tensors[k] for k in keys],dim=-1,)
+
         # Concatenate predictions and targets across all layers.
-        all_predictions = torch.cat(
-            [prediction for prediction in predictions.values()],
-            dim=-1,
-        ).to(nn_model.globals.DEVICE)
-        all_targets = torch.cat([target for target in targets.values()], dim=-1).to(
-            nn_model.globals.DEVICE
-        )
+        all_predictions = cat(predictions).to(nn_model.globals.DEVICE)
+        all_targets = cat(targets).to(nn_model.globals.DEVICE)
 
         # Run the calculate function once on the concatenated tensors.
-        cc_norm, cc_abs = self.evaluation_metrics.calculate(
+        total = self.evaluation_metrics.calculate(
             all_predictions, all_targets
         )
 
-        return cc_norm, cc_abs
+        layer_specific_metrics = {}
+        for layer in keys:
+            metric = self.evaluation_metrics.calculate(
+                predictions[layer].to(nn_model.globals.DEVICE),
+                targets[layer].to(nn_model.globals.DEVICE)
+            )
+            layer_specific_metrics[layer] = metric
+
+        return total, layer_specific_metrics
 
     def evaluation(
         self,
@@ -1121,8 +1135,8 @@ class ModelExecuter:
 
         self.model.eval()
 
-        cc_norm_sum = 0.0
-        cc_abs_sum = 0.0
+        metric_sum = Metric(0,0)
+        specific_sum = defaultdict(lambda: Metric(0, 0))
 
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
@@ -1143,19 +1157,23 @@ class ModelExecuter:
                         i, all_predictions, targets
                     )
 
-                cc_norm, cc_abs = self.compute_evaluation_score(
+                metric, layer_specific = self.compute_evaluation_score(
                     # Compute evaluation for all time steps except the first step (0-th).
                     {layer: target[:, :, 1:, :] for layer, target in targets.items()},
                     all_predictions[PredictionTypes.FULL_PREDICTION],
                 )
-                cc_norm_sum += cc_norm
-                cc_abs_sum += cc_abs
+
+                # Add metrics to the total
+                metric_sum += metric
+
+                for layer, layer_metric in layer_specific.items():
+                    specific_sum[layer] += layer_metric
 
                 # Logging of the evaluation results.
-                self.logger.wandb_batch_evaluation_logs(cc_norm, cc_abs)
+                self.logger.wandb_batch_evaluation_logs(metric.cc_norm, metric.cc_abs)
                 if i % print_each_step == 0:
                     self.logger.print_current_evaluation_status(
-                        i + 1, cc_norm_sum, cc_abs_sum
+                        i + 1, metric_sum.cc_norm, metric_sum.cc_abs
                     )
 
         # Decide what was the total number of examples during evaluation.
@@ -1164,11 +1182,11 @@ class ModelExecuter:
             num_examples = len(self.test_loader)
 
         # Average evaluation metrics calculation
-        avg_cc_norm = cc_norm_sum / num_examples
-        avg_cc_abs = cc_abs_sum / num_examples
-        self.logger.print_final_evaluation_results(avg_cc_norm, avg_cc_abs)
+        avg_metric = metric_sum / num_examples
+        avg_specific = DictionaryHandler.apply_function(specific_sum, lambda x: x / num_examples)
+        self.logger.print_final_evaluation_results(avg_metric, avg_specific)
 
-        return avg_cc_norm
+        return avg_metric.cc_norm
 
     def evaluate_neuron_models(
         self, start: float = -1.0, end: float = 1.0, step: float = 0.001

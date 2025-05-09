@@ -24,14 +24,15 @@ class ModelLayer(nn.Module):
     """
 
     def __init__(
-        self,
-        input_size: int,
-        hidden_size: int,
-        layer_name: str,
-        weight_constraint: WeightConstraint,
-        input_constraints: List[Dict],
-        weight_initialization_type: str,
-        neuron_model: Optional[SharedNeuronBase] = None,
+            self,
+            input_size: int,
+            hidden_size: int,
+            layer_name: str,
+            weight_constraint: WeightConstraint,
+            input_constraints: List[Dict],
+            weight_initialization_type: str,
+            neuron_model: Optional[SharedNeuronBase] = None,
+            parameter_reduction: bool = False,
     ):
         """
         Initializes layer parameters and constraints.
@@ -46,6 +47,7 @@ class ModelLayer(nn.Module):
         :param neuron_model: Shared complexity neuron model used as a neuron non-linearity
         activation in the layer. In case we would like to use simple model the value
         should be `None`.
+        :param parameter_reduction: Reduce the number of trainable parameters if True.
         """
         super(ModelLayer, self).__init__()
 
@@ -75,6 +77,7 @@ class ModelLayer(nn.Module):
             input_constraints,
             self.model_type,
             weight_initialization_type,
+            parameter_reduction
         )
         self.custom_activation = LeakyTanh()
 

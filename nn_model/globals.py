@@ -5,13 +5,17 @@ about the layer and model parameters.
 """
 
 import os
+import pickle
 from pathlib import Path
+
+import numpy as np
+import torch
 
 from nn_model.type_variants import (
     LayerType,
     PathDefaultFields,
-    PathPlotDefaults,
     ModelTypes,
+    LayerParent,
 )
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -34,6 +38,15 @@ TIME_STEP = int(os.getenv("TIME_STEP", DEFAULT_TIME_STEP))
 # Batch sizes:
 TRAIN_BATCH_SIZE = 50
 TEST_BATCH_SIZE = 10
+
+LAYER_TO_PARENT = {
+    LayerType.X_ON.value: LayerParent.LGN.value,
+    LayerType.X_OFF.value: LayerParent.LGN.value,
+    LayerType.V1_EXC_L4.value: LayerParent.L4.value,
+    LayerType.V1_INH_L4.value: LayerParent.L4.value,
+    LayerType.V1_EXC_L23.value: LayerParent.L23.value,
+    LayerType.V1_INH_L23.value: LayerParent.L23.value,
+}
 
 # Will return values as its names
 EXCITATORY_LAYERS = {
@@ -155,3 +168,15 @@ def rewrite_test_batch_size(new_batch_size: int):
     """
     global TEST_BATCH_SIZE
     TEST_BATCH_SIZE = new_batch_size
+
+with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", 'rb') as f:
+    POS_ORI_DICT = pickle.load(f)
+
+with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], 'rb') as f:
+    NEURON_SELECTION = pickle.load(f)
+
+for layer, xyo in POS_ORI_DICT.items():
+    subset_filter = NEURON_SELECTION[layer].astype(int)
+    for attr in xyo.keys():
+        POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[subset_filter].astype(float)
+        POS_ORI_DICT[layer][attr] = torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)

@@ -4,9 +4,11 @@ This source defines custom logger class used in model execution.
 
 import logging
 
+import pandas as pd
 import wandb
 
 import nn_model.globals
+from nn_model.evaluation_metrics import Metric
 
 
 # pylint: disable=W1203
@@ -148,14 +150,27 @@ class LoggerModel:
             )
         )
 
-    def print_final_evaluation_results(self, avg_cc_norm: float, avg_cc_abs: float):
+    def print_final_evaluation_results(self, avg_metric: Metric, layer_specific: dict[str, Metric]):
         """
         Prints final evaluation results and stores them also to `wandb` logs.
 
-        :param avg_cc_norm: Average CC_NORM value.
-        :param avg_cc_abs: Average CC_ABS value.
+        :param avg_metric: Average CC_NORM and CC_ABS values across all layers.
+        :param layer_specific: Average CC_NORM and CC_ABS values for each layer.
         """
-        print(f"Final average normalized cross correlation is: {avg_cc_norm:.4f}")
-        print(f"Final average Pearson's CC is: {avg_cc_abs:.4f}")
-        wandb.log({"CC_NORM": avg_cc_norm})
-        wandb.log({"CC_ABS": avg_cc_abs})
+        print("Final evaluation results:")
+        print(30 * "-")
+        print(f"Average normalized cross correlation: {avg_metric.cc_norm:.4f}")
+        print(f"Average Pearson's CC: {avg_metric.cc_abs:.4f}")
+        wandb.log({"CC_NORM": avg_metric.cc_norm})
+        wandb.log({"CC_ABS": avg_metric.cc_abs})
+        # log correlation for each layer
+        rows = []
+        for layer_name, metric in layer_specific.items():
+            name = layer_name.removeprefix('V1_')
+            # group per-layer metrics by their type (norm or abs)
+            wandb.log({"CC_NORM/" + name: metric.cc_norm})
+            wandb.log({"CC_ABS/" + name: metric.cc_abs})
+            rows.append({'Layer': name, 'CC_NORM': metric.cc_norm, 'CC_ABS': metric.cc_abs})
+        df = pd.DataFrame.from_records(rows).set_index("Layer").sort_index()
+        print("\nPer-layer correlation summary")
+        print(df.to_string(float_format="%.4f"))
