@@ -51,6 +51,11 @@ class ModelEvaluationRunVariant(Enum):
     # Synaptic adaptation
     SYN_ADAPT = "syn_adapt"
 
+    # Poison Loss Experiments:
+    DNN_JOINT_POISON = "dnn_joint_poison"
+    RNN_BACKPROPAGATION_10_POISON = "rnn_separate_10_poison"
+    SYN_ADAPT_BACKPROPAGATION_10_POISON = "syn_adapt_10_poison"
+
 
 class AdditionalExperiments(Enum):
     """
