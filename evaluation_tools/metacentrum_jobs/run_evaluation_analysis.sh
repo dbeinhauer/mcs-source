@@ -13,7 +13,7 @@ JOB_SCRIPT="job_evaluation_${MODEL}.sh"
 cat << EOF > "$JOB_SCRIPT"
 #!/bin/bash
 #PBS -N EVALUATION_ANALYSIS_${MODEL}
-#PBS -l walltime=01:00:00
+#PBS -l walltime=00:20:00
 #PBS -l select=1:ncpus=8:mem=100gb:scratch_local=100gb
 #PBS -m ae
 #PBS -j oe
