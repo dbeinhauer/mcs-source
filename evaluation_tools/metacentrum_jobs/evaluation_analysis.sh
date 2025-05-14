@@ -8,21 +8,22 @@
 
 set -euo pipefail
 
-# === CONFIGURATION ===
-PROJECT_NAME="mcs-source"
-SERVER_LOCATION="praha1"
-DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
-EVALUATION_TOOLS_DIR="$DATADIR/evaluation_tools"
-SIF_IMAGE="/storage/$SERVER_LOCATION/home/$USER/visual_cortex.sif"  # or .sandbox
-
 # === ARGUMENT VALIDATION ===
 if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <model_variant>"
     exit 1
 fi
 
+# === CONFIGURATION ===
+PROJECT_NAME="mcs-source"
+SERVER_LOCATION="praha1"
+DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
+SIF_IMAGE="/storage/$SERVER_LOCATION/home/$USER/visual_cortex.sif"  # or .sandbox
+
 MODEL="$1"
-RESULTS_SAVE_PATH="$EVALUATION_TOOLS_DIR/evaluation_results/evaluation_analysis/$MODEL"
+FILENAME="prediction_analysis-$MODEL.pkl"
+RESULTS_SAVE_DIR="$DATADIR/analysis_results/prediction_analysis/"
+RESULTS_SAVE_PATH="$RESULTS_SAVE_DIR$FILENAME"
 
 # === PREPARATION ===
 echo "Task started at $(date)"
@@ -36,7 +37,7 @@ exit 1
 cd "$SCRATCHDIR" || { echo "Failed to enter scratch directory" >&2; exit 1; }
 
 # Ensure results directory exists
-mkdir -p "$RESULTS_SAVE_PATH"
+mkdir -p "$RESULTS_SAVE_DIR"
 
 # Create the runner script for inside container
 cat << EOF > run_inside.sh
@@ -50,7 +51,7 @@ echo "Starting evaluation analysis at \$(date)"
 python /mnt/evaluation_tools/evaluation_processor.py \\
     --action=prediction_analysis \\
     --model_evaluation_variant="$MODEL" \\
-    --results_save_path="/mnt/evaluation_tools/evaluation_results/evaluation_analysis/$MODEL" || {
+    --results_save_path="$RESULTS_SAVE_PATH" || {
     echo >&2 "Python script failed"
     exit 1
 }

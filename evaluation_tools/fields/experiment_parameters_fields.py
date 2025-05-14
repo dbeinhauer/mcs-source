@@ -52,9 +52,9 @@ class ModelEvaluationRunVariant(Enum):
     SYN_ADAPT = "syn_adapt"
 
     # Poison Loss Experiments:
-    DNN_JOINT_POISON = "dnn_joint_poison"
-    RNN_BACKPROPAGATION_10_POISON = "rnn_separate_10_poison"
-    SYN_ADAPT_BACKPROPAGATION_10_POISON = "syn_adapt_10_poison"
+    DNN_JOINT_POISSON = "dnn_joint_poisson"
+    RNN_BACKPROPAGATION_10_POISSON = "rnn_separate_10_poisson"
+    SYN_ADAPT_BACKPROPAGATION_10_POISSON = "syn_adapt_10_poisson"
 
 
 class AdditionalExperiments(Enum):
