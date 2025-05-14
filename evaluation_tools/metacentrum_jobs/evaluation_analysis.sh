@@ -20,7 +20,7 @@ SERVER_LOCATION="praha1"
 DATADIR="/storage/$SERVER_LOCATION/home/$USER/$PROJECT_NAME"
 SIF_IMAGE="/storage/$SERVER_LOCATION/home/$USER/visual_cortex.sif"  # or .sandbox
 
-MODEL="$1"
+# MODEL="$1"
 FILENAME="prediction_analysis-$MODEL.pkl"
 RESULTS_SAVE_DIR="$DATADIR/analysis_results/prediction_analysis/"
 RESULTS_SAVE_PATH="$RESULTS_SAVE_DIR$FILENAME"
