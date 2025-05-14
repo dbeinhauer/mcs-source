@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N EVALUATION_ANALYSIS
-#PBS -l walltime=00:30:00
-#PBS -l select=1:ncpus=8:mem=24gb:scratch_local=30gb
+#PBS -l walltime=01:00:00
+#PBS -l select=1:ncpus=8:mem=100gb:scratch_local=100gb
 
 #PBS -m ae
 #PBS -j oe
