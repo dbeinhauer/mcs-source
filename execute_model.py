@@ -287,9 +287,7 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--experiment_selection_path",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.EXPERIMENT_SELECTION_PATH.value
-        ],
+        default="",
         help="Path to selected experiments used for model analysis during evaluation.",
     )
     parser.add_argument(
@@ -433,7 +431,7 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--loss",
         type=str,
-        default=LossTypes.MSE.value,
+        default=LossTypes.POISSON.value,
         help="Loss to use during training.",
     )
 

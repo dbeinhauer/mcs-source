@@ -21,7 +21,10 @@ from nn_model.type_variants import (
 PROJECT_ROOT = Path(__file__).parent.parent
 
 # GPU Devices:
-DEVICE = "cuda"
+if torch.cuda.is_available():
+    DEVICE = "cuda"
+else:
+    DEVICE = "cpu"
 
 # Model Parameters:
 
@@ -110,14 +113,16 @@ SEPARATE_MODELS = [
     ModelTypes.RNN_SEPARATE.value,
 ]
 
+DATASET_NAME = 'testing_dataset'
+
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {
-    PathDefaultFields.TRAIN_DIR.value: f"{PROJECT_ROOT}/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.TEST_DIR.value: f"{PROJECT_ROOT}/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.SUBSET_DIR.value: f"{PROJECT_ROOT}/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
+    PathDefaultFields.TRAIN_DIR.value: f"{PROJECT_ROOT}/{DATASET_NAME}/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.TEST_DIR.value: f"{PROJECT_ROOT}/{DATASET_NAME}/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
+    PathDefaultFields.SUBSET_DIR.value: f"{PROJECT_ROOT}/{DATASET_NAME}/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
     PathDefaultFields.MODEL_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/best_models/",
     PathDefaultFields.EXPERIMENT_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
-    PathDefaultFields.NEURON_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
+    PathDefaultFields.NEURON_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER * 100)}_subset_10.pkl",
     PathDefaultFields.SELECTION_RESULTS_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/neuron_responses/",
     PathDefaultFields.FULL_EVALUATION_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/full_evaluation_results/",
     PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/neuron_model_responses/",
