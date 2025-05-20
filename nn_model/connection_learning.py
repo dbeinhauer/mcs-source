@@ -16,7 +16,7 @@ def get_features(layer_name_pre, layer_name_post):
 
 class Autapse(nn.Module):
     """
-    Learnable self‑connection weights for inhibitory neurons.
+    Learnable self-connection weights for inhibitory neurons.
     Autapses are self-to-self connections, most common in inhibitory neurons of the visual cortex.
     """
 
@@ -36,8 +36,8 @@ class Autapse(nn.Module):
     def forward(self) -> Tensor:
         """
         Apply the chosen constraint to the embedding and negate it.
-
-        :return: Negative autapse weights, shape (n_neurons,).        """
+        :return: Negative autapse weights, shape (n_neurons,).
+        """
         return - self.constraint(self.embedding)
 
 
