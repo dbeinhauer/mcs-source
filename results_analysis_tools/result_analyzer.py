@@ -324,3 +324,23 @@ if __name__ == "__main__":
         EvaluationProcessorChoices.PREDICTION_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.PREDICTION_ANALYSIS.value}/",
     }
     result_analyzer = ResultAnalyzer(analysis_paths)
+    model_variant = ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10_POISSON
+    # kwargs = {
+    #     "model_variant": EvaluationResultsProcessor.model_names_mapping_for_plotting[
+    #         model_variant
+    #     ],
+    # }
+    # filename = f"separate_model_synchrony_curve_{model_variant.value}.pdf"
+    # destination = f"{PLOTING_DESTINATION}{filename}"
+    plot_data = result_analyzer.prepare_dataframe_for_plot(
+        PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION,
+        synchrony_curve_kwargs={
+            "model_variants": [model_variant],
+        },
+    )
+    # ResultsPlotter.plot(
+    #     plot_data,
+    #     PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION,
+    #     save_fig=destination,
+    #     kwargs=kwargs,
+    # )

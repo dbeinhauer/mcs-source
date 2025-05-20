@@ -144,6 +144,7 @@ def plot_single_model_synchrony_curves_across_layers(
         facet_kws={"sharey": False, "sharex": True},
         height=4,
         aspect=1.5,
+        errorbar=None,  # <<< Disable error bars
     )
 
     # Group the axes

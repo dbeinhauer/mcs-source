@@ -2,6 +2,7 @@
 This scripts serves for loading the analysis results.
 """
 
+import os
 from typing import Dict, List, Tuple, Iterable
 
 from itertools import product
@@ -102,12 +103,15 @@ class ResultsLoader:
             filename = "-".join(filename_parts) + ".pkl"
             path_to_data = base_path + filename
 
-            # Load and annotate
-            dataset = load_pickle_file(path_to_data)
-            for col, val in combo_dict.items():
-                dataset[col] = val
+            if os.path.exists(path_to_data):
+                # Load and annotate
+                dataset = load_pickle_file(path_to_data)
+                for col, val in combo_dict.items():
+                    dataset[col] = val
 
-            all_dfs.append(dataset)
+                all_dfs.append(dataset)
+            else:
+                print(f"File {filename} does not exist. Skipping!")
 
         # Combine into a single DataFrame
         full_df = pd.concat(all_dfs, ignore_index=True)
@@ -179,14 +183,17 @@ class ResultsLoader:
             [
                 (
                     "model_variant",
-                    [
-                        ModelEvaluationRunVariant.SIMPLE_LEAKYTANH,
-                        ModelEvaluationRunVariant.DNN_JOINT,
-                        ModelEvaluationRunVariant.DNN_SEPARATE,
-                        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
-                        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
-                        ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
-                    ],
+                    list(ModelEvaluationRunVariant),
+                    # [
+                    #     ModelEvaluationRunVariant.SIMPLE_LEAKYTANH,
+                    #     ModelEvaluationRunVariant.DNN_JOINT,
+                    #     ModelEvaluationRunVariant.DNN_SEPARATE,
+                    #     ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
+                    #     ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
+                    #     ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
+                    #     ModelEvaluationRunVariant.DNN_JOINT_POISSON,
+                    #     ModelEvaluationRunVariant.
+                    # ],
                 )
             ],
         )

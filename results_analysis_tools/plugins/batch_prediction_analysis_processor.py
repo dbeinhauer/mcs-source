@@ -86,7 +86,7 @@ class BatchPredictionAnalysisProcessor:
                             "variant_type": variant,
                             "subset_index": subset_idx,
                             "time": t,
-                            # Make the synchrony to be a ration of firing neurons from the layer.
+                            # Make the synchrony to be a ratio of firing neurons from the layer.
                             "synchrony": summed_curve[t]
                             / nn_model.globals.MODEL_SIZES[layer],
                         }

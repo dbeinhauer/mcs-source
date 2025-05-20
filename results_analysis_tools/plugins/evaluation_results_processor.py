@@ -44,6 +44,9 @@ class EvaluationResultsProcessor:
         ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10: "rnn (10 steps)",
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5: "syn adapt lgn (5 steps)",
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10: "syn adapt lgn (10 steps)",
+        ModelEvaluationRunVariant.DNN_JOINT_POISSON: "dnn joint - poisson loss",
+        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10_POISSON: "rnn (10 steps) - poisson loss",
+        ModelEvaluationRunVariant.SYN_ADAPT_BACKPROPAGATION_10_POISSON: "syn adapt (10 steps) - poisson loss",
     }
 
     # Grid search experiment names for plotting.
