@@ -6,6 +6,7 @@ from typing import Tuple, NamedTuple, Union
 
 import torch
 
+import nn_model.globals
 
 class Metric(NamedTuple):
     """
@@ -29,32 +30,41 @@ class Metric(NamedTuple):
     """
     cc_norm: float
     cc_abs: float
+    cc_abs_separate: float = 0.0
 
     def __add__(self, other: 'Metric') -> 'Metric':
         if not isinstance(other, Metric): return NotImplemented
         return Metric(self.cc_norm + other.cc_norm,
-                      self.cc_abs + other.cc_abs)
+                      self.cc_abs + other.cc_abs,
+                      self.cc_abs_separate + other.cc_abs_separate
+                      )
 
     def __sub__(self, other: 'Metric') -> 'Metric':
         if not isinstance(other, Metric): return NotImplemented
         return Metric(self.cc_norm - other.cc_norm,
-                      self.cc_abs - other.cc_abs)
+                      self.cc_abs - other.cc_abs,
+                      self.cc_abs_separate - other.cc_abs_separate
+                      )
 
     def __neg__(self) -> 'Metric':
         return Metric(-self.cc_norm,
-                      -self.cc_abs)
+                      -self.cc_abs,
+                      -self.cc_abs_separate)
 
     def __mul__(self, scalar: Union[int, float]) -> 'Metric':
         if not isinstance(scalar, (int, float)): return NotImplemented
         return Metric(self.cc_norm * scalar,
-                      self.cc_abs * scalar)
+                      self.cc_abs * scalar,
+                      self.cc_abs_separate * scalar)
 
     __rmul__ = __mul__ # alpha * Metric = Metric * alpha
 
     def __truediv__(self, scalar: Union[int, float]) -> 'Metric':
         if not isinstance(scalar, (int, float)): return NotImplemented
         return Metric(self.cc_norm / scalar,
-                      self.cc_abs / scalar)
+                      self.cc_abs / scalar,
+                      self.cc_abs_separate / scalar)
+        
 
 class NormalizedCrossCorrelation:
     """
@@ -249,6 +259,22 @@ class NormalizedCrossCorrelation:
         :return: Returns mean of given CC across batch.
         """
         return cc_vector.mean(dim=0).item()
+    
+    def _cc_abs_separate(self, all_predictions: torch.Tensor, all_targets: torch.Tensor) -> torch.Tensor:
+        """
+        Calculates Pearson's CC for each trial separately and returns its mean.
+        """
+        
+        cc_abs_sum = torch.zeros(all_predictions.shape[0]).to(nn_model.globals.DEVICE)
+        for i in range(all_predictions.shape[1]):
+            predictions = all_predictions[:, i, :].to(nn_model.globals.DEVICE)
+            targets = all_targets[:, i, :].to(nn_model.globals.DEVICE)
+            std_pred, std_target = self._neurons_std(predictions, targets)
+            cc_abs_sum += self._cc_abs(predictions, targets, std_pred, std_target)
+            
+        return cc_abs_sum / all_predictions.shape[1]
+        
+            
 
     def calculate(
         self, prediction: torch.Tensor, target: torch.Tensor
@@ -289,6 +315,8 @@ class NormalizedCrossCorrelation:
             std_target,
             target,
         )
+        
+        cc_abs_separate = self._cc_abs_separate(prediction, target)
 
-        cc_norm, cc_abs = self._batch_mean(cc_norm), self._batch_mean(cc_abs)
-        return Metric(cc_norm=cc_norm, cc_abs=cc_abs)
+        cc_norm, cc_abs, cc_abs_separate = self._batch_mean(cc_norm), self._batch_mean(cc_abs), self._batch_mean(cc_abs_separate)
+        return Metric(cc_norm=cc_norm, cc_abs=cc_abs, cc_abs_separate=cc_abs_separate)

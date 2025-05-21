@@ -1138,8 +1138,8 @@ class ModelExecuter:
 
         self.model.eval()
 
-        metric_sum = Metric(0, 0)
-        specific_sum = defaultdict(lambda: Metric(0, 0))
+        metric_sum = Metric(0, 0, 0)
+        specific_sum = defaultdict(lambda: Metric(0, 0, 0))
 
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
@@ -1173,10 +1173,10 @@ class ModelExecuter:
                     specific_sum[layer] += layer_metric
 
                 # Logging of the evaluation results.
-                self.logger.wandb_batch_evaluation_logs(metric.cc_norm, metric.cc_abs)
+                self.logger.wandb_batch_evaluation_logs(metric.cc_norm, metric.cc_abs, metric.cc_abs_separate)
                 if i % print_each_step == 0:
                     self.logger.print_current_evaluation_status(
-                        i + 1, metric_sum.cc_norm, metric_sum.cc_abs
+                        i + 1, metric_sum.cc_norm, metric_sum.cc_abs, metric_sum.cc_abs_separate
                     )
 
         # Decide what was the total number of examples during evaluation.
