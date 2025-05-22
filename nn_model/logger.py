@@ -119,7 +119,9 @@ class LoggerModel:
             f"Running final evaluation on model with best CC_NORM value: {best_metric:.4f}"
         )
 
-    def wandb_batch_evaluation_logs(self, cc_norm: float, cc_abs: float, cc_abs_separate: float):
+    def wandb_batch_evaluation_logs(
+        self, cc_norm: float, cc_abs: float, cc_abs_separate: float
+    ):
         """
         Writes logs to `wandb` regarding the batch evaluation metrics.
 
@@ -129,10 +131,13 @@ class LoggerModel:
         wandb.log({"batch_cc_norm": cc_norm})
         wandb.log({"batch_cc_abs": cc_abs})
         wandb.log({"batch_cc_abs_separate": cc_abs_separate})
-        
 
     def print_current_evaluation_status(
-        self, step_num: int, cc_norm_sum: float, cc_abs_sum: float, cc_abs_separate_sum: float
+        self,
+        step_num: int,
+        cc_norm_sum: float,
+        cc_abs_sum: float,
+        cc_abs_separate_sum: float,
     ):
         """
         Prints status of the current evaluation.
@@ -172,7 +177,7 @@ class LoggerModel:
         print(f"Average Separate Pearson's CC: {avg_metric.cc_abs_separate:.4f}")
         wandb.log({"CC_NORM": avg_metric.cc_norm})
         wandb.log({"CC_ABS": avg_metric.cc_abs})
-        wandb.log({"CC_SEPARATE_ABS": avg_metric.cc_abs})
+        wandb.log({"CC_SEPARATE_ABS": avg_metric.cc_abs_separate})
         # log correlation for each layer
         rows = []
         for layer_name, metric in layer_specific.items():
