@@ -1,4 +1,7 @@
-from typing import Optional
+"""
+This module defines components for learning biologically inspired connections
+between neurons based on their spatial and feature relationships.
+"""
 
 import torch
 import torch.nn as nn
@@ -7,7 +10,17 @@ from nn_model.globals import POS_ORI_DICT, INHIBITORY_LAYERS, MODEL_SIZES, LAYER
 from nn_model.type_variants import LayerParent
 
 
-def get_features(layer_name_pre, layer_name_post):
+def get_features(layer_name_pre: str, layer_name_post: str) -> dict[str, tuple[Tensor, Tensor]]:
+    """
+    Returns dictionary of neural features.
+
+    Example:
+        "ori" -> (<presynaptic orientation tensor>, <postsynaptic orientation tensor>)
+
+    :param layer_name_pre: name of presynaptic layer
+    :param layer_name_post: name of postsynaptic layer
+    :return: dictionary of neural features
+    """
     return {
         key: (value.clone(), POS_ORI_DICT[layer_name_post][key].clone())
         for key, value in POS_ORI_DICT[layer_name_pre].items()
@@ -17,18 +30,20 @@ def get_features(layer_name_pre, layer_name_post):
 class Autapse(nn.Module):
     """
     Learnable self-connection weights for inhibitory neurons.
-    Autapses are self-to-self connections, most common in inhibitory neurons of the visual cortex.
     """
 
-    def __init__(self, n_neurons: int, sharp: bool = False, initial_mean=-8, initial_std=1):
+    def __init__(self, n_neurons: int, layer: str, sharp: bool = False, initial_mean=-8, initial_std=1):
         """
         :param n_neurons: number of neurons in the layer.
+        :param layer: name of layer which contains the neurons.
         :param sharp: whether to use sharp or softplus function.
         :param initial_mean: initial mean of the embedding.
         :param initial_std: initial standard deviation of the embedding.
         """
         super().__init__()
+        assert n_neurons >= 1
         self.n_neurons = n_neurons
+        self.polarity = -1 if layer in INHIBITORY_LAYERS else 1
         initial = torch.normal(mean=initial_mean, std=initial_std, size=(self.n_neurons,))
         self.embedding = nn.Parameter(initial)
         self.constraint = nn.functional.relu if sharp else nn.functional.softplus
@@ -38,7 +53,7 @@ class Autapse(nn.Module):
         Apply the chosen constraint to the embedding and negate it.
         :return: Negative autapse weights, shape (n_neurons,).
         """
-        return - self.constraint(self.embedding)
+        return self.polarity * self.constraint(self.embedding)
 
 
 def standard_scale(x: Tensor) -> Tensor:
@@ -53,14 +68,13 @@ def standard_scale(x: Tensor) -> Tensor:
     return (x - mean) / std
 
 
-def pairwise_delta(x: Tensor, y: Optional[Tensor] = None) -> Tensor:
+def pairwise_delta(x: Tensor, y: Tensor) -> Tensor:
     """
     Computes pairwise delta between two tensors.
     :param x: input tensor, size m
-    :param y: input tensor, size n. Defaults to x.
+    :param y: input tensor, size n
     :return: pairwise delta, shape (m * n,)
     """
-    y = x if y is None else y
     return (x.unsqueeze(0) - y.unsqueeze(1)).flatten()
 
 
@@ -71,21 +85,22 @@ def encode_orientation(x: Tensor, y: Tensor) -> Tensor:
     :param y: post-synaptic orientation tensor, shape (n,)
     :return: encoded pair-wise orientation tensor, shape (m * n,)
     """
-    delta = pairwise_delta(x, y).remainder(torch.pi)
-    delta = delta - (torch.pi / 2)
-    return torch.cos(delta) ** 2
+    delta = pairwise_delta(x, y)
+    return torch.sin(delta) ** 2
 
 
-def encode_phase(x: Tensor, y) -> Tensor:
+def encode_phase(x: Tensor, y: Tensor, pre: str) -> Tensor:
     """
     Maps phase tensor to range [0, 1] using cosine transform.
     :param x: pre-synaptic phase tensor, shape (m,)
     :param y: post-synaptic phase tensor, shape (n,)
+    :param pre: name of presynaptic layer
     :return: encoded pair-wise phase tensor, shape (m * n,)
     """
-    delta = pairwise_delta(x, y).remainder(torch.pi * 2)
-    delta = delta - torch.pi
-    return torch.cos(delta / 2) ** 2
+    delta = pairwise_delta(x, y)
+    if pre in INHIBITORY_LAYERS:
+        return torch.cos(delta / 2) ** 2
+    return torch.sin(delta / 2) ** 2
 
 
 class NeuralConnectionGenerator(nn.Module):
@@ -123,8 +138,8 @@ class NeuralConnectionGenerator(nn.Module):
         self.register_buffer('features', x)
         self.hidden_size = 16
         # handle self-to-self-connections
-        if self.is_inh and self.has_self_connection:
-            self.autapse = Autapse(self.in_features)
+        if self.has_self_connection:
+            self.autapse = Autapse(self.in_features, layer_name_pre)
         # initialize DNN
         self.weight_dnn = nn.Sequential(
             nn.Linear(self.features.shape[1], self.hidden_size),
@@ -157,7 +172,7 @@ class NeuralConnectionGenerator(nn.Module):
         # relative phase
         if self.has_phase:
             phase = features['phase'] if self.has_phase else None
-            phase = encode_phase(*phase)
+            phase = encode_phase(*phase, layer_name_pre)
             res = torch.column_stack((res, phase))
         return res
 
@@ -167,10 +182,7 @@ class NeuralConnectionGenerator(nn.Module):
         weights = weights.view(self.out_features, self.in_features)
         if not self.has_self_connection:
             return weights
-        if self.is_inh:
-            weights.diagonal().copy_(self.autapse())
-        else:
-            weights.fill_diagonal_(0)
+        weights.diagonal().copy_(self.autapse())
         return weights
 
 
