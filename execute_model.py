@@ -68,6 +68,7 @@ def init_wandb(
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
         "param_red": arguments.parameter_reduction,
         "loss": arguments.loss,
+        "visible_neurons_ratio": arguments.visible_ratio,
     }
 
     if arguments.debug:
@@ -84,7 +85,6 @@ def init_wandb(
     wandb.login(key=api_key)
 
     wandb.init(
-        # project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
         project=project_name,
         config=config,
     )
@@ -113,11 +113,13 @@ def init_model_path(arguments) -> str:
         )
 
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
+        visible_ratio = f"_visible-{str(arguments.visible_ratio)}" if arguments.visible_ratio < 1.0 else ""
         return "".join(
             [
                 f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
                 train_subset_string,
                 subset_variant_string,
+                visible_ratio,
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
@@ -342,6 +344,13 @@ def init_parser() -> argparse.ArgumentParser:
         help="Directory where the results of neuron DNN model on testing range should be stored "
         "(filename is best model name).",
     )
+    parser.add_argument(
+        "--visible_neurons_path",
+        type=str,
+        default=nn_model.globals.DEFAULT_PATHS[
+        ],
+        help="Path to the file containing visible neurons indices (of the already selected subset of neurons).",
+    )
     # Technical setup:
     parser.add_argument(
         "--num_data_workers",
@@ -476,6 +485,13 @@ def init_parser() -> argparse.ArgumentParser:
         "--synaptic_adaptation_only_lgn",
         action="store_true",
         help="Whether we want to use synaptic adaptation RNN module only on LGN layer.",
+    )
+    # Ratio of visible neurons:
+    parser.add_argument(
+        "--visible_neurons_ratio",
+        type=float,
+        default=1.0,
+        help="Ratio of the visible neurons during the training.",
     )
     # Parameter reduction
     parser.set_defaults(parameter_reduction=False)
