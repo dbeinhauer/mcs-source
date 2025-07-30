@@ -31,6 +31,7 @@ from nn_model.evaluation_metrics import NormalizedCrossCorrelation, Metric
 from nn_model.evaluation_results_saver import EvaluationResultsSaver
 from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
+from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 
 
 class ModelExecuter:
@@ -59,6 +60,8 @@ class ModelExecuter:
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
+        
+        self.visible_neurons_handler = VisibleNeuronsHandler(arguments)
 
         # Gradient clipping upper bound.
         self.gradient_clip = arguments.gradient_clip
@@ -815,6 +818,7 @@ class ModelExecuter:
             ModelExecuter._init_modules_hidden_states()
         )
         accumulated_loss = 0
+        predictions = torch.zeros()
 
         for visible_time in range(
             1, time_length
@@ -823,6 +827,8 @@ class ModelExecuter:
             inputs, targets, hidden_states = ModelExecuter._get_train_current_time_data(
                 visible_time, input_batch, target_batch, all_hidden_states
             )
+            
+            # TODO: If neuron subset -> assign visible neurons and let the rest be the predictions.
 
             # Perform model forward step.
             predictions, neuron_hidden, synaptic_adaptation_hidden = (
@@ -830,7 +836,9 @@ class ModelExecuter:
                     inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
-
+            
+            # TODO: if neuron subset -> calculate loss only for visible neurons.
+            
             # Calculate time step loss.
             accumulated_loss += self._calculate_loss(predictions, targets)
 

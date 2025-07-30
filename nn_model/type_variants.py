@@ -180,6 +180,7 @@ class PathDefaultFields(Enum):
     SELECTION_RESULTS_DIR = "selection_results_dir"
     FULL_EVALUATION_DIR = "full_evaluation_dir"
     NEURON_MODEL_RESPONSES_DIR = "neuron_model_responses_dir"
+    VISIBLE_NEURONS_DIR = "visible_neurons_dir"
 
 
 class PathPlotDefaults(Enum):
