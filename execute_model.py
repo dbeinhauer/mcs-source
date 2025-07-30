@@ -298,9 +298,7 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--experiment_selection_path",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.EXPERIMENT_SELECTION_PATH.value
-        ],
+        default="",
         help="Path to selected experiments used for model analysis during evaluation.",
     )
     parser.add_argument(
@@ -470,7 +468,7 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--synaptic_adaptation_num_layers",
         type=int,
-        default=1,
+        default=3,
         help="Number of layers in the synaptic adaptation RNN module.",
     )
     parser.set_defaults(synaptic_adaptation_only_lgn=False)
