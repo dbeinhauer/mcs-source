@@ -201,3 +201,13 @@ class EvaluationMeanVariants(Enum):
     LAYER_MEAN = "layer_mean"
     NEURON_MEAN = "neuron_mean"
     IMAGE_MEAN = "image_mean"
+
+class EvaluationMetricVariants(Enum):
+    """
+    All variants of evaluated subsets.
+    """
+    
+    FULL_METRIC = "full_metric"
+    VISIBLE_METRIC = "visible_metric"
+    INVISIBLE_METRIC = "invisible_metric"
+    LAYER_SPECIFIC = "layer_specific_metric"

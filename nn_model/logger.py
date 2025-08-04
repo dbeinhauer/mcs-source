@@ -3,13 +3,15 @@ This source defines custom logger class used in model execution.
 """
 
 import logging
-from typing import Dict
+from typing import Dict, Union
 
 import pandas as pd
 import wandb
 
 import nn_model.globals
 from nn_model.evaluation_metrics import Metric
+from nn_model.type_variants import (
+    EvaluationMetricVariants,)
 
 
 # pylint: disable=W1203
@@ -57,6 +59,7 @@ class LoggerModel:
                     f"Synaptic adaptation layer size: {arguments.synaptic_adaptation_size}",
                     "Synaptic adaptation number of layers: "
                     + str(arguments.synaptic_adaptation_num_layers),
+                    f"Visible neurons ratio: {arguments.visible_neurons_ratio}",
                 ]
             )
         )
@@ -120,17 +123,17 @@ class LoggerModel:
         )
 
     def wandb_batch_evaluation_logs(
-        self, cc_norm: float, cc_abs: float, cc_abs_separate: float
+        self, all_evaluation_metric: Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]
     ):
         """
         Writes logs to `wandb` regarding the batch evaluation metrics.
-
-        :param cc_norm: Batch CC_NORM value.
-        :param cc_abs: Batch CC_ABS value.
         """
-        wandb.log({"batch_cc_norm": cc_norm})
-        wandb.log({"batch_cc_abs": cc_abs})
-        wandb.log({"batch_cc_abs_separate": cc_abs_separate})
+        for metric_variant, values in all_evaluation_metric.items():
+            if isinstance(values, Metric):
+                # Skip layer separate metrics.
+                wandb.log({f"{metric_variant.value}_batch_cc_norm": values.cc_norm})
+                wandb.log({f"{metric_variant.value}_batch_cc_abs": values.cc_abs})
+                wandb.log({f"{metric_variant.value}_batch_cc_abs_separate": values.cc_abs_separate})
 
     def print_current_evaluation_status(
         self,
@@ -162,32 +165,44 @@ class LoggerModel:
         )
 
     def print_final_evaluation_results(
-        self, avg_metric: Metric, layer_specific: Dict[str, Metric]
+        self, all_avg_metric: Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]
     ):
         """
         Prints final evaluation results and stores them also to `wandb` logs.
 
-        :param avg_metric: Average CC_NORM and CC_ABS values across all layers.
+        :param all_avg_metric: Average CC_NORM and CC_ABS values across all layers.
         :param layer_specific: Average CC_NORM and CC_ABS values for each layer.
         """
         print("Final evaluation results:")
         print(30 * "-")
-        print(f"Average normalized cross correlation: {avg_metric.cc_norm:.4f}")
-        print(f"Average Pearson's CC: {avg_metric.cc_abs:.4f}")
-        print(f"Average Separate Pearson's CC: {avg_metric.cc_abs_separate:.4f}")
-        wandb.log({"CC_NORM": avg_metric.cc_norm})
-        wandb.log({"CC_ABS": avg_metric.cc_abs})
-        wandb.log({"CC_SEPARATE_ABS": avg_metric.cc_abs_separate})
-        # log correlation for each layer
-        rows = []
-        for layer_name, metric in layer_specific.items():
-            name = layer_name
-            # group per-layer metrics by their type (norm or abs)
-            wandb.log({"CC_NORM/" + name: metric.cc_norm})
-            wandb.log({"CC_ABS/" + name: metric.cc_abs})
-            rows.append(
-                {"Layer": name, "CC_NORM": metric.cc_norm, "CC_ABS": metric.cc_abs}
-            )
-        df = pd.DataFrame.from_records(rows).set_index("Layer").sort_index()
-        print("\nPer-layer correlation summary")
-        print(df.to_string(float_format="%.4f"))
+        for metric_variant, avg_metric in all_avg_metric.items():
+            if isinstance(avg_metric, Metric):
+                if metric_variant == EvaluationMetricVariants.FULL_METRIC:
+                    wandb.log({"CC_NORM": avg_metric.cc_norm})
+                    wandb.log({"CC_ABS": avg_metric.cc_abs})
+                    wandb.log({"CC_SEPARATE_ABS": avg_metric.cc_abs_separate})
+                    print(f"Average normalized cross correlation: {avg_metric.cc_norm:.4f}")
+                    print(f"Average Pearson's CC: {avg_metric.cc_abs:.4f}")
+                    print(f"Average Separate Pearson's CC: {avg_metric.cc_abs_separate:.4f}")
+                else:
+                    # Skip layer separate metrics.
+                    wandb.log({f"CC_NORM_{metric_variant.value}": avg_metric.cc_norm})
+                    wandb.log({f"CC_ABS_{metric_variant.value}": avg_metric.cc_abs})
+                    wandb.log({f"CC_SEPARATE_ABS_{metric_variant.value}": avg_metric.cc_abs_separate})
+                    print(f"CC_NORM_{metric_variant.value}: {avg_metric.cc_norm:.4f}")
+                    print(f"CC_ABS_{metric_variant.value}: {avg_metric.cc_abs:.4f}")
+                    print(f"CC_ABS_SEPARATE_{metric_variant.value}: {avg_metric.cc_abs_separate:.4f}")
+            else:
+                # log correlation for each layer
+                rows = []
+                for layer_name, metric in avg_metric.items():
+                    name = layer_name
+                    # group per-layer metrics by their type (norm or abs)
+                    wandb.log({"CC_NORM/" + name: metric.cc_norm})
+                    wandb.log({"CC_ABS/" + name: metric.cc_abs})
+                    rows.append(
+                        {"Layer": name, "CC_NORM": metric.cc_norm, "CC_ABS": metric.cc_abs}
+                    )
+                df = pd.DataFrame.from_records(rows).set_index("Layer").sort_index()
+                print("\nPer-layer correlation summary")
+                print(df.to_string(float_format="%.4f"))

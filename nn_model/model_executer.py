@@ -21,6 +21,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     ModelModulesFields,
     LossTypes,
+    EvaluationMetricVariants
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -32,6 +33,7 @@ from nn_model.evaluation_results_saver import EvaluationResultsSaver
 from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
 from nn_model.visible_neurons_handler import VisibleNeuronsHandler
+from nn_model.evaluation_metric_handler import EvaluationMetricHandler
 
 
 class ModelExecuter:
@@ -71,7 +73,7 @@ class ModelExecuter:
         self.num_backpropagation_time_steps = arguments.num_backpropagation_time_steps
 
         # Evaluation metric.
-        self.evaluation_metrics = NormalizedCrossCorrelation()
+        self.evaluation_metric_handler = EvaluationMetricHandler(NormalizedCrossCorrelation())
 
         # Placeholder for the best evaluation result value.
         self.best_metric = -float("inf")
@@ -750,8 +752,8 @@ class ModelExecuter:
         total_loss = torch.zeros(1)
         for layer in predictions:
             total_loss += self.criterion(
-                predictions[layer],
-                targets[layer],
+                predictions[layer].cpu(),
+                targets[layer].cpu(),
             )
 
         return total_loss
@@ -818,7 +820,7 @@ class ModelExecuter:
             ModelExecuter._init_modules_hidden_states()
         )
         accumulated_loss = 0
-        predictions = torch.zeros()
+        predictions = {layer: torch.zeros(data[:, 0].shape).to(nn_model.globals.DEVICE) for layer, data in all_hidden_states.items()}
 
         for visible_time in range(
             1, time_length
@@ -829,6 +831,8 @@ class ModelExecuter:
             )
             
             # TODO: If neuron subset -> assign visible neurons and let the rest be the predictions.
+            batch_size = hidden_states[LayerType.V1_EXC_L4.value].shape[0]
+            hidden_states = self.visible_neurons_handler.assign_teacher_forced_responses(hidden_states, predictions)
 
             # Perform model forward step.
             predictions, neuron_hidden, synaptic_adaptation_hidden = (
@@ -836,11 +840,12 @@ class ModelExecuter:
                     inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
-            
-            # TODO: if neuron subset -> calculate loss only for visible neurons.
+                        
+            visible_predictions, _ = self.visible_neurons_handler.split_visible_invisible_neurons(predictions)
+            visible_targets, _ = self.visible_neurons_handler.split_visible_invisible_neurons(targets)
             
             # Calculate time step loss.
-            accumulated_loss += self._calculate_loss(predictions, targets)
+            accumulated_loss += self._calculate_loss(visible_predictions, visible_targets)
 
             if (
                 visible_time % self.num_backpropagation_time_steps == 0
@@ -975,6 +980,11 @@ class ModelExecuter:
                     for layer, layer_hidden in targets.items()
                 }
             )
+            trial_invisible_hidden = {layer: torch.tensor(0.0).to(nn_model.globals.DEVICE) for layer in trial_hidden.keys()}
+            
+            trial_hidden = self.visible_neurons_handler.assign_teacher_forced_responses(
+                trial_hidden, trial_invisible_hidden
+            )
 
             # Initialize hidden states of the neuron and synaptic adaptation modules.
             neuron_hidden, synaptic_adaptation_hidden = (
@@ -1069,47 +1079,7 @@ class ModelExecuter:
             )
 
         return return_predictions
-
-    def compute_evaluation_score(
-        self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor]
-    ) -> Tuple[Metric, Dict[str, Metric]]:
-        """
-        Computes evaluation score between vectors of all prediction
-        and all target layers.
-
-        Between two vectors that were created by concatenating all predictions and
-        all targets for all output layers.
-
-        :param targets: dictionary of targets for all layers.
-        :param predictions: dictionary of predictions for all layers.
-        :return: Returns tuple of overall evaluation score (CC_NORM and CC_ABS) and over each layer separately.
-        """
-        # Avoid dict insertion order issue
-        keys = list(targets.keys())
-
-        def cat(tensors: Dict[str, torch.Tensor]):
-            return torch.cat(
-                [tensors[k] for k in keys],
-                dim=-1,
-            )
-
-        # Concatenate predictions and targets across all layers.
-        all_predictions = cat(predictions).to(nn_model.globals.DEVICE)
-        all_targets = cat(targets).to(nn_model.globals.DEVICE)
-
-        # Run the calculate function once on the concatenated tensors.
-        total = self.evaluation_metrics.calculate(all_predictions, all_targets)
-
-        layer_specific_metrics = {}
-        for layer in keys:
-            metric = self.evaluation_metrics.calculate(
-                predictions[layer].to(nn_model.globals.DEVICE),
-                targets[layer].to(nn_model.globals.DEVICE),
-            )
-            layer_specific_metrics[layer] = metric
-
-        return total, layer_specific_metrics
-
+    
     def evaluation(
         self,
         subset_for_evaluation: int = -1,
@@ -1146,9 +1116,7 @@ class ModelExecuter:
 
         self.model.eval()
 
-        metric_sum = Metric(0, 0, 0)
-        specific_sum = defaultdict(lambda: Metric(0, 0, 0))
-
+        self.evaluation_metric_handler.reset_all_metrics()
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
                 if subset_for_evaluation != -1 and i > subset_for_evaluation:
@@ -1168,21 +1136,19 @@ class ModelExecuter:
                         i, all_predictions, targets
                     )
 
-                metric, layer_specific = self.compute_evaluation_score(
+                all_metrics = self.evaluation_metric_handler.compute_all_evaluation_scores(
                     # Compute evaluation for all time steps except the first step (0-th).
-                    {layer: target[:, :, 1:, :] for layer, target in targets.items()},
-                    all_predictions[PredictionTypes.FULL_PREDICTION],
+                    {layer: target[:, :, 1:, :] for layer, target in targets.items()}, 
+                    all_predictions[PredictionTypes.FULL_PREDICTION], 
+                    self.visible_neurons_handler
                 )
-
-                # Add metrics to the total
-                metric_sum += metric
-
-                for layer, layer_metric in layer_specific.items():
-                    specific_sum[layer] += layer_metric
+                
+                self.evaluation_metric_handler.add_to_sum(all_metrics)
 
                 # Logging of the evaluation results.
-                self.logger.wandb_batch_evaluation_logs(metric.cc_norm, metric.cc_abs, metric.cc_abs_separate)
+                self.logger.wandb_batch_evaluation_logs(all_metrics)
                 if i % print_each_step == 0:
+                    metric_sum = self.evaluation_metric_handler.all_metrics_sum[EvaluationMetricVariants.FULL_METRIC]
                     self.logger.print_current_evaluation_status(
                         i + 1, metric_sum.cc_norm, metric_sum.cc_abs, metric_sum.cc_abs_separate
                     )
@@ -1193,13 +1159,10 @@ class ModelExecuter:
             num_examples = len(self.test_loader)
 
         # Average evaluation metrics calculation
-        avg_metric = metric_sum / num_examples
-        avg_specific = DictionaryHandler.apply_function(
-            specific_sum, lambda x: x / num_examples
-        )
-        self.logger.print_final_evaluation_results(avg_metric, avg_specific)
+        avg_all_metrics = self.evaluation_metric_handler.divide_from_sum(num_examples)
+        self.logger.print_final_evaluation_results(avg_all_metrics)
 
-        return avg_metric.cc_norm
+        return avg_all_metrics[EvaluationMetricVariants.FULL_METRIC].cc_norm
 
     def evaluate_neuron_models(
         self, start: float = -1.0, end: float = 1.0, step: float = 0.001

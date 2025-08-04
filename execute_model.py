@@ -68,7 +68,7 @@ def init_wandb(
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
         "param_red": arguments.parameter_reduction,
         "loss": arguments.loss,
-        "visible_neurons_ratio": arguments.visible_ratio,
+        "visible_neurons_ratio": arguments.visible_neurons_ratio,
     }
 
     if arguments.debug:
@@ -114,8 +114,8 @@ def init_model_path(arguments) -> str:
 
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
         visible_ratio = (
-            f"_visible-{str(arguments.visible_ratio)}"
-            if arguments.visible_ratio < 1.0
+            f"_visible-{str(arguments.visible_neurons_ratio)}"
+            if arguments.visible_neurons_ratio < 1.0
             else ""
         )
         return "".join(

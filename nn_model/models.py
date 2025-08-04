@@ -607,17 +607,23 @@ class PrimaryVisualCortexModel(nn.Module):
         self,
         all_outputs: Dict[str, List[torch.Tensor]],
         time_step_outputs,
+        keep_gradients: bool = True,
     ):
         """
         Appends outputs of each output layer to list of outputs of all time steps.
 
         :param all_outputs: outputs of layersFalse of all time steps.
         :param time_step_outputs: outputs of current time step.
+        :param: keep_gradients: Whether to keep gradients for the outputs (whether to keep in cuda).
         """
         for layer, layer_outputs in time_step_outputs.items():
             if layer in PrimaryVisualCortexModel.layers_input_parameters:
                 # For each output layer append output of the current time step.
-                all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
+                # all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
+                current_outputs = layer_outputs.unsqueeze(1) if keep_gradients else layer_outputs.unsqueeze(1).cpu()
+                all_outputs[layer].append(current_outputs)
+
+
 
     def forward(
         self,
@@ -716,7 +722,7 @@ class PrimaryVisualCortexModel(nn.Module):
 
                 if self.training:
                     # In train return all hidden time steps (for back-propagation through time)
-                    self._append_outputs(all_hidden_outputs, hidden_states)
+                    self._append_outputs(all_hidden_outputs, hidden_states)#, keep_gradients=True)
 
             if not self.training:
                 # Evaluation mode -> save only predictions of the visible time steps
