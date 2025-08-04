@@ -3,7 +3,12 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
-from nn_model.globals import POS_ORI_DICT, INHIBITORY_LAYERS, MODEL_SIZES, LAYER_TO_PARENT
+from nn_model.globals import (
+    POS_ORI_DICT,
+    INHIBITORY_LAYERS,
+    MODEL_SIZES,
+    LAYER_TO_PARENT,
+)
 from nn_model.type_variants import LayerParent
 
 
@@ -20,7 +25,9 @@ class Autapse(nn.Module):
     Autapses are self-to-self connections, most common in inhibitory neurons of the visual cortex.
     """
 
-    def __init__(self, n_neurons: int, sharp: bool = False, initial_mean=-8, initial_std=1):
+    def __init__(
+        self, n_neurons: int, sharp: bool = False, initial_mean=-8, initial_std=1
+    ):
         """
         :param n_neurons: number of neurons in the layer.
         :param sharp: whether to use sharp or softplus function.
@@ -29,7 +36,9 @@ class Autapse(nn.Module):
         """
         super().__init__()
         self.n_neurons = n_neurons
-        initial = torch.normal(mean=initial_mean, std=initial_std, size=(self.n_neurons,))
+        initial = torch.normal(
+            mean=initial_mean, std=initial_std, size=(self.n_neurons,)
+        )
         self.embedding = nn.Parameter(initial)
         self.constraint = nn.functional.relu if sharp else nn.functional.softplus
 
@@ -38,7 +47,7 @@ class Autapse(nn.Module):
         Apply the chosen constraint to the embedding and negate it.
         :return: Negative autapse weights, shape (n_neurons,).
         """
-        return - self.constraint(self.embedding)
+        return -self.constraint(self.embedding)
 
 
 def standard_scale(x: Tensor) -> Tensor:
@@ -109,8 +118,9 @@ class NeuralConnectionGenerator(nn.Module):
         """
         super().__init__()
         layer_pre_parent = LAYER_TO_PARENT[layer_name_pre]
-        assert layer_pre_parent == LAYER_TO_PARENT[
-            layer_name_post], 'Neurons are expected to come from the same biological layer.'
+        assert (
+            layer_pre_parent == LAYER_TO_PARENT[layer_name_post]
+        ), "Neurons are expected to come from the same biological layer."
         self.in_features = MODEL_SIZES[layer_name_pre]
         self.out_features = MODEL_SIZES[layer_name_post]
         self.polarity = -1 if layer_name_pre in INHIBITORY_LAYERS else 1
@@ -120,7 +130,7 @@ class NeuralConnectionGenerator(nn.Module):
         self.has_self_connection = layer_name_pre == layer_name_post
         # prepare features
         x = self.encode_neural_features(layer_name_pre, layer_name_post)
-        self.register_buffer('features', x)
+        self.register_buffer("features", x)
         self.hidden_size = 16
         # handle self-to-self-connections
         if self.is_inh and self.has_self_connection:
@@ -141,22 +151,29 @@ class NeuralConnectionGenerator(nn.Module):
         """
         features = get_features(layer_name_pre, layer_name_post)
         # relative position
-        x = features['x']
-        y = features['y']
-        ori = features['ori']
+        x = features["x"]
+        y = features["y"]
+        ori = features["ori"]
         dx = pairwise_delta(*x)
         dy = pairwise_delta(*y)
         # relative distance
-        dist = (dx ** 2 + dy ** 2) ** 0.5
-        dist = dist / 5.
+        dist = (dx**2 + dy**2) ** 0.5
+        dist = dist / 5.0
         # relative orientation
         ori = encode_orientation(*ori)
         dx = standard_scale(dx)
         dy = standard_scale(dy)
-        res = torch.column_stack((dist, dx, dy, ori,))
+        res = torch.column_stack(
+            (
+                dist,
+                dx,
+                dy,
+                ori,
+            )
+        )
         # relative phase
         if self.has_phase:
-            phase = features['phase'] if self.has_phase else None
+            phase = features["phase"] if self.has_phase else None
             phase = encode_phase(*phase)
             res = torch.column_stack((res, phase))
         return res
@@ -184,7 +201,15 @@ class ConnectionAffine(nn.Module):
         self.layer_name_pre = layer_name_pre
         self.layer_name_post = layer_name_post
         self.weight = NeuralConnectionGenerator(layer_name_pre, layer_name_post)
-        self.bias = nn.Parameter(torch.zeros(MODEL_SIZES[layer_name_post], )) if bias else None
+        self.bias = (
+            nn.Parameter(
+                torch.zeros(
+                    MODEL_SIZES[layer_name_post],
+                )
+            )
+            if bias
+            else None
+        )
 
     def forward(self, input: Tensor) -> Tensor:
         return nn.functional.linear(input, self.weight(), self.bias)

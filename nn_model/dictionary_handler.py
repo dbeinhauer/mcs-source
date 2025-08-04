@@ -20,7 +20,7 @@ class DictionaryHandler:
 
     @staticmethod
     def assign_args_kwargs(
-        call_tuple: Tuple[Any, Optional[Tuple], Optional[Dict]]
+        call_tuple: Tuple[Any, Optional[Tuple], Optional[Dict]],
     ) -> Tuple:
         """
         Assigns call args and kwargs in case they are not defined in the provided call tuple.
@@ -214,9 +214,7 @@ class DictionaryHandler:
         :returns: Dictionary altered by the function.
         """
         if not inplace:
-            return {
-                key: fn(value) for key, value in dictionary.items()
-            }
+            return {key: fn(value) for key, value in dictionary.items()}
         for key, value in dictionary.items():
             dictionary[key] = fn(value)
         return dictionary

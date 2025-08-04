@@ -316,7 +316,7 @@ class PrimaryVisualCortexModel(nn.Module):
             self.layers_configs[layer].input_constraints,
             self.weight_initialization,
             self.layers_configs[layer].neuron_model,
-            self.parameter_reduction
+            self.parameter_reduction,
         )
 
     def _init_model_architecture(self):
@@ -620,10 +620,12 @@ class PrimaryVisualCortexModel(nn.Module):
             if layer in PrimaryVisualCortexModel.layers_input_parameters:
                 # For each output layer append output of the current time step.
                 # all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
-                current_outputs = layer_outputs.unsqueeze(1) if keep_gradients else layer_outputs.unsqueeze(1).cpu()
+                current_outputs = (
+                    layer_outputs.unsqueeze(1)
+                    if keep_gradients
+                    else layer_outputs.unsqueeze(1).cpu()
+                )
                 all_outputs[layer].append(current_outputs)
-
-
 
     def forward(
         self,
@@ -722,7 +724,9 @@ class PrimaryVisualCortexModel(nn.Module):
 
                 if self.training:
                     # In train return all hidden time steps (for back-propagation through time)
-                    self._append_outputs(all_hidden_outputs, hidden_states)#, keep_gradients=True)
+                    self._append_outputs(
+                        all_hidden_outputs, hidden_states
+                    )  # , keep_gradients=True)
 
             if not self.training:
                 # Evaluation mode -> save only predictions of the visible time steps

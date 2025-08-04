@@ -4,8 +4,7 @@ from typing import Dict, List, Union, NamedTuple
 import torch
 
 from nn_model.evaluation_metrics import Metric, NormalizedCrossCorrelation
-from nn_model.type_variants import (
-    EvaluationMetricVariants, LayerType)
+from nn_model.type_variants import EvaluationMetricVariants, LayerType
 import nn_model.globals
 from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 
@@ -14,29 +13,35 @@ class EvaluationMetricHandler:
     """
     Class that handles the evaluation metrics for the model.
     """
-    
+
     def __init__(self, evaluation_metric):
         self.all_metrics_sum = self.init_all_metrics()
         self.evaluation_metric = evaluation_metric
-    
-    def init_all_metrics(self) -> Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]:
+
+    def init_all_metrics(
+        self,
+    ) -> Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]:
         """
         Resets all metrics to zero.
         """
         return {
             EvaluationMetricVariants.FULL_METRIC: Metric(0, 0, 0),
-            EvaluationMetricVariants.LAYER_SPECIFIC: defaultdict(lambda: Metric(0, 0, 0)),
+            EvaluationMetricVariants.LAYER_SPECIFIC: defaultdict(
+                lambda: Metric(0, 0, 0)
+            ),
             EvaluationMetricVariants.VISIBLE_METRIC: Metric(0, 0, 0),
             EvaluationMetricVariants.INVISIBLE_METRIC: Metric(0, 0, 0),
         }
-        
+
     def reset_all_metrics(self):
         """
         Resets all metrics to zero.
         """
         self.all_metrics_sum = self.init_all_metrics()
-        
-    def add_to_sum(self, metrics: Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]):
+
+    def add_to_sum(
+        self, metrics: Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]
+    ):
         """
         Adds the provided metrics to the sum of all metrics.
 
@@ -48,8 +53,10 @@ class EvaluationMetricHandler:
             else:
                 for layer, metric in value.items():
                     self.all_metrics_sum[key][layer] += metric
-                    
-    def divide_from_sum(self, divisor: int) -> Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]:
+
+    def divide_from_sum(
+        self, divisor: int
+    ) -> Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]:
         """
         Divides all metrics in the sum by the provided divisor.
 
@@ -62,11 +69,15 @@ class EvaluationMetricHandler:
             else:
                 for layer in metric_value:
                     divided_metric[metric_variant][layer] /= divisor
-                    
+
         return divided_metric
-    
-    
-    def _compute_all_layers_evaluation(self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor], keys: List[str]) -> Metric:
+
+    def _compute_all_layers_evaluation(
+        self,
+        targets: Dict[str, torch.Tensor],
+        predictions: Dict[str, torch.Tensor],
+        keys: List[str],
+    ) -> Metric:
         """
         Computes evaluation score between vectors of predictions
         and targets across all layers.
@@ -77,6 +88,7 @@ class EvaluationMetricHandler:
         :param evaluation_metric: Evaluation metric to be used for the evaluation.
         :return: Returns evaluation score between provided values across all layers.
         """
+
         def cat(tensors: Dict[str, torch.Tensor]):
             return torch.cat(
                 [tensors[k] for k in keys],
@@ -89,8 +101,13 @@ class EvaluationMetricHandler:
 
         # Run the calculate function once on the concatenated tensors.
         return self.evaluation_metric.calculate(all_predictions, all_targets)
-    
-    def _compute_layer_specific_evaluation(self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor], keys: List[str]) -> Dict[str, Metric]:
+
+    def _compute_layer_specific_evaluation(
+        self,
+        targets: Dict[str, torch.Tensor],
+        predictions: Dict[str, torch.Tensor],
+        keys: List[str],
+    ) -> Dict[str, Metric]:
         layer_specific_metrics = {}
         for layer in keys:
             metric = self.evaluation_metric.calculate(
@@ -98,11 +115,14 @@ class EvaluationMetricHandler:
                 targets[layer].to(nn_model.globals.DEVICE),
             )
             layer_specific_metrics[layer] = metric
-            
+
         return layer_specific_metrics
-    
+
     def compute_all_evaluation_scores(
-        self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor], visible_neurons_handler: VisibleNeuronsHandler
+        self,
+        targets: Dict[str, torch.Tensor],
+        predictions: Dict[str, torch.Tensor],
+        visible_neurons_handler: VisibleNeuronsHandler,
     ) -> Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]:
         """
         Computes evaluation score between vectors of all prediction
@@ -122,13 +142,29 @@ class EvaluationMetricHandler:
         keys = list(targets.keys())
         all_metrics = self.init_all_metrics()
 
-        all_metrics[EvaluationMetricVariants.FULL_METRIC] = self._compute_all_layers_evaluation(targets, predictions, keys)
+        all_metrics[EvaluationMetricVariants.FULL_METRIC] = (
+            self._compute_all_layers_evaluation(targets, predictions, keys)
+        )
 
         # batch_size =  targets[LayerType.V1_EXC_L4.value].shape[0]
-        visible_targets, invisible_targets = visible_neurons_handler.split_visible_invisible_neurons(targets)
-        visible_predictions, invisible_predictions = visible_neurons_handler.split_visible_invisible_neurons(predictions)
-        all_metrics[EvaluationMetricVariants.VISIBLE_METRIC] = self._compute_all_layers_evaluation(visible_targets, visible_predictions, keys)
-        all_metrics[EvaluationMetricVariants.INVISIBLE_METRIC] = self._compute_all_layers_evaluation(invisible_targets, invisible_predictions, keys)
-        all_metrics[EvaluationMetricVariants.LAYER_SPECIFIC] = self._compute_layer_specific_evaluation(targets, predictions, keys)
+        visible_targets, invisible_targets = (
+            visible_neurons_handler.split_visible_invisible_neurons(targets)
+        )
+        visible_predictions, invisible_predictions = (
+            visible_neurons_handler.split_visible_invisible_neurons(predictions)
+        )
+        all_metrics[EvaluationMetricVariants.VISIBLE_METRIC] = (
+            self._compute_all_layers_evaluation(
+                visible_targets, visible_predictions, keys
+            )
+        )
+        all_metrics[EvaluationMetricVariants.INVISIBLE_METRIC] = (
+            self._compute_all_layers_evaluation(
+                invisible_targets, invisible_predictions, keys
+            )
+        )
+        all_metrics[EvaluationMetricVariants.LAYER_SPECIFIC] = (
+            self._compute_layer_specific_evaluation(targets, predictions, keys)
+        )
 
         return all_metrics

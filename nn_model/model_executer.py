@@ -21,7 +21,7 @@ from nn_model.type_variants import (
     OptimizerTypes,
     ModelModulesFields,
     LossTypes,
-    EvaluationMetricVariants
+    EvaluationMetricVariants,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
@@ -62,7 +62,7 @@ class ModelExecuter:
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
-        
+
         self.visible_neurons_handler = VisibleNeuronsHandler(arguments)
 
         # Gradient clipping upper bound.
@@ -73,7 +73,9 @@ class ModelExecuter:
         self.num_backpropagation_time_steps = arguments.num_backpropagation_time_steps
 
         # Evaluation metric.
-        self.evaluation_metric_handler = EvaluationMetricHandler(NormalizedCrossCorrelation())
+        self.evaluation_metric_handler = EvaluationMetricHandler(
+            NormalizedCrossCorrelation()
+        )
 
         # Placeholder for the best evaluation result value.
         self.best_metric = -float("inf")
@@ -820,7 +822,10 @@ class ModelExecuter:
             ModelExecuter._init_modules_hidden_states()
         )
         accumulated_loss = 0
-        predictions = {layer: torch.zeros(data[:, 0].shape).to(nn_model.globals.DEVICE) for layer, data in all_hidden_states.items()}
+        predictions = {
+            layer: torch.zeros(data[:, 0].shape).to(nn_model.globals.DEVICE)
+            for layer, data in all_hidden_states.items()
+        }
 
         for visible_time in range(
             1, time_length
@@ -829,10 +834,14 @@ class ModelExecuter:
             inputs, targets, hidden_states = ModelExecuter._get_train_current_time_data(
                 visible_time, input_batch, target_batch, all_hidden_states
             )
-            
+
             # TODO: If neuron subset -> assign visible neurons and let the rest be the predictions.
             batch_size = hidden_states[LayerType.V1_EXC_L4.value].shape[0]
-            hidden_states = self.visible_neurons_handler.assign_teacher_forced_responses(hidden_states, predictions)
+            hidden_states = (
+                self.visible_neurons_handler.assign_teacher_forced_responses(
+                    hidden_states, predictions
+                )
+            )
 
             # Perform model forward step.
             predictions, neuron_hidden, synaptic_adaptation_hidden = (
@@ -840,12 +849,20 @@ class ModelExecuter:
                     inputs, hidden_states, neuron_hidden, synaptic_adaptation_hidden
                 )
             )
-                        
-            visible_predictions, _ = self.visible_neurons_handler.split_visible_invisible_neurons(predictions)
-            visible_targets, _ = self.visible_neurons_handler.split_visible_invisible_neurons(targets)
-            
+
+            visible_predictions, _ = (
+                self.visible_neurons_handler.split_visible_invisible_neurons(
+                    predictions
+                )
+            )
+            visible_targets, _ = (
+                self.visible_neurons_handler.split_visible_invisible_neurons(targets)
+            )
+
             # Calculate time step loss.
-            accumulated_loss += self._calculate_loss(visible_predictions, visible_targets)
+            accumulated_loss += self._calculate_loss(
+                visible_predictions, visible_targets
+            )
 
             if (
                 visible_time % self.num_backpropagation_time_steps == 0
@@ -980,8 +997,11 @@ class ModelExecuter:
                     for layer, layer_hidden in targets.items()
                 }
             )
-            trial_invisible_hidden = {layer: torch.tensor(0.0).to(nn_model.globals.DEVICE) for layer in trial_hidden.keys()}
-            
+            trial_invisible_hidden = {
+                layer: torch.tensor(0.0).to(nn_model.globals.DEVICE)
+                for layer in trial_hidden.keys()
+            }
+
             trial_hidden = self.visible_neurons_handler.assign_teacher_forced_responses(
                 trial_hidden, trial_invisible_hidden
             )
@@ -1079,7 +1099,7 @@ class ModelExecuter:
             )
 
         return return_predictions
-    
+
     def evaluation(
         self,
         subset_for_evaluation: int = -1,
@@ -1138,19 +1158,24 @@ class ModelExecuter:
 
                 all_metrics = self.evaluation_metric_handler.compute_all_evaluation_scores(
                     # Compute evaluation for all time steps except the first step (0-th).
-                    {layer: target[:, :, 1:, :] for layer, target in targets.items()}, 
-                    all_predictions[PredictionTypes.FULL_PREDICTION], 
-                    self.visible_neurons_handler
+                    {layer: target[:, :, 1:, :] for layer, target in targets.items()},
+                    all_predictions[PredictionTypes.FULL_PREDICTION],
+                    self.visible_neurons_handler,
                 )
-                
+
                 self.evaluation_metric_handler.add_to_sum(all_metrics)
 
                 # Logging of the evaluation results.
                 self.logger.wandb_batch_evaluation_logs(all_metrics)
                 if i % print_each_step == 0:
-                    metric_sum = self.evaluation_metric_handler.all_metrics_sum[EvaluationMetricVariants.FULL_METRIC]
+                    metric_sum = self.evaluation_metric_handler.all_metrics_sum[
+                        EvaluationMetricVariants.FULL_METRIC
+                    ]
                     self.logger.print_current_evaluation_status(
-                        i + 1, metric_sum.cc_norm, metric_sum.cc_abs, metric_sum.cc_abs_separate
+                        i + 1,
+                        metric_sum.cc_norm,
+                        metric_sum.cc_abs,
+                        metric_sum.cc_abs_separate,
                     )
 
         # Decide what was the total number of examples during evaluation.

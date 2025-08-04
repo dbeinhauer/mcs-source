@@ -11,7 +11,8 @@ import wandb
 import nn_model.globals
 from nn_model.evaluation_metrics import Metric
 from nn_model.type_variants import (
-    EvaluationMetricVariants,)
+    EvaluationMetricVariants,
+)
 
 
 # pylint: disable=W1203
@@ -123,7 +124,10 @@ class LoggerModel:
         )
 
     def wandb_batch_evaluation_logs(
-        self, all_evaluation_metric: Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]
+        self,
+        all_evaluation_metric: Dict[
+            EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]
+        ],
     ):
         """
         Writes logs to `wandb` regarding the batch evaluation metrics.
@@ -133,7 +137,11 @@ class LoggerModel:
                 # Skip layer separate metrics.
                 wandb.log({f"{metric_variant.value}_batch_cc_norm": values.cc_norm})
                 wandb.log({f"{metric_variant.value}_batch_cc_abs": values.cc_abs})
-                wandb.log({f"{metric_variant.value}_batch_cc_abs_separate": values.cc_abs_separate})
+                wandb.log(
+                    {
+                        f"{metric_variant.value}_batch_cc_abs_separate": values.cc_abs_separate
+                    }
+                )
 
     def print_current_evaluation_status(
         self,
@@ -165,7 +173,10 @@ class LoggerModel:
         )
 
     def print_final_evaluation_results(
-        self, all_avg_metric: Dict[EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]]
+        self,
+        all_avg_metric: Dict[
+            EvaluationMetricVariants, Union[Metric, Dict[str, Metric]]
+        ],
     ):
         """
         Prints final evaluation results and stores them also to `wandb` logs.
@@ -181,17 +192,27 @@ class LoggerModel:
                     wandb.log({"CC_NORM": avg_metric.cc_norm})
                     wandb.log({"CC_ABS": avg_metric.cc_abs})
                     wandb.log({"CC_SEPARATE_ABS": avg_metric.cc_abs_separate})
-                    print(f"Average normalized cross correlation: {avg_metric.cc_norm:.4f}")
+                    print(
+                        f"Average normalized cross correlation: {avg_metric.cc_norm:.4f}"
+                    )
                     print(f"Average Pearson's CC: {avg_metric.cc_abs:.4f}")
-                    print(f"Average Separate Pearson's CC: {avg_metric.cc_abs_separate:.4f}")
+                    print(
+                        f"Average Separate Pearson's CC: {avg_metric.cc_abs_separate:.4f}"
+                    )
                 else:
                     # Skip layer separate metrics.
                     wandb.log({f"CC_NORM_{metric_variant.value}": avg_metric.cc_norm})
                     wandb.log({f"CC_ABS_{metric_variant.value}": avg_metric.cc_abs})
-                    wandb.log({f"CC_SEPARATE_ABS_{metric_variant.value}": avg_metric.cc_abs_separate})
+                    wandb.log(
+                        {
+                            f"CC_SEPARATE_ABS_{metric_variant.value}": avg_metric.cc_abs_separate
+                        }
+                    )
                     print(f"CC_NORM_{metric_variant.value}: {avg_metric.cc_norm:.4f}")
                     print(f"CC_ABS_{metric_variant.value}: {avg_metric.cc_abs:.4f}")
-                    print(f"CC_ABS_SEPARATE_{metric_variant.value}: {avg_metric.cc_abs_separate:.4f}")
+                    print(
+                        f"CC_ABS_SEPARATE_{metric_variant.value}: {avg_metric.cc_abs_separate:.4f}"
+                    )
             else:
                 # log correlation for each layer
                 rows = []
@@ -201,7 +222,11 @@ class LoggerModel:
                     wandb.log({"CC_NORM/" + name: metric.cc_norm})
                     wandb.log({"CC_ABS/" + name: metric.cc_abs})
                     rows.append(
-                        {"Layer": name, "CC_NORM": metric.cc_norm, "CC_ABS": metric.cc_abs}
+                        {
+                            "Layer": name,
+                            "CC_NORM": metric.cc_norm,
+                            "CC_ABS": metric.cc_abs,
+                        }
                     )
                 df = pd.DataFrame.from_records(rows).set_index("Layer").sort_index()
                 print("\nPer-layer correlation summary")

@@ -79,7 +79,7 @@ class LayerConfig:
                 ],
                 LayerConstraintFields.TYPE.value: self._get_constraint_type(layer_name),
                 LayerConstraintFields.NAME.value: layer_name,
-                LayerConstraintFields.TIMESTEP.value: timestep
+                LayerConstraintFields.TIMESTEP.value: timestep,
             }
             for layer_name, timestep in self.input_layers_parameters
         ]
@@ -146,7 +146,7 @@ class LayerConfig:
         if synaptic_activation_model is None:
             # Synaptic adaptation is not defined for this connection.
             return input_tensor, hidden_states
-        
+
         complexity_result = input_tensor.reshape(
             -1, synaptic_activation_model.input_size
         )
