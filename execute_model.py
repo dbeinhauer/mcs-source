@@ -113,7 +113,11 @@ def init_model_path(arguments) -> str:
         )
 
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
-        visible_ratio = f"_visible-{str(arguments.visible_ratio)}" if arguments.visible_ratio < 1.0 else ""
+        visible_ratio = (
+            f"_visible-{str(arguments.visible_ratio)}"
+            if arguments.visible_ratio < 1.0
+            else ""
+        )
         return "".join(
             [
                 f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
@@ -348,6 +352,7 @@ def init_parser() -> argparse.ArgumentParser:
         "--visible_neurons_path",
         type=str,
         default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.VISIBLE_NEURONS_DIR.value
         ],
         help="Path to the file containing visible neurons indices (of the already selected subset of neurons).",
     )

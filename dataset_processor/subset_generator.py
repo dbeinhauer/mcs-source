@@ -2,17 +2,20 @@
 This script serves for random generating of model subsets.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import argparse
 import random
 import pickle
 
 import nn_model.globals
-import nn_model.visible_neurons_handler as VisibleNeuronsHandler
+from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 
 SUBSET_DIRECTORY = "generated_subsets/"
 
-def generate_random_subset(subset_ratio: float, original_sizes: Dict[str, int]) -> Dict[str, int]:
+
+def generate_random_subset(
+    subset_ratio: float, original_sizes: Dict[str, int]
+) -> Dict[str, List[int]]:
     """
     Generates a random subset of indices for each layer based on the specified ratio.
 
@@ -31,7 +34,9 @@ def generate_random_subset(subset_ratio: float, original_sizes: Dict[str, int]) 
     return subset_dict
 
 
-def one_subset_generation(subset_ratio, output_file, original_sizes: Dict[str, int]):
+def one_subset_generation(
+    subset_ratio, output_file: str, original_sizes: Dict[str, int]
+):
     subset_dict = generate_random_subset(subset_ratio, original_sizes)
 
     with open(output_file, "wb") as f:
@@ -68,25 +73,29 @@ def main():
         action="store_true",
         help="Whether we want to generate visible neurons subset.",
     )
-    
+
     args = parser.parse_args()
 
     ratio_percentage = int(args.subset_ratio * 100)
-    preliminary_output_file = args.output_file
+    output_dir, output_filename = "", ""
     original_sizes = {}
-    
-    if args.output_file == "":
-        if args.visible_neurons:
-            preliminary_output_file = VisibleNeuronsHandler.get_visible_indices_path(args.subset_ratio, directory_path = SUBSET_DIRECTORY)
-            original_sizes = nn_model.globals.MODEL_SIZES
-        else:
-            preliminary_output_file = SUBSET_DIRECTORY + f"size_{ratio_percentage}.pkl"
-            original_sizes = nn_model.globals.ORIGINAL_SIZES
+
+    if args.visible_neurons:
+        output_dir, output_filename = VisibleNeuronsHandler.get_visible_indices_path(
+            args.subset_ratio, directory_path=SUBSET_DIRECTORY
+        )
+        original_sizes = nn_model.globals.MODEL_SIZES
+    else:
+        output_dir = SUBSET_DIRECTORY
+        output_filename = f"subset_size_{ratio_percentage}.pkl"
+        original_sizes = nn_model.globals.ORIGINAL_SIZES
+
+    if not args.output_file:
+        args.output_file = f"{output_dir}/{output_filename}"
 
     for i in range(args.num_subsets):
         if args.num_subsets > 1:
-            args.output_file = preliminary_output_file + f"size_{ratio_percentage}_variant_{i}.pkl"
-
+            args.output_file = ".".split(args.output_file)[0] + f"_variant_{i}.pkl"
         one_subset_generation(args.subset_ratio, args.output_file, original_sizes)
 
 
