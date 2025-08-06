@@ -112,6 +112,14 @@ class EvaluationMetricHandler:
         predictions: Dict[str, torch.Tensor],
         keys: List[str],
     ) -> Dict[str, Metric]:
+        """
+        Computes evaluation score between layer-specific predictions.
+
+        :param targets: Targets for all layers.
+        :param predictions: Predictions for all layers.
+        :param keys: Layer names sorted in expected order.
+        :return: Returns evaluation score for each layer separately.
+        """
         layer_specific_metrics = {}
         for layer in keys:
             metric = self.evaluation_metric.calculate(

@@ -155,7 +155,7 @@ class VisibleNeuronsHandler:
             layer: torch.where(
                 expanded_mask[layer],
                 target_responses[layer],
-                prediction_responses[layer].detach(),
+                prediction_responses[layer]#.detach(),
             )
             for layer in target_responses
         }
