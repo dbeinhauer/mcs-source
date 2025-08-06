@@ -836,7 +836,6 @@ class ModelExecuter:
             )
 
             # TODO: If neuron subset -> assign visible neurons and let the rest be the predictions.
-            batch_size = hidden_states[LayerType.V1_EXC_L4.value].shape[0]
             hidden_states = (
                 self.visible_neurons_handler.assign_teacher_forced_responses(
                     hidden_states, predictions
@@ -878,6 +877,10 @@ class ModelExecuter:
                 neuron_hidden, synaptic_adaptation_hidden = self._optimizer_step(
                     neuron_hidden, synaptic_adaptation_hidden
                 )
+                
+                for layer in predictions:
+                    # Store predictions for the current time step.
+                    predictions[layer] = predictions[layer].detach()
 
                 # Save loss for logs and reset counter.
                 time_loss_sum += accumulated_loss.item()

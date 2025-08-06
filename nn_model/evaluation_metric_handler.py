@@ -94,6 +94,10 @@ class EvaluationMetricHandler:
                 [tensors[k] for k in keys],
                 dim=-1,
             )
+            
+        if not predictions:
+            # If there are no predictions, return a zero metric.
+            return Metric(0, 0, 0)
 
         # Concatenate predictions and targets across all layers.
         all_predictions = cat(predictions).to(nn_model.globals.DEVICE)
@@ -108,6 +112,14 @@ class EvaluationMetricHandler:
         predictions: Dict[str, torch.Tensor],
         keys: List[str],
     ) -> Dict[str, Metric]:
+        """
+        Computes evaluation score between layer-specific predictions.
+
+        :param targets: Targets for all layers.
+        :param predictions: Predictions for all layers.
+        :param keys: Layer names sorted in expected order.
+        :return: Returns evaluation score for each layer separately.
+        """
         layer_specific_metrics = {}
         for layer in keys:
             metric = self.evaluation_metric.calculate(
@@ -146,7 +158,6 @@ class EvaluationMetricHandler:
             self._compute_all_layers_evaluation(targets, predictions, keys)
         )
 
-        # batch_size =  targets[LayerType.V1_EXC_L4.value].shape[0]
         visible_targets, invisible_targets = (
             visible_neurons_handler.split_visible_invisible_neurons(targets)
         )
