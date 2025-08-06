@@ -14,6 +14,7 @@ class VisibleNeuronsHandler:
 
     def __init__(self, arguments):
         self.visible_neurons_ratio = arguments.visible_neurons_ratio
+        self.visible_neurons_mask_1d = None
         if self.visible_neurons_ratio < 1.0:
             # Load indices only if ratio is subset of the full model.
             self.visible_neurons_mask_1d = self._load_visible_neuron_indices()

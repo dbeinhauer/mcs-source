@@ -94,6 +94,10 @@ class EvaluationMetricHandler:
                 [tensors[k] for k in keys],
                 dim=-1,
             )
+            
+        if not predictions:
+            # If there are no predictions, return a zero metric.
+            return Metric(0, 0, 0)
 
         # Concatenate predictions and targets across all layers.
         all_predictions = cat(predictions).to(nn_model.globals.DEVICE)
@@ -146,7 +150,6 @@ class EvaluationMetricHandler:
             self._compute_all_layers_evaluation(targets, predictions, keys)
         )
 
-        # batch_size =  targets[LayerType.V1_EXC_L4.value].shape[0]
         visible_targets, invisible_targets = (
             visible_neurons_handler.split_visible_invisible_neurons(targets)
         )
