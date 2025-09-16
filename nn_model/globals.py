@@ -176,19 +176,35 @@ def rewrite_test_batch_size(new_batch_size: int):
     TEST_BATCH_SIZE = new_batch_size
 
 
+def unflatten_dict(d):
+    """Rebuild nested dict from flattened keys."""
+    result = {}
+    for k, v in d.items():
+        keys = k.split(".")
+        cur = result
+        for sub in keys[:-1]:
+            cur = cur.setdefault(sub, {})
+        cur[keys[-1]] = v
+    return result
+
+# Load
+POS_ORI_DICT = unflatten_dict(dict(np.load(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.npz", allow_pickle=True)))
+# dict_npz = unflatten_dict(dict(data))
+
+
 # TODO: Comment the following functionalities.
 # with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", "rb") as f:
 #     POS_ORI_DICT = pickle.load(f)
 
-# with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], "rb") as f:
-#     NEURON_SELECTION = pickle.load(f)
+with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], "rb") as f:
+    NEURON_SELECTION = pickle.load(f)
 
-# for layer, xyo in POS_ORI_DICT.items():
-#     subset_filter = NEURON_SELECTION[layer].astype(int)
-#     for attr in xyo.keys():
-#         POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
-#             subset_filter
-#         ].astype(float)
-#         POS_ORI_DICT[layer][attr] = (
-#             torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
-#         )
+for layer, xyo in POS_ORI_DICT.items():
+    subset_filter = NEURON_SELECTION[layer].astype(int)
+    for attr in xyo.keys():
+        POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
+            subset_filter
+        ].astype(float)
+        POS_ORI_DICT[layer][attr] = (
+            torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
+        )
