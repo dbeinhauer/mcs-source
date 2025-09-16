@@ -29,7 +29,7 @@ else:
 # Model Parameters:
 
 # Model Diminishing factor
-DEFAULT_SIZE_MULTIPLIER = 0.1
+DEFAULT_SIZE_MULTIPLIER = 0.02
 # Allow overriding SIZE_MULTIPLIER via an environment variable -> model size using env variables.
 SIZE_MULTIPLIER = float(os.getenv("SIZE_MULTIPLIER", DEFAULT_SIZE_MULTIPLIER))
 

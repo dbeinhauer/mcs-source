@@ -6,6 +6,7 @@ from typing import Dict, Optional, List
 import argparse
 import random
 import pickle
+from pathlib import Path
 
 import nn_model.globals
 from nn_model.visible_neurons_handler import VisibleNeuronsHandler
@@ -35,7 +36,7 @@ def generate_random_subset(
 
 
 def one_subset_generation(
-    subset_ratio, output_file: str, original_sizes: Dict[str, int]
+    subset_ratio, output_file: Path, original_sizes: Dict[str, int]
 ):
     subset_dict = generate_random_subset(subset_ratio, original_sizes)
 
@@ -94,9 +95,14 @@ def main():
         args.output_file = f"{output_dir}/{output_filename}"
 
     for i in range(args.num_subsets):
+        new_output_file = Path(args.output_file)
         if args.num_subsets > 1:
-            args.output_file = ".".split(args.output_file)[0] + f"_variant_{i}.pkl"
-        one_subset_generation(args.subset_ratio, args.output_file, original_sizes)
+            print(args.output_file)
+            new_output_file = new_output_file.with_name(
+                f"{new_output_file.stem}_variant_{i}{new_output_file.suffix}"
+            )
+            # new_output_file = ".".split(args.output_file)[0] + f"_variant_{i}.pkl"
+        one_subset_generation(args.subset_ratio, new_output_file, original_sizes)
 
 
 if __name__ == "__main__":

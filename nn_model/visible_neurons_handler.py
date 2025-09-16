@@ -68,7 +68,9 @@ class VisibleNeuronsHandler:
 
         :return:
         """
-        directory, filename = self.get_visible_indices_path(self.visible_neurons_ratio)
+        directory, filename = self.get_visible_indices_path(
+            self.visible_neurons_ratio,
+        )
         with open(Path(directory) / filename, "rb") as pickle_file:
             return VisibleNeuronsHandler._create_visible_neurons_mask(
                 pickle.load(pickle_file)
@@ -155,7 +157,7 @@ class VisibleNeuronsHandler:
             layer: torch.where(
                 expanded_mask[layer],
                 target_responses[layer],
-                prediction_responses[layer]#.detach(),
+                prediction_responses[layer],  # .detach(),
             )
             for layer in target_responses
         }
