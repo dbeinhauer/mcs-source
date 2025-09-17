@@ -34,6 +34,7 @@ from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
 from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 from nn_model.evaluation_metric_handler import EvaluationMetricHandler
+from nn_model.connection_learning import compute_neural_distances
 
 
 class ModelExecuter:
@@ -62,6 +63,9 @@ class ModelExecuter:
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
+        # Strength of distance regularization.
+        self.distance_regularizer = arguments.distance_regularizer
+        self.sigma_regularizer = arguments.sigma_regularizer
 
         self.visible_neurons_handler = VisibleNeuronsHandler(arguments)
 
@@ -746,19 +750,60 @@ class ModelExecuter:
 
         return predictions, neuron_hidden, synaptic_adaptation_hidden
 
+    def _calculate_distance_loss(self, sigma: float = 0.2) -> torch.Tensor:
+        """
+        Calculates distance-dependent regularizer gaussian loss based on the current model weights.
+        The loss is calculated as:
+            `(1 - exp(-d^2 / (2*sigma^2))) * w^2`
+        where `d` is the distance between the neurons, `w` is the weight of the connection
+
+        :return: Returns distance-dependent regularization loss in format.
+        """
+        distance_loss = 0
+        
+        for post_layer_name, input_layers in PrimaryVisualCortexModel.layers_input_parameters.items():
+            for pre_layer_name, _ in input_layers + [(post_layer_name, "")]:  # Add self-recurrent connection.
+                layer_sigma = sigma
+                if pre_layer_name in nn_model.globals.LGN_NEURONS:
+                    # Input layer -> skip
+                    continue
+                if pre_layer_name == post_layer_name:
+                    # Self-recurrent connection -> skip
+                    continue
+                if {pre_layer_name, post_layer_name} in nn_model.globals.L23_NEURONS:
+                    layer_sigma = sigma * 4 # L23 layers are more spread out.
+                pair_weights = torch.transpose(self.model.get_weights_per_layer_pair(pre_layer_name, post_layer_name), 0, 1).cpu()
+                # pair_distances = compute_neural_distances(pre_layer_name, post_layer_name)
+                pair_distances = self.model.neural_distances[(pre_layer_name, post_layer_name)].cpu()#.to(nn_model.globals.DEVICE)
+                # sigma = 1.0  # adjust the standard deviation as needed
+                gaussian_weight = 1 - torch.exp(- (pair_distances ** 2) / (2 * layer_sigma ** 2))
+                weights = pair_weights.flatten()
+                distance_loss += torch.sum(gaussian_weight * (weights * weights)).unsqueeze(0)
+                
+        return distance_loss
+                
+
     def _calculate_loss(
         self,
         predictions: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
-    ):
-        total_loss = torch.zeros(1)
+    ) -> torch.Tensor:
+        """
+        Calculates total loss based on the predictions and targets and distance-dependent weights.
+        
+        :param predictions: Predictions of the model.
+        :param targets: Targets of the model.
+        :return: Returns loss combining prediction loss and distance-dependent loss (regularization).
+        """
+        distance_dependent_loss = self._calculate_distance_loss(self.sigma_regularizer)
+        prediction_loss = torch.zeros(1)
         for layer in predictions:
-            total_loss += self.criterion(
+            prediction_loss += self.criterion(
                 predictions[layer].cpu(),
                 targets[layer].cpu(),
             )
 
-        return total_loss
+        return prediction_loss + self.distance_regularizer * distance_dependent_loss
 
     def _optimizer_step(
         self,
@@ -857,7 +902,7 @@ class ModelExecuter:
             visible_targets, _ = (
                 self.visible_neurons_handler.split_visible_invisible_neurons(targets)
             )
-
+            
             # Calculate time step loss.
             accumulated_loss += self._calculate_loss(
                 visible_predictions, visible_targets

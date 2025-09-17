@@ -27,7 +27,7 @@ hostname = socket.gethostname()
 
 # Select the GPU to use in case we are working in CGG server.
 if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -68,6 +68,8 @@ def init_wandb(
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
         "param_red": arguments.parameter_reduction,
         "loss": arguments.loss,
+        "distance_regularizer": arguments.distance_regularizer,
+        "sigma_regularizer": arguments.sigma_regularizer,
         "visible_neurons_ratio": arguments.visible_neurons_ratio,
     }
 
@@ -114,7 +116,7 @@ def init_model_path(arguments) -> str:
 
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
         visible_ratio = (
-            f"_visible-{str(arguments.visible_neurons_ratio)}"
+            f"_visib-{str(arguments.visible_neurons_ratio)}"
             if arguments.visible_neurons_ratio < 1.0
             else ""
         )
@@ -127,16 +129,18 @@ def init_model_path(arguments) -> str:
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
-                f"_optim-steps-{arguments.num_backpropagation_time_steps}",
+                f"_opt-steps-{arguments.num_backpropagation_time_steps}",
+                f"_dis-reg-{arguments.distance_regularizer}",
+                f"-sig-{arguments.sigma_regularizer}",
                 "_neuron",
                 f"-layers-{arguments.neuron_num_layers}",
                 f"-size-{arguments.neuron_layer_size}",
-                f"-activation-{arguments.neuron_activation_function}",
+                # f"-activation-{arguments.neuron_activation_function}",
                 f"-res-{arguments.neuron_residual}",
                 f"_hid-time-{arguments.num_hidden_time_steps}",
-                f"_grad-clip-{arguments.gradient_clip}",
+                # f"_grad-clip-{arguments.gradient_clip}",
                 f"_optim-{arguments.optimizer_type}",
-                f"_weight-init-{arguments.weight_initialization}",
+                # f"_weight-init-{arguments.weight_initialization}",
                 f"_p-red-{arguments.parameter_reduction}",
                 f"_loss-{arguments.loss}",
                 "_synaptic",
@@ -214,6 +218,7 @@ def main(arguments):
     arguments.subset_dir = get_subset_variant_name(
         arguments.subset_dir, arguments.subset_variant
     )
+    nn_model.globals.define_neuron_selection(arguments.subset_dir)
 
     logger = LoggerModel()
     logger.print_experiment_info(arguments)
@@ -391,6 +396,18 @@ def init_parser() -> argparse.ArgumentParser:
         default=LossTypes.POISSON.value,
         choices=[loss_type.value for loss_type in LossTypes],
         help="Loss to use during training.",
+    )
+    parser.add_argument(
+        "--distance_regularizer",
+        type=float,
+        default=0.0,
+        help="Strength of distance regularization (0.0 means no regularization).",
+    )
+    parser.add_argument(
+        "--sigma_regularizer",
+        type=float,
+        default=0.2,
+        help="Sigma of the Gaussian used in distance regularization.",
     )
     parser.add_argument(
         "--gradient_clip",

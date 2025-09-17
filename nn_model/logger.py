@@ -45,6 +45,8 @@ class LoggerModel:
                     f"Model subset variant: {arguments.subset_variant}",
                     f"Batch size: {arguments.train_batch_size}",
                     f"Learning rate: {arguments.learning_rate}",
+                    f"Distance regularizer constant: {arguments.distance_regularizer}",
+                    f"Sigma distance regularizer: {arguments.sigma_regularizer}",
                     f"Num epochs: {arguments.num_epochs}",
                     f"Model variant: {arguments.model}",
                     f"Number of hidden time steps: {arguments.num_hidden_time_steps}",

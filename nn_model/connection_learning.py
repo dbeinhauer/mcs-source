@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict
 
 import torch
 import torch.nn as nn
@@ -12,11 +12,27 @@ from nn_model.globals import (
 from nn_model.type_variants import LayerParent
 
 
-def get_features(layer_name_pre, layer_name_post):
+def get_features(layer_name_pre, layer_name_post, skip_phase=False) -> Dict:
     return {
         key: (value.clone(), POS_ORI_DICT[layer_name_post][key].clone())
-        for key, value in POS_ORI_DICT[layer_name_pre].items()
+        for key, value in POS_ORI_DICT[layer_name_pre].items() if key != "phase" or not skip_phase
     }
+    
+def compute_neural_distances(layer_name_pre: str, layer_name_post: str) -> torch.Tensor:
+    """
+    Computes pairwise Euclidean distances between neurons in two layers.
+    :param layer_name_pre: Name of the layer with pre-synaptic neurons.
+    :param layer_name_post: Name of the layer with post-synaptic neurons.
+    :return: Pairwise distances, shape (n_neurons_pre, n_neurons_post).
+    """
+    features = get_features(layer_name_pre, layer_name_post, skip_phase=True)
+    # relative position
+    x = features["x"]
+    y = features["y"]
+    dx = pairwise_delta(*x)
+    dy = pairwise_delta(*y)
+    distances = torch.sqrt(dx**2 + dy**2)
+    return distances
 
 
 class Autapse(nn.Module):

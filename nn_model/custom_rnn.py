@@ -17,7 +17,7 @@ from nn_model.type_variants import (
     WeightsInitializationTypes,
 )
 
-# from nn_model.connection_learning import ConnectionAffine
+from nn_model.connection_learning import ConnectionAffine
 
 
 class CustomRNNCell(nn.Module):
@@ -85,15 +85,15 @@ class CustomRNNCell(nn.Module):
         self.weights_ih_inh = nn.Linear(
             self.inhibitory_size, hidden_size
         )  # Input inhibitory
+        # Neuron distanced
+        
         # Self-connection
         if self.parameter_reduction:
-            # # Bias already handled by weights_ih_exc and weights_ih_inh
-            # self.weights_hh = ConnectionAffine(layer_name, layer_name, bias=False)
-            # self.weights_lateral = ConnectionAffine(
-            #     self.lateral_pre, layer_name, bias=False
-            # )
-            # TODO: make it working
-            pass
+            # Bias already handled by weights_ih_exc and weights_ih_inh
+            self.weights_hh = ConnectionAffine(layer_name, layer_name, bias=False)
+            self.weights_lateral = ConnectionAffine(
+                self.lateral_pre, layer_name, bias=False
+            )
         else:
             self.weights_hh = nn.Linear(hidden_size, hidden_size, bias=False)
 

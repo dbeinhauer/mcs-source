@@ -20,6 +20,7 @@ from nn_model.layers import (
 )
 from nn_model.neurons import DNNNeuron, SharedNeuronBase, RNNNeuron
 from nn_model.layer_config import LayerConfig
+from nn_model.connection_learning import compute_neural_distances
 
 
 class PrimaryVisualCortexModel(nn.Module):
@@ -164,6 +165,45 @@ class PrimaryVisualCortexModel(nn.Module):
 
         # Init model.
         self._init_model_architecture()
+        
+        self.neural_distances = {
+            (pre_layer, post_layer): compute_neural_distances(pre_layer, post_layer)
+            for post_layer, input_params in PrimaryVisualCortexModel.layers_input_parameters.items()
+            for pre_layer, _ in input_params
+            if pre_layer not in nn_model.globals.LGN_NEURONS
+        }
+        
+    def get_weights_per_layer_pair(self, layer_pre: str, layer_post: str) -> torch.Tensor:
+        """
+        Selects weights between given layer pair.
+
+        :param layer_pre: Presynaptic (input) layer name.
+        :param layer_post: Postsynaptic (output) layer name.
+        :return: Returns weights between the given layer pair, shape [n_neurons_post, n_neurons_pre].
+        """
+        if layer_pre == layer_post:
+            # Self-recurrent connection.
+            return self.layers[layer_post].rnn_cell.weights_hh.weight
+        input_layers = PrimaryVisualCortexModel.layers_input_parameters[layer_post]
+        if layer_pre in nn_model.globals.INHIBITORY_LAYERS:
+            # Inhibitory input layer.
+            return self.layers[layer_post].rnn_cell.weights_ih_inh.weight
+        
+        # Excitatory input layer -> find proper slice of the weights.
+        start_index = 0
+        for input_layer_name, _ in input_layers:
+            layer_size = self.layer_sizes[input_layer_name]
+            if input_layer_name == layer_pre:
+                end_index = start_index + layer_size
+                return self.layers[layer_post].rnn_cell.weights_ih_exc.weight[:, start_index: end_index]
+            else:
+                if input_layer_name not in nn_model.globals.INHIBITORY_LAYERS:
+                    # If the input layer is excitatory, we need to move the start index.
+                    start_index += layer_size
+                            
+        raise ValueError(f"Layer pair {layer_pre}, {layer_post} not found.")
+
+            
 
     def switch_to_return_recurrent_state(self):
         """

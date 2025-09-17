@@ -34,6 +34,8 @@ WANDB_NAME=""
 SIZE_MULTIPLIER=0.1
 EVALUATION_RUN=false
 VISIBLE_NEURONS_RATIO=1.0
+DISTANCE_REGULARIZER=0.0
+SIGMA_REGULARIZER=0.2
 
 # Parse long options
 while [[ $# -gt 0 ]]; do
@@ -98,6 +100,14 @@ while [[ $# -gt 0 ]]; do
         VISIBLE_NEURONS_RATIO="$2"
         shift 2
         ;;
+    --distance_regularizer)
+        DISTANCE_REGULARIZER="$2"
+        shift 2
+        ;;
+    --sigma_regularizer)
+        SIGMA_REGULARIZER="$2"
+        shift 2
+        ;;
     --wandb_name)
         WANDB_NAME="$2"
         shift 2
@@ -148,6 +158,8 @@ MODEL_PARAMS="--num_data_workers=8 \\
 --synaptic_adaptation_num_layers=$SYN_ADAPT_NUM_LAYERS \\
 --wandb_project_name=$WANDB_NAME \\
 --visible_neurons_ratio=$VISIBLE_NEURONS_RATIO \\
+--distance_regularizer=$DISTANCE_REGULARIZER \\
+--sigma_regularizer=$SIGMA_REGULARIZER \\
 --save_all_predictions"
 
 # Add boolean flags to MODEL_PARAMS if they are set to true

@@ -51,6 +51,22 @@ LAYER_TO_PARENT = {
     LayerType.V1_INH_L23.value: LayerParent.L23.value,
 }
 
+# Layers containing LGN layer.
+LGN_NEURONS = {
+    LayerType.X_ON.value,
+    LayerType.X_OFF.value,
+}
+
+L4_NEURONS = {
+    LayerType.V1_EXC_L4.value,
+    LayerType.V1_INH_L4.value,
+}
+
+L23_NEURONS = {
+    LayerType.V1_EXC_L23.value,
+    LayerType.V1_INH_L23.value,
+}
+
 # Will return values as its names
 EXCITATORY_LAYERS = {
     LayerType.X_ON.value,
@@ -187,24 +203,31 @@ def unflatten_dict(d):
         cur[keys[-1]] = v
     return result
 
-# Load
+# Load position and orientation dictionary. TODO: works also in old numpy
 POS_ORI_DICT = unflatten_dict(dict(np.load(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.npz", allow_pickle=True)))
-# dict_npz = unflatten_dict(dict(data))
-
 
 # TODO: Comment the following functionalities.
 # with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", "rb") as f:
 #     POS_ORI_DICT = pickle.load(f)
 
-with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], "rb") as f:
-    NEURON_SELECTION = pickle.load(f)
+NEURON_SELECTION = None
 
-for layer, xyo in POS_ORI_DICT.items():
-    subset_filter = NEURON_SELECTION[layer].astype(int)
-    for attr in xyo.keys():
-        POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
-            subset_filter
-        ].astype(float)
-        POS_ORI_DICT[layer][attr] = (
-            torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
-        )
+def define_neuron_selection(subset_dir: str):
+    """
+    Defines the neuron selection from the specified path.
+
+    :param subset_dir: Path to the neuron subset pickle file.
+    """
+    global NEURON_SELECTION, POS_ORI_DICT
+    with open(subset_dir, "rb") as f:
+        NEURON_SELECTION = pickle.load(f)
+
+    for layer, xyo in POS_ORI_DICT.items():
+        subset_filter = np.array(NEURON_SELECTION[layer]).astype(int)
+        for attr in xyo.keys():
+            POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
+                subset_filter
+            ].astype(float)
+            POS_ORI_DICT[layer][attr] = (
+                torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
+            )
