@@ -165,15 +165,13 @@ class PrimaryVisualCortexModel(nn.Module):
 
         # Init model.
         self._init_model_architecture()
-        
-        self.neural_distances = {
-            (pre_layer, post_layer): compute_neural_distances(pre_layer, post_layer)
-            for post_layer, input_params in PrimaryVisualCortexModel.layers_input_parameters.items()
-            for pre_layer, _ in input_params
-            if pre_layer not in nn_model.globals.LGN_NEURONS
-        }
-        
-    def get_weights_per_layer_pair(self, layer_pre: str, layer_post: str) -> torch.Tensor:
+
+        # Neural distances between all layer pairs (pre, post) that are connected (except LGN).
+        self.neural_distances = self._init_neural_distances()
+
+    def get_weights_per_layer_pair(
+        self, layer_pre: str, layer_post: str
+    ) -> torch.Tensor:
         """
         Selects weights between given layer pair.
 
@@ -188,22 +186,23 @@ class PrimaryVisualCortexModel(nn.Module):
         if layer_pre in nn_model.globals.INHIBITORY_LAYERS:
             # Inhibitory input layer.
             return self.layers[layer_post].rnn_cell.weights_ih_inh.weight
-        
+
         # Excitatory input layer -> find proper slice of the weights.
         start_index = 0
         for input_layer_name, _ in input_layers:
             layer_size = self.layer_sizes[input_layer_name]
             if input_layer_name == layer_pre:
+                # Found the input layer -> return the proper slice of the weights.
                 end_index = start_index + layer_size
-                return self.layers[layer_post].rnn_cell.weights_ih_exc.weight[:, start_index: end_index]
+                return self.layers[layer_post].rnn_cell.weights_ih_exc.weight[
+                    :, start_index:end_index
+                ]
             else:
                 if input_layer_name not in nn_model.globals.INHIBITORY_LAYERS:
                     # If the input layer is excitatory, we need to move the start index.
                     start_index += layer_size
-                            
-        raise ValueError(f"Layer pair {layer_pre}, {layer_post} not found.")
 
-            
+        raise ValueError(f"Layer pair {layer_pre}, {layer_post} not found.")
 
     def switch_to_return_recurrent_state(self):
         """
@@ -396,6 +395,20 @@ class PrimaryVisualCortexModel(nn.Module):
         # Training mode. Hidden layers are last steps from targets for each time step.
         # Assign the values in each training step (not in this function).
         return {}
+
+    def _init_neural_distances(self) -> Dict[Tuple[str, str], torch.Tensor]:
+        """
+        Initializes neural distances between all layer pairs (pre, post) that are connected
+        except LGN.
+
+        :return: Returns dictionary of layer pairs and their neural distances.
+        """
+        return {
+            (pre_layer, post_layer): compute_neural_distances(pre_layer, post_layer)
+            for post_layer, input_params in PrimaryVisualCortexModel.layers_input_parameters.items()
+            for pre_layer, _ in input_params
+            if pre_layer not in nn_model.globals.LGN_NEURONS
+        }
 
     def apply_layer_neuron_complexity(
         self, layer: str, input_data: torch.Tensor

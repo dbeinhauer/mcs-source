@@ -13,11 +13,21 @@ from nn_model.type_variants import LayerParent
 
 
 def get_features(layer_name_pre, layer_name_post, skip_phase=False) -> Dict:
+    """
+    Creates clone of the pair-wise features dictionary for the given layers.
+
+    :param layer_name_pre: Presynaptic layer name.
+    :param layer_name_post: Postsynaptic layer name.
+    :param skip_phase: Whether to skip phase feature.
+    :return: Returns a dictionary with keys 'x', 'y', 'ori', and optionally 'phase'.
+    """
     return {
         key: (value.clone(), POS_ORI_DICT[layer_name_post][key].clone())
-        for key, value in POS_ORI_DICT[layer_name_pre].items() if key != "phase" or not skip_phase
+        for key, value in POS_ORI_DICT[layer_name_pre].items()
+        if key != "phase" or not skip_phase
     }
-    
+
+
 def compute_neural_distances(layer_name_pre: str, layer_name_post: str) -> torch.Tensor:
     """
     Computes pairwise Euclidean distances between neurons in two layers.

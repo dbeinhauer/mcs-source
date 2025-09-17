@@ -203,14 +203,23 @@ def unflatten_dict(d):
         cur[keys[-1]] = v
     return result
 
+
 # Load position and orientation dictionary. TODO: works also in old numpy
-POS_ORI_DICT = unflatten_dict(dict(np.load(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.npz", allow_pickle=True)))
+POS_ORI_DICT = unflatten_dict(
+    dict(
+        np.load(
+            f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.npz",
+            allow_pickle=True,
+        )
+    )
+)
 
 # TODO: Comment the following functionalities.
 # with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", "rb") as f:
 #     POS_ORI_DICT = pickle.load(f)
 
 NEURON_SELECTION = None
+
 
 def define_neuron_selection(subset_dir: str):
     """

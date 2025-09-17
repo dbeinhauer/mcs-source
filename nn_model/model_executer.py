@@ -34,7 +34,6 @@ from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
 from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 from nn_model.evaluation_metric_handler import EvaluationMetricHandler
-from nn_model.connection_learning import compute_neural_distances
 
 
 class ModelExecuter:
@@ -760,9 +759,14 @@ class ModelExecuter:
         :return: Returns distance-dependent regularization loss in format.
         """
         distance_loss = 0
-        
-        for post_layer_name, input_layers in PrimaryVisualCortexModel.layers_input_parameters.items():
-            for pre_layer_name, _ in input_layers + [(post_layer_name, "")]:  # Add self-recurrent connection.
+
+        for (
+            post_layer_name,
+            input_layers,
+        ) in PrimaryVisualCortexModel.layers_input_parameters.items():
+            for pre_layer_name, _ in input_layers + [
+                (post_layer_name, "")
+            ]:  # Add self-recurrent connection.
                 layer_sigma = sigma
                 if pre_layer_name in nn_model.globals.LGN_NEURONS:
                     # Input layer -> skip
@@ -771,17 +775,26 @@ class ModelExecuter:
                     # Self-recurrent connection -> skip
                     continue
                 if {pre_layer_name, post_layer_name} in nn_model.globals.L23_NEURONS:
-                    layer_sigma = sigma * 4 # L23 layers are more spread out.
-                pair_weights = torch.transpose(self.model.get_weights_per_layer_pair(pre_layer_name, post_layer_name), 0, 1).cpu()
-                # pair_distances = compute_neural_distances(pre_layer_name, post_layer_name)
-                pair_distances = self.model.neural_distances[(pre_layer_name, post_layer_name)].cpu()#.to(nn_model.globals.DEVICE)
-                # sigma = 1.0  # adjust the standard deviation as needed
-                gaussian_weight = 1 - torch.exp(- (pair_distances ** 2) / (2 * layer_sigma ** 2))
+                    layer_sigma = sigma * 4  # L23 layers are more spread out.
+                pair_weights = torch.transpose(
+                    self.model.get_weights_per_layer_pair(
+                        pre_layer_name, post_layer_name
+                    ),
+                    0,
+                    1,
+                ).cpu()
+                pair_distances = self.model.neural_distances[
+                    (pre_layer_name, post_layer_name)
+                ].cpu()
+                gaussian_weight = 1 - torch.exp(
+                    -(pair_distances**2) / (2 * layer_sigma**2)
+                )
                 weights = pair_weights.flatten()
-                distance_loss += torch.sum(gaussian_weight * (weights * weights)).unsqueeze(0)
-                
+                distance_loss += torch.sum(
+                    gaussian_weight * (weights * weights)
+                ).unsqueeze(0)
+
         return distance_loss
-                
 
     def _calculate_loss(
         self,
@@ -790,7 +803,7 @@ class ModelExecuter:
     ) -> torch.Tensor:
         """
         Calculates total loss based on the predictions and targets and distance-dependent weights.
-        
+
         :param predictions: Predictions of the model.
         :param targets: Targets of the model.
         :return: Returns loss combining prediction loss and distance-dependent loss (regularization).
@@ -902,7 +915,7 @@ class ModelExecuter:
             visible_targets, _ = (
                 self.visible_neurons_handler.split_visible_invisible_neurons(targets)
             )
-            
+
             # Calculate time step loss.
             accumulated_loss += self._calculate_loss(
                 visible_predictions, visible_targets
@@ -922,7 +935,7 @@ class ModelExecuter:
                 neuron_hidden, synaptic_adaptation_hidden = self._optimizer_step(
                     neuron_hidden, synaptic_adaptation_hidden
                 )
-                
+
                 for layer in predictions:
                     # Store predictions for the current time step.
                     predictions[layer] = predictions[layer].detach()

@@ -94,7 +94,7 @@ class EvaluationMetricHandler:
                 [tensors[k] for k in keys],
                 dim=-1,
             )
-            
+
         if not predictions:
             # If there are no predictions, return a zero metric.
             return Metric(0, 0, 0)

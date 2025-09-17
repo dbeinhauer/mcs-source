@@ -86,7 +86,7 @@ class CustomRNNCell(nn.Module):
             self.inhibitory_size, hidden_size
         )  # Input inhibitory
         # Neuron distanced
-        
+
         # Self-connection
         if self.parameter_reduction:
             # Bias already handled by weights_ih_exc and weights_ih_inh
