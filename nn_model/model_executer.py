@@ -1082,6 +1082,7 @@ class ModelExecuter:
             )
 
             # Teacher-forced evaluation results.
+            # TODO: Probably broken while using only subset of neurons.
             neuron_hidden, synaptic_adaptation_hidden = (
                 ModelExecuter._init_modules_hidden_states()
             )
