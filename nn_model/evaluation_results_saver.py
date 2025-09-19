@@ -33,6 +33,16 @@ class EvaluationResultsSaver:
         # Directory where the full evaluation results should be stored.
         self.full_evaluation_directory = arguments.full_evaluation_dir
 
+    def _to_cpu(self, data):
+        """Recursively converts tensors to CPU."""
+        if isinstance(data, torch.Tensor):
+            return data.cpu()
+        if isinstance(data, dict):
+            return {k: self._to_cpu(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [self._to_cpu(item) for item in data]
+        return data
+
     def save_predictions_batch(
         self,
         batch_index: int,
@@ -65,18 +75,25 @@ class EvaluationResultsSaver:
             os.makedirs(subdirectory_path, exist_ok=True)
             filename = os.path.join(subdirectory_path, f"batch_{batch_index}.pkl")
 
+        # Convert all tensors to CPU to remove device specification.
+        predictions_cpu = {
+            k: self._to_cpu(v)
+            for k, v in all_predictions.items()
+        }
+        targets_cpu = self._to_cpu(targets)
+
         # Save to a pickle file
         with open(filename, "wb") as f:
             pickle.dump(
                 {
-                    EvaluationFields.PREDICTIONS: all_predictions[
+                    EvaluationFields.PREDICTIONS: predictions_cpu[
                         PredictionTypes.FULL_PREDICTION
                     ],
-                    EvaluationFields.TARGETS: targets,
-                    EvaluationFields.TRAIN_LIKE_PREDICTION: all_predictions[
+                    EvaluationFields.TARGETS: targets_cpu,
+                    EvaluationFields.TRAIN_LIKE_PREDICTION: predictions_cpu[
                         PredictionTypes.TRAIN_LIKE_PREDICTION
                     ],
-                    EvaluationFields.RNN_PREDICTIONS: all_predictions[
+                    EvaluationFields.RNN_PREDICTIONS: predictions_cpu[
                         PredictionTypes.RNN_PREDICTION
                     ],
                 },
@@ -95,9 +112,9 @@ class EvaluationResultsSaver:
 
         :param batch_index: ID of the batch used to determine filename (batch ID is part of it).
         :param predictions: Dictionary of predictions of the batch for all layers.
-        Shape of tensor:(batch_size, time, num_neurons)
+        Shape of tensor:(batch_size, num_trials, time, num_neurons)
         :param targets: Dictionary of targets of the batch for all layers.
-        Shape of tensor:(batch_size, time, num_neurons)
+        Shape of tensor:(batch_size, num_trials, time, num_neurons)
         """
         self.save_predictions_batch(
             batch_index,
