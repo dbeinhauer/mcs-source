@@ -12,8 +12,12 @@ class VisibleNeuronsHandler:
     Class handling the differentiation between visible and invisible neurons in the model.
     """
 
-    def __init__(self, arguments):
-        self.visible_neurons_ratio = arguments.visible_neurons_ratio
+    def __init__(self, visible_neurons_ratio: float):
+        """
+        :param visible_neurons_ratio: Ratio of visible neurons (between 0 and 1).
+        """
+        # self.visible_neurons_ratio = arguments.visible_neurons_ratio
+        self.visible_neurons_ratio = visible_neurons_ratio
         self.visible_neurons_mask_1d = None
         if self.visible_neurons_ratio < 1.0:
             # Load indices only if ratio is subset of the full model.

@@ -66,7 +66,9 @@ class ModelExecuter:
         self.distance_regularizer = arguments.distance_regularizer
         self.sigma_regularizer = arguments.sigma_regularizer
 
-        self.visible_neurons_handler = VisibleNeuronsHandler(arguments)
+        self.visible_neurons_handler = VisibleNeuronsHandler(
+            arguments.visible_neurons_ratio
+        )
 
         # Gradient clipping upper bound.
         self.gradient_clip = arguments.gradient_clip
