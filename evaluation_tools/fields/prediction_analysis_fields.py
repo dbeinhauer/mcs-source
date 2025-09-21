@@ -68,3 +68,13 @@ class BatchJobParameters(Enum):
     PAIRS_TO_COMPUTE = "pairs_to_compute"
     # Summary function to be applied on the selected batch.
     FUNCTION_TO_APPLY = "function_to_apply"
+
+
+class VisibilityVariants(Enum):
+    """
+    All visibility variants of the neurons.
+    """
+
+    ALL_NEURONS = "all_neurons_visible"
+    VISIBLE_NEURONS = "visible_neurons"
+    INVISIBLE_NEURONS = "invisible_neurons"

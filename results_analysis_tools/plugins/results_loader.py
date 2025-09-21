@@ -169,31 +169,28 @@ class ResultsLoader:
 
         return wandb_results
 
-    def load_evaluation_analyses(self, base_path: str = "") -> pd.DataFrame:
+    def load_evaluation_analyses(
+        self, base_path: str = "", custom_variant: str = ""
+    ) -> pd.DataFrame:
         """
         Loads all analyses of the evaluation results of all model variants.
 
         :param base_path: Path to directory containing all results to load.
         If `""` then load from the default path.
+        :param custom_variant: If specified, only this model variant is loaded.
         :return: Returns dataframe containing all results.
         """
+        variants_to_load = list(ModelEvaluationRunVariant)
+        if custom_variant:
+            # If custom variant specified, only load this one.
+            variants_to_load = [custom_variant]
         return self.load_general_results(
             base_path,
             EvaluationProcessorChoices.PREDICTION_ANALYSIS,
             [
                 (
                     "model_variant",
-                    list(ModelEvaluationRunVariant),
-                    # [
-                    #     ModelEvaluationRunVariant.SIMPLE_LEAKYTANH,
-                    #     ModelEvaluationRunVariant.DNN_JOINT,
-                    #     ModelEvaluationRunVariant.DNN_SEPARATE,
-                    #     ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
-                    #     ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
-                    #     ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
-                    #     ModelEvaluationRunVariant.DNN_JOINT_POISSON,
-                    #     ModelEvaluationRunVariant.
-                    # ],
+                    variants_to_load,
                 )
             ],
         )

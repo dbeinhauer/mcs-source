@@ -45,10 +45,13 @@ class BatchPredictionAnalysisProcessor:
     ]
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
-        self.all_batch_evaluation_results = (
-            EvaluationResultsProcessor.get_evaluation_results(all_results)
-        )
-        self.wandb_processor = WandbSummaryProcessor(all_results)
+        self.all_batch_evaluation_results: pd.DataFrame = None
+
+        if EvaluationProcessorChoices.PREDICTION_ANALYSIS in all_results:
+            self.all_batch_evaluation_results = (
+                EvaluationResultsProcessor.get_evaluation_results(all_results)
+            )
+            self.wandb_processor = WandbSummaryProcessor(all_results)
 
     @staticmethod
     def _mean_synchrony(df: pd.DataFrame) -> pd.DataFrame:
@@ -64,6 +67,7 @@ class BatchPredictionAnalysisProcessor:
             model = row["model_variant"]
             layer = row["layer_name"]
             variant = row["variant_type"]
+            visibility = row["visibility_variant"]
             sync = row[
                 "value"
             ]  # shape: [num_model_subsets, num_batches, batch_size, time_steps]
@@ -84,6 +88,7 @@ class BatchPredictionAnalysisProcessor:
                             "layer_name": layer,
                             "layer_size": nn_model.globals.MODEL_SIZES[layer],
                             "variant_type": variant,
+                            "visibility_variant": visibility,
                             "subset_index": subset_idx,
                             "time": t,
                             # Make the synchrony to be a ratio of firing neurons from the layer.
@@ -179,6 +184,10 @@ class BatchPredictionAnalysisProcessor:
                 variants_to_plot=variants_to_plot,
             )
         )
+
+        print(df_selection["variant_type"].unique())
+        print(df_selection["model_variant"].unique())
+        print(df_selection["visibility_variant"].unique())
 
         # Apply all necessary processing steps in order to prepare the synchrony curve for plotting.
         return EvaluationResultsProcessor.ensure_layer_type_order(

@@ -56,6 +56,9 @@ class ModelEvaluationRunVariant(Enum):
     RNN_BACKPROPAGATION_10_POISSON = "rnn_separate_10_poisson"
     SYN_ADAPT_BACKPROPAGATION_10_POISSON = "syn_adapt_10_poisson"
 
+    # Custom Experiments:
+    CUSTOM = "custom"
+
 
 class AdditionalExperiments(Enum):
     """
