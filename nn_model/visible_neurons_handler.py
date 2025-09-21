@@ -122,7 +122,7 @@ class VisibleNeuronsHandler:
         :param data: Data tensor to select from for each layer.
         :param mask: Mask tensor to apply.
         :return: Returns the selected data based on the mask for each layer.
-        The not selected data are kept as zeros (the original shape is preserved).
+        The not selected data are omitted from the output.
         """
         return {
             layer: data_dict[layer][..., mask[layer]]  # assuming same shape logic
@@ -131,8 +131,8 @@ class VisibleNeuronsHandler:
 
     def assign_teacher_forced_responses(
         self,
-        target_responses: Dict[str, torch.Tensor],
-        prediction_responses: Dict[str, torch.Tensor],
+        teacher_forced_neurons: Dict[str, torch.Tensor],
+        invisible_neurons: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
         """
         Takes all target responses and assigns them to the visible neurons.
@@ -147,9 +147,9 @@ class VisibleNeuronsHandler:
         """
         if not self.visible_neurons_mask_1d:
             # We have all neurons visible, return the original visible neurons.
-            return target_responses
+            return teacher_forced_neurons
 
-        expanded_mask = self._expand_masks_to_responses(target_responses)
+        expanded_mask = self._expand_masks_to_responses(teacher_forced_neurons)
         expanded_mask = {
             layer: expanded_mask[layer].to(nn_model.globals.DEVICE)
             for layer in expanded_mask
@@ -160,10 +160,10 @@ class VisibleNeuronsHandler:
         return {
             layer: torch.where(
                 expanded_mask[layer],
-                target_responses[layer],
-                prediction_responses[layer],  # .detach(),
+                teacher_forced_neurons[layer],
+                invisible_neurons[layer],
             )
-            for layer in target_responses
+            for layer in teacher_forced_neurons
         }
 
     def split_visible_invisible_neurons(
