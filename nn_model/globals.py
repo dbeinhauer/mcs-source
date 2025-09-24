@@ -29,7 +29,7 @@ else:
 # Model Parameters:
 
 # Model Diminishing factor
-DEFAULT_SIZE_MULTIPLIER = 0.1
+DEFAULT_SIZE_MULTIPLIER = 0.02
 # Allow overriding SIZE_MULTIPLIER via an environment variable -> model size using env variables.
 SIZE_MULTIPLIER = float(os.getenv("SIZE_MULTIPLIER", DEFAULT_SIZE_MULTIPLIER))
 
@@ -131,11 +131,16 @@ SEPARATE_MODELS = [
 
 DATASET_NAME = "testing_dataset"
 
+# String to represent model size in indices selection (if int then remove zeros).
+SIZE_MULTIPLIER_STRING = (
+    int(SIZE_MULTIPLIER * 100) if SIZE_MULTIPLIER % 1 == 0 else SIZE_MULTIPLIER * 100
+)
+
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {
     PathDefaultFields.TRAIN_DIR.value: f"{PROJECT_ROOT}/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
     PathDefaultFields.TEST_DIR.value: f"{PROJECT_ROOT}/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.SUBSET_DIR.value: f"{PROJECT_ROOT}/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
+    PathDefaultFields.SUBSET_DIR.value: f"{PROJECT_ROOT}/dataset/model_subsets/size_{SIZE_MULTIPLIER_STRING}.pkl",
     PathDefaultFields.VISIBLE_NEURONS_DIR.value: f"{PROJECT_ROOT}/dataset/visible_neurons/",
     PathDefaultFields.MODEL_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/best_models/",
     PathDefaultFields.EXPERIMENT_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
