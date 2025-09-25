@@ -195,6 +195,8 @@ def get_subset_variant_name(subset_path: str, subset_variant: int = -1) -> str:
     if subset_variant != -1:
         # Subset variant specified -> add it for the variant to be loaded.
         splitted_path = subset_path.split(".")
+        if len(splitted_path) > 2:
+            return f"{splitted_path[0]}.{splitted_path[1]}" + f"_variant_{subset_variant}." + splitted_path[-1]
         return splitted_path[0] + f"_variant_{subset_variant}." + splitted_path[-1]
 
     return subset_path
