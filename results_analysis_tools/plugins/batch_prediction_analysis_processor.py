@@ -185,10 +185,6 @@ class BatchPredictionAnalysisProcessor:
             )
         )
 
-        print(df_selection["variant_type"].unique())
-        print(df_selection["model_variant"].unique())
-        print(df_selection["visibility_variant"].unique())
-
         # Apply all necessary processing steps in order to prepare the synchrony curve for plotting.
         return EvaluationResultsProcessor.ensure_layer_type_order(
             EvaluationResultsProcessor.ensure_model_type_order(

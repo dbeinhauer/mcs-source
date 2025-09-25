@@ -77,7 +77,7 @@ def main():
 
     args = parser.parse_args()
 
-    ratio_percentage = int(args.subset_ratio * 100)
+    ratio_percentage = args.subset_ratio * 100
     output_dir, output_filename = "", ""
     original_sizes = {}
 
@@ -88,7 +88,9 @@ def main():
         original_sizes = nn_model.globals.MODEL_SIZES
     else:
         output_dir = SUBSET_DIRECTORY
-        output_filename = f"subset_size_{ratio_percentage}.pkl"
+        if ratio_percentage % 1 == 0:
+            ratio_percentage = int(ratio_percentage)
+        output_filename = f"size_{ratio_percentage}.pkl"
         original_sizes = nn_model.globals.ORIGINAL_SIZES
 
     if not args.output_file:
