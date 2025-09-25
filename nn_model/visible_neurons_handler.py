@@ -43,9 +43,7 @@ class VisibleNeuronsHandler:
             if directory_path == ""
             else directory_path
         )
-        filename = (
-            f"size_{int(size_multiplier)}_ratio_{int(visible_neurons_ratio*100)}.pkl"
-        )
+        filename = f"size_{size_multiplier}_ratio_{visible_neurons_ratio*100}.pkl"
         return directory_path, filename
 
     @staticmethod
