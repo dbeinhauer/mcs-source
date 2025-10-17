@@ -2,7 +2,7 @@
 This code encapsulates the processing of the prediction batched analysis results.
 """
 
-from typing import Dict, Union, List
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -18,16 +18,12 @@ from results_analysis_tools.plugins.evaluation_results_processor import (
 from evaluation_tools.fields.prediction_analysis_fields import (
     BatchSummaryFields,
     EvaluationPairsVariants,
+    VisibilityVariants,
 )
 from evaluation_tools.fields.experiment_parameters_fields import (
-    WandbExperimentVariants,
-    GridSearchRunVariants,
     ModelEvaluationRunVariant,
-    AdditionalExperiments,
 )
 from results_analysis_tools.plugins.wandb_summary_processor import WandbSummaryProcessor
-
-from nn_model.type_variants import LayerType
 import nn_model.globals
 
 
@@ -67,7 +63,10 @@ class BatchPredictionAnalysisProcessor:
             model = row["model_variant"]
             layer = row["layer_name"]
             variant = row["variant_type"]
-            visibility = row["visibility_variant"]
+            visibility = VisibilityVariants.ALL_NEURONS
+            if "visibility_variant" in row:
+                # Check whether visibility variant is defined
+                visibility = row["visibility_variant"]
             sync = row[
                 "value"
             ]  # shape: [num_model_subsets, num_batches, batch_size, time_steps]

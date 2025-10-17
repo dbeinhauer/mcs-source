@@ -1017,7 +1017,11 @@ class ModelExecuter:
         NOTE: This function changes internal state of `self.model` object.
         """
         self.model.load_state_dict(
-            torch.load(self.evaluation_results_saver.best_model_path, weights_only=True)
+            torch.load(
+                self.evaluation_results_saver.best_model_path,
+                weights_only=True,
+                map_location=torch.device(nn_model.globals.DEVICE),
+            )
         )
         self.logger.print_best_model_evaluation(self.best_metric)
 

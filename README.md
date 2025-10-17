@@ -14,14 +14,14 @@ functionalities. The main part of the code is in the Directory `nn_model/`
 where the source code that defines and runs the model is located. 
 
 Main Components of the repository:
-- `execute_model.py` - This file serves as an user interface for execution the model of V1.
-- `nn_model/` - Main project directory. There is all implementation of the model of V1 located.
-- `dataset_processor/` - Directory containing definition of all tools used for dataset processing and preparation.
-- `evaluation_tools/` - Directory containing implementation of the evaluation processing tools that preprocesses raw model predictions or dataset for further analysis. There is also a default location where the evaluation results and best model parameters are stored.
-- `results_analysis_tools/` - Directory containing tools for processing results generated from the `evaluation_tools/`. It entail for the exact statistical analysis and plotting of the results.
-- `testing_dataset/` - Small example of the model dataset and model subset indices that has been used in our thesis. If one renames it to "dataset/", it should be in format in which the model can correctly load this toy example using default parameters without user modifications of the arguments. It may serve for testing correct installation of the model.
+- `execute_model.py` - This file serves as an user interface for execution of the model (both training and evaluation).
+- `nn_model/` - Main project directory. There the core implementation of the model is located.
+- `dataset_processor/` - Directory containing definition of all tools for dataset processing and preparation.
+- `evaluation_tools/` - Directory containing implementation of the evaluation processing tools that preprocesses raw model predictions, or dataset for further analysis. It is also a default location where the evaluation results and best model parameters are stored.
+- `results_analysis_tools/` - Directory containing tools for processing results generated from the `evaluation_tools/`. It entails the selected statistical analysis and results plotting functions.
+- `testing_dataset/` - Contains a small example of the model dataset. Furthermore, all model subsets and visible neurons indices used in the thesis are stored there. If one renames it to "dataset/", it should be in the feasible format to run the model correctly without any user modifications of the arguments. It may serve as a test of correct installation of the project.
 - `run_metacentrum_experiments.sh` - Interface script that entails model execution on Metacentrum server.
-- `metacentrum_scripts/` - Directory necessary scripts to run model on the Metacentrum server.
+- `metacentrum_scripts/` - Directory of necessary scripts to run model on the Metacentrum server.
 - `environment.yaml` - File containing the environment setup necessary for running the model on the Metacentrum server. 
 - `requirements_metacentrum.txt` - Requirements file used for correct installation of the environment on Metacentrum.
 - `thesis_experiment_setups/` - Setup of all experiments that has been run in the thesis analysis.

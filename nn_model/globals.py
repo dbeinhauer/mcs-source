@@ -29,7 +29,7 @@ else:
 # Model Parameters:
 
 # Model Diminishing factor
-DEFAULT_SIZE_MULTIPLIER = 0.02
+DEFAULT_SIZE_MULTIPLIER = 0.1
 # Allow overriding SIZE_MULTIPLIER via an environment variable -> model size using env variables.
 SIZE_MULTIPLIER = float(os.getenv("SIZE_MULTIPLIER", DEFAULT_SIZE_MULTIPLIER))
 
@@ -195,6 +195,31 @@ def rewrite_test_batch_size(new_batch_size: int):
     """
     global TEST_BATCH_SIZE
     TEST_BATCH_SIZE = new_batch_size
+
+
+# with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", "rb") as f:
+#     POS_ORI_DICT = pickle.load(f)
+
+# # with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], 'rb') as f:
+# with open(
+#     "/home/david/source/diplomka_richard_version/mcs-source/testing_dataset/model_subsets/size_10_variant_2.pkl",
+#     "rb",
+# ) as f:
+#     NEURON_SELECTION = pickle.load(f)
+#     NEURON_SELECTION = {
+#         layer: np.array(neuron_selection)
+#         for layer, neuron_selection in NEURON_SELECTION.items()
+#     }
+
+# for layer, xyo in POS_ORI_DICT.items():
+#     subset_filter = NEURON_SELECTION[layer].astype(int)
+#     for attr in xyo.keys():
+#         POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
+#             subset_filter
+#         ].astype(float)
+#         POS_ORI_DICT[layer][attr] = (
+#             torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
+#         )
 
 
 def unflatten_dict(d):

@@ -1,10 +1,10 @@
 from collections import defaultdict
-from typing import Dict, List, Union, NamedTuple
+from typing import Dict, List, Union
 
 import torch
 
-from nn_model.evaluation_metrics import Metric, NormalizedCrossCorrelation
-from nn_model.type_variants import EvaluationMetricVariants, LayerType
+from nn_model.evaluation_metrics import Metric
+from nn_model.type_variants import EvaluationMetricVariants
 import nn_model.globals
 from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 
