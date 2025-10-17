@@ -21,3 +21,10 @@ thesis_plots
 TODO.md
 useful_commands.md
 working_log.md
+
+conference_plots/orient_plots/
+conference_plots/plots/
+conference_plots/poster/
+conference_plots/selected_results/
+conference_plots/
+dataset_export/
