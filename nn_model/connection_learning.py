@@ -1,4 +1,9 @@
-from typing import Optional, Dict
+"""
+This module defines components for learning biologically inspired connections
+between neurons based on their spatial and feature relationships.
+"""
+
+from typing import Optional, Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -12,7 +17,9 @@ from nn_model.globals import (
 from nn_model.type_variants import LayerParent
 
 
-def get_features(layer_name_pre, layer_name_post, skip_phase=False) -> Dict:
+def get_features(
+    layer_name_pre: str, layer_name_post: str, skip_phase: bool = False
+) -> Dict[str, Tuple[Tensor, Tensor]]:
     """
     Creates clone of the pair-wise features dictionary for the given layers.
 
@@ -48,7 +55,6 @@ def compute_neural_distances(layer_name_pre: str, layer_name_post: str) -> torch
 class Autapse(nn.Module):
     """
     Learnable self-connection weights for inhibitory neurons.
-    Autapses are self-to-self connections, most common in inhibitory neurons of the visual cortex.
     """
 
     def __init__(
@@ -56,11 +62,13 @@ class Autapse(nn.Module):
     ):
         """
         :param n_neurons: number of neurons in the layer.
+        :param layer: name of layer which contains the neurons.
         :param sharp: whether to use sharp or softplus function.
         :param initial_mean: initial mean of the embedding.
         :param initial_std: initial standard deviation of the embedding.
         """
         super().__init__()
+        assert n_neurons >= 1
         self.n_neurons = n_neurons
         initial = torch.normal(
             mean=initial_mean, std=initial_std, size=(self.n_neurons,)
@@ -88,14 +96,13 @@ def standard_scale(x: Tensor) -> Tensor:
     return (x - mean) / std
 
 
-def pairwise_delta(x: Tensor, y: Optional[Tensor] = None) -> Tensor:
+def pairwise_delta(x: Tensor, y: Tensor) -> Tensor:
     """
     Computes pairwise delta between two tensors.
     :param x: input tensor, size m
-    :param y: input tensor, size n. Defaults to x.
+    :param y: input tensor, size n
     :return: pairwise delta, shape (m * n,)
     """
-    y = x if y is None else y
     return (x.unsqueeze(0) - y.unsqueeze(1)).flatten()
 
 
@@ -106,21 +113,22 @@ def encode_orientation(x: Tensor, y: Tensor) -> Tensor:
     :param y: post-synaptic orientation tensor, shape (n,)
     :return: encoded pair-wise orientation tensor, shape (m * n,)
     """
-    delta = pairwise_delta(x, y).remainder(torch.pi)
-    delta = delta - (torch.pi / 2)
-    return torch.cos(delta) ** 2
+    delta = pairwise_delta(x, y)
+    return torch.sin(delta) ** 2
 
 
-def encode_phase(x: Tensor, y) -> Tensor:
+def encode_phase(x: Tensor, y: Tensor, pre: str) -> Tensor:
     """
     Maps phase tensor to range [0, 1] using cosine transform.
     :param x: pre-synaptic phase tensor, shape (m,)
     :param y: post-synaptic phase tensor, shape (n,)
+    :param pre: name of presynaptic layer
     :return: encoded pair-wise phase tensor, shape (m * n,)
     """
-    delta = pairwise_delta(x, y).remainder(torch.pi * 2)
-    delta = delta - torch.pi
-    return torch.cos(delta / 2) ** 2
+    delta = pairwise_delta(x, y)
+    if pre in INHIBITORY_LAYERS:
+        return torch.cos(delta / 2) ** 2
+    return torch.sin(delta / 2) ** 2
 
 
 class NeuralConnectionGenerator(nn.Module):
@@ -159,8 +167,8 @@ class NeuralConnectionGenerator(nn.Module):
         self.register_buffer("features", x)
         self.hidden_size = 16
         # handle self-to-self-connections
-        if self.is_inh and self.has_self_connection:
-            self.autapse = Autapse(self.in_features)
+        if self.has_self_connection:
+            self.autapse = Autapse(self.in_features, layer_name_pre)
         # initialize DNN
         self.weight_dnn = nn.Sequential(
             nn.Linear(self.features.shape[1], self.hidden_size),
@@ -210,10 +218,7 @@ class NeuralConnectionGenerator(nn.Module):
         weights = weights.view(self.out_features, self.in_features)
         if not self.has_self_connection:
             return weights
-        if self.is_inh:
-            weights.diagonal().copy_(self.autapse())
-        else:
-            weights.fill_diagonal_(0)
+        weights.diagonal().copy_(self.autapse())
         return weights
 
 
