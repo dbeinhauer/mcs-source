@@ -7,7 +7,7 @@ if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then
 fi
 
 # Set Weights and Biases API Key if not specified
-if [ "$#" -eq  4 ]; then
+if [ "$#" -eq 4 ]; then
     echo "Running .wandb_api_key.sh because wandb_api_key wasn't specified."
     source ./.wandb_api_key.sh || exit 1
 fi
@@ -19,7 +19,7 @@ MODEL=$2
 LEARNING_RATE=$3
 NUM_EPOCHS=$4
 
-SUBSET_ID
+SUBSET_ID=3
 
 # Set wandb api key if specified
 if [ "$#" -eq 5 ]; then

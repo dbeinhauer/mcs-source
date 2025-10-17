@@ -27,7 +27,7 @@ hostname = socket.gethostname()
 
 # Select the GPU to use in case we are working in CGG server.
 if hostname in ["mayrau", "dyscalculia", "chicxulub.ms.mff.cuni.cz"]:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # use the second GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # use the second GPU
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -122,7 +122,7 @@ def init_model_path(arguments) -> str:
         )
         return "".join(
             [
-                f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
+                f"model-{nn_model.globals.SIZE_MULTIPLIER*100}",
                 train_subset_string,
                 subset_variant_string,
                 visible_ratio,
@@ -195,9 +195,7 @@ def get_subset_variant_name(subset_path: str, subset_variant: int = -1) -> str:
     if subset_variant != -1:
         # Subset variant specified -> add it for the variant to be loaded.
         splitted_path = subset_path.split(".")
-        # if len(splitted_path) > 2:
         return f"{splitted_path[0]}.{splitted_path[1]}" + f"_variant_{subset_variant}." + splitted_path[-1]
-        # return splitted_path[0] + f"_variant_{subset_variant}." + splitted_path[-1]
 
     return subset_path
 
