@@ -810,12 +810,19 @@ class ModelExecuter:
         :param targets: Targets of the model.
         :return: Returns loss combining prediction loss and distance-dependent loss (regularization).
         """
-        distance_dependent_loss = self._calculate_distance_loss(self.sigma_regularizer)
+        distance_dependent_loss = torch.zeros(1)
+        if self.visible_neurons_handler.is_invisible_part():
+            # In case there are some invisible neurons -> compute distance loss
+            distance_dependent_loss = self._calculate_distance_loss(
+                self.sigma_regularizer
+            )
         prediction_loss = torch.zeros(1)
         for layer in predictions:
             prediction_loss += self.criterion(
-                predictions[layer].cpu(),
-                targets[layer].cpu(),
+                predictions[
+                    layer
+                ],  # .cpu(), # TODO: CPU converting was needed for invisible neurons (keep in case it will be needed in the future development)
+                targets[layer],  # .cpu(),
             )
 
         return prediction_loss + self.distance_regularizer * distance_dependent_loss

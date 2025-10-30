@@ -23,6 +23,14 @@ class VisibleNeuronsHandler:
             # Load indices only if ratio is subset of the full model.
             self.visible_neurons_mask_1d = self._load_visible_neuron_indices()
 
+    def is_invisible_part(self) -> bool:
+        """
+        Indicator whether there are any invisible neurons.
+
+        :return: Returns `True` in case there is at least one invisible (hidden) neuron in the network.
+        """
+        return self.visible_neurons_mask_1d is None
+
     @staticmethod
     def get_visible_indices_path(
         visible_neurons_ratio,
