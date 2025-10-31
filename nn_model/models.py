@@ -114,6 +114,7 @@ class PrimaryVisualCortexModel(nn.Module):
         neuron_type: str,
         weight_initialization: str,
         parameter_reduction: bool,
+        process_invisible: bool,
         model_modules_kwargs: Dict[str, Optional[Dict]],
     ):
         """
@@ -126,6 +127,7 @@ class PrimaryVisualCortexModel(nn.Module):
         (name from `ModelTypes`).
         :param weight_initialization: type of weight initialization that we want to use.
         :param parameter_reduction: Reduce the number of trainable model parameters if True.
+        :param process_invisible: Flag whether we want to process invisible neurons.
         :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic
         adaptation models.
         """
@@ -135,9 +137,10 @@ class PrimaryVisualCortexModel(nn.Module):
         # during training and evaluation (in order to learn the dynamics better).
         self.num_hidden_time_steps = num_hidden_time_steps
 
+        # Model properties.
         self.weight_initialization = weight_initialization
-
-        self.parameter_reduction = parameter_reduction
+        self.parameter_reduction = parameter_reduction # Whether to apply parameter reduction.
+        self.process_invisible = process_invisible # Whether to process invisible neurons.
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -778,12 +781,11 @@ class PrimaryVisualCortexModel(nn.Module):
                 if self.training:
                     # In train return all hidden time steps (for back-propagation through time)
                     self._append_outputs(
-                        all_hidden_outputs, hidden_states
-                    )  # , keep_gradients=True)
+                        all_hidden_outputs, hidden_states, keep_gradients=self.process_invisible)
 
             if not self.training:
                 # Evaluation mode -> save only predictions of the visible time steps
-                self._append_outputs(all_hidden_outputs, hidden_states)
+                self._append_outputs(all_hidden_outputs, hidden_states, keep_gradients=False)
 
             if self.return_recurrent_state:
                 # If the model is in evaluation mode
@@ -794,7 +796,7 @@ class PrimaryVisualCortexModel(nn.Module):
                     ModelTypes.RNN_JOINT.value,
                     ModelTypes.DNN_JOINT.value,
                 ]:
-                    self._append_outputs(all_recurrent_outputs, recurrent_outputs)
+                    self._append_outputs(all_recurrent_outputs, recurrent_outputs, keep_gradients=False)
                     # TODO: might work for all types
 
         # Clear caches

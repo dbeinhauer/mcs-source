@@ -29,7 +29,7 @@ class VisibleNeuronsHandler:
 
         :return: Returns `True` in case there is at least one invisible (hidden) neuron in the network.
         """
-        return self.visible_neurons_mask_1d is None
+        return self.visible_neurons_mask_1d is not None
 
     @staticmethod
     def get_visible_indices_path(

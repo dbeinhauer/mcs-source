@@ -55,19 +55,20 @@ class ModelExecuter:
         self.num_data_workers = arguments.num_data_workers
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
         self.train_loader, self.test_loader = self._init_data_loaders(arguments)
-
-        # Model initialization.
-        self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
-        self.criterion = self._init_criterion(arguments)
-        self.optimizer = self._init_optimizer(
-            arguments.optimizer_type, arguments.learning_rate
-        )
-        # Strength of distance regularization.
+        
+        # Strength of distance regularization and visible neurons handler.
         self.distance_regularizer = arguments.distance_regularizer
         self.sigma_regularizer = arguments.sigma_regularizer
 
         self.visible_neurons_handler = VisibleNeuronsHandler(
             arguments.visible_neurons_ratio
+        )
+
+        # Model initialization.
+        self.model = self._init_model(arguments, self.visible_neurons_handler.is_invisible_part()).to(device=nn_model.globals.DEVICE)
+        self.criterion = self._init_criterion(arguments)
+        self.optimizer = self._init_optimizer(
+            arguments.optimizer_type, arguments.learning_rate
         )
 
         # Gradient clipping upper bound.
@@ -551,11 +552,12 @@ class ModelExecuter:
 
         return train_loader, test_loader
 
-    def _init_model(self, arguments) -> PrimaryVisualCortexModel:
+    def _init_model(self, arguments, process_invisible: bool = False) -> PrimaryVisualCortexModel:
         """
         Initializes the model based on the provided arguments.
 
         :param arguments: command line arguments containing model setup info.
+        :param process_invisible: Flag whether we want to process invisible neurons.
         :return: Returns initializes model.
         """
         return PrimaryVisualCortexModel(
@@ -564,6 +566,7 @@ class ModelExecuter:
             arguments.model,
             arguments.weight_initialization,
             arguments.parameter_reduction,
+            process_invisible,
             model_modules_kwargs={
                 **ModelExecuter._get_neuron_model_kwargs(arguments),
                 **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
@@ -760,6 +763,7 @@ class ModelExecuter:
 
         :return: Returns distance-dependent regularization loss in format.
         """
+        # TODO: This function caused significant slow-down in training (it is used while invisible neurons are present).
         distance_loss = 0
 
         for (
@@ -821,8 +825,8 @@ class ModelExecuter:
             prediction_loss += self.criterion(
                 predictions[
                     layer
-                ],  # .cpu(), # TODO: CPU converting was needed for invisible neurons (keep in case it will be needed in the future development)
-                targets[layer],  # .cpu(),
+                ].cpu(),
+                targets[layer],
             )
 
         return prediction_loss + self.distance_regularizer * distance_dependent_loss
