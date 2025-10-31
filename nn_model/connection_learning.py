@@ -208,7 +208,7 @@ class NeuralConnectionGenerator(nn.Module):
         # relative phase
         if self.has_phase:
             phase = features["phase"] if self.has_phase else None
-            phase = encode_phase(*phase)
+            phase = encode_phase(*phase, layer_name_pre)
             res = torch.column_stack((res, phase))
         return res
 
