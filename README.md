@@ -25,12 +25,13 @@ Main Components of the repository:
 - `metacentrum_scripts/` - Directory of necessary scripts to run model on the Metacentrum server.
 - `environment.yaml` - File containing the environment setup necessary for running the model on the Metacentrum server. 
 - `requirements_metacentrum.txt` - Requirements file used for correct installation of the environment on Metacentrum.
-- `thesis_experiment_setups/` - Setup of all experiments that has been run in the thesis analysis.
+- `experiment_setups_examples/` - Examples of different experiment setups used throughout the research.
+- `notebooks/` - Directory containing examples of dataset and evaluation results analyses and plotting workflows already used throughout the research.
 - `pyproject.toml` - File for correct project definition while using poetry Poetry package manager.- `poetry.lock` - Poetry lock file for easier environment installation.
 - `neural_simulation/` - Auxiliary directory for correct installation of the Poetry project.
 - `requirements.txt` - Files listing the requirements for correct execution of the model.
-- `run_model.sh` - Script used to execute model training as a background process on the CGG servers.
-- `run_evaluation.sh` - Script used to execute model evaluation as a background process on the CGG servers.
+- `run_model.sh` - Script used to execute model training as a background process on the CGG servers (may also work locally).
+- `run_evaluation.sh` - Script used to execute model evaluation as a background process on the CGG servers (may also work locally).
 
 # Installation
 In order to run the model properly it is necessary to work on the machine with GPU available. 
