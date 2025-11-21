@@ -18,6 +18,7 @@ Main Components of the repository:
 - `nn_model/` - Main project directory. There the core implementation of the model is located.
 - `dataset_processor/` - Directory containing definition of all tools for dataset processing and preparation.
 - `evaluation_tools/` - Directory containing implementation of the evaluation processing tools that preprocesses raw model predictions, or dataset for further analysis. It is also a default location where the evaluation results and best model parameters are stored.
+- `evaluation_pipeline_example.ipynb` - Jupyter Notebook depicting example of evaluation pipeline necessary to plot the model predictions.
 - `results_analysis_tools/` - Directory containing tools for processing results generated from the `evaluation_tools/`. It entails the selected statistical analysis and results plotting functions.
 - `testing_dataset/` - Contains a small example of the model dataset. Furthermore, all model subsets and visible neurons indices used in the thesis are stored there. If one renames it to "dataset/", it should be in the feasible format to run the model correctly without any user modifications of the arguments. It may serve as a test of correct installation of the project.
 - `run_metacentrum_experiments.sh` - Interface script that entails model execution on Metacentrum server.
@@ -189,7 +190,7 @@ modification in the program functionality.
 
 # Evaluation Tools and Result Analysis Tools
 In case one is interested in execution of the evaluation tool and results analysis tools
-please refer to corresponding directories `evaluation_tools/` and `results_analysis_tools/`
+please refer to corresponding directories `evaluation_tools/`, `results_analysis_tools/`, and `evaluation_pipeline_example.ipynb`
 where more detailed description is provided.
 
 What is worth noting though is option for running only evaluation on the model parameters
