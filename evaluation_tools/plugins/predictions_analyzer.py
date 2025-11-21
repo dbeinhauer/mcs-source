@@ -28,7 +28,9 @@ from evaluation_tools.fields.prediction_analysis_fields import (
     BatchSummaryFields,
     EvaluationPairsVariants,
     PredictionAnalysisVariants,
+    VisibilityVariants,
 )
+from nn_model.visible_neurons_handler import VisibleNeuronsHandler
 
 
 class PredictionsAnalyzer:
@@ -88,10 +90,13 @@ class PredictionsAnalyzer:
                 Dict[
                     int,
                     Dict[
-                        BatchSummaryFields,
+                        VisibilityVariants,
                         Dict[
-                            PredictionAnalysisVariants,
-                            Dict[str, torch.Tensor],
+                            BatchSummaryFields,
+                            Dict[
+                                PredictionAnalysisVariants,
+                                Dict[str, torch.Tensor],
+                            ],
                         ],
                     ],
                 ],
@@ -161,11 +166,16 @@ class PredictionsAnalyzer:
         }
 
     @staticmethod
-    def process_all_batches(responses_dir: str, subset: int = -1) -> Dict[
+    def process_all_batches(
+        responses_dir: str, subset: int = -1, visible_neurons_ratio: float = 1.0
+    ) -> Dict[
         int,
         Dict[
-            BatchSummaryFields,
-            Dict[PredictionAnalysisVariants, Dict[str, torch.Tensor]],
+            VisibilityVariants,
+            Dict[
+                BatchSummaryFields,
+                Dict[PredictionAnalysisVariants, Dict[str, torch.Tensor]],
+            ],
         ],
     ]:
         """
@@ -186,8 +196,11 @@ class PredictionsAnalyzer:
         processed_subset_results: Dict[
             int,
             Dict[
-                BatchSummaryFields,
-                Dict[PredictionAnalysisVariants, Dict[str, torch.Tensor]],
+                VisibilityVariants,
+                Dict[
+                    BatchSummaryFields,
+                    Dict[PredictionAnalysisVariants, Dict[str, torch.Tensor]],
+                ],
             ],
         ] = {}
 
@@ -202,9 +215,27 @@ class PredictionsAnalyzer:
                     PredictionsAnalyzer.evaluation_fields_to_load,
                 )
             )
-            processed_subset_results[batch_id] = (
-                BatchPredictionProcessor.process_batch_results(batch_evaluation_results)
-            )
+            # TODO: Split results to visible and invisible neurons.
+            visible_neurons_handler = VisibleNeuronsHandler(visible_neurons_ratio)
+            visible_part, invisible_part = {}, {}
+            for evaluation_type, evaluation_results in batch_evaluation_results.items():
+                visible_part[evaluation_type], invisible_part[evaluation_type] = (
+                    visible_neurons_handler.split_visible_invisible_neurons(
+                        evaluation_results
+                    )
+                )
+
+            prepared_for_processing = {
+                VisibilityVariants.ALL_NEURONS: batch_evaluation_results,
+                VisibilityVariants.VISIBLE_NEURONS: visible_part,
+                VisibilityVariants.INVISIBLE_NEURONS: invisible_part,
+            }
+
+            # TODO: Add for loop to process all, visible and invisible neurons.
+            processed_subset_results[batch_id] = {
+                variant: BatchPredictionProcessor.process_batch_results(variant_data)
+                for variant, variant_data in prepared_for_processing.items()
+            }
 
         return processed_subset_results
 
@@ -216,10 +247,13 @@ class PredictionsAnalyzer:
         Dict[
             int,
             Dict[
-                BatchSummaryFields,
+                VisibilityVariants,
                 Dict[
-                    PredictionAnalysisVariants,
-                    Dict[str, torch.Tensor],
+                    BatchSummaryFields,
+                    Dict[
+                        PredictionAnalysisVariants,
+                        Dict[str, torch.Tensor],
+                    ],
                 ],
             ],
         ],
@@ -240,10 +274,13 @@ class PredictionsAnalyzer:
             Dict[
                 int,
                 Dict[
-                    BatchSummaryFields,
+                    VisibilityVariants,
                     Dict[
-                        PredictionAnalysisVariants,
-                        Dict[str, torch.Tensor],
+                        BatchSummaryFields,
+                        Dict[
+                            PredictionAnalysisVariants,
+                            Dict[str, torch.Tensor],
+                        ],
                     ],
                 ],
             ],
@@ -261,8 +298,19 @@ class PredictionsAnalyzer:
                     # The path exists and corresponds to some model variant
                     # -> load all batches of the predictions
                     variant_number = int(match.group(1))
+
+                    # Determine visible neurons ratio if specified in the directory name.
+                    visible_part = 1.0
+                    match_visible_part = re.search(
+                        r"_visib-(\d+(?:\.\d+)?)_", full_path_to_subset
+                    )
+                    if match_visible_part:
+                        # If the visible part is specified in the directory name, determine it.
+                        visible_part = float(match_visible_part.group(1))
                     all_model_subset_variant_analyses[variant_number] = (
-                        PredictionsAnalyzer.process_all_batches(full_path_to_subset)
+                        PredictionsAnalyzer.process_all_batches(
+                            full_path_to_subset, visible_neurons_ratio=visible_part
+                        )
                     )
 
                     counter += 1
@@ -273,7 +321,10 @@ class PredictionsAnalyzer:
         return all_model_subset_variant_analyses
 
     def process_all_model_variants_predictions(
-        self, base_dir: str, evaluation_variants: List[ModelEvaluationRunVariant] = []
+        self,
+        base_dir: str,
+        evaluation_variants: List[ModelEvaluationRunVariant] = [],
+        evaluation_variant_dir: str = "",
     ) -> Dict[
         ModelEvaluationRunVariant,
         Dict[
@@ -281,10 +332,13 @@ class PredictionsAnalyzer:
             Dict[
                 int,
                 Dict[
-                    BatchSummaryFields,
+                    VisibilityVariants,
                     Dict[
-                        PredictionAnalysisVariants,
-                        Dict[str, torch.Tensor],
+                        BatchSummaryFields,
+                        Dict[
+                            PredictionAnalysisVariants,
+                            Dict[str, torch.Tensor],
+                        ],
                     ],
                 ],
             ],
@@ -297,6 +351,8 @@ class PredictionsAnalyzer:
         NOTE: The subdirectories containing the model variants results must match the values from
         `EvaluationRunVariants` values selected for the processing.
         :param evaluation_variants: List of variants to process, if `[]` then use default from `self`.
+        :param evaluation_variant_dir: In case `ModelEvaluationRunVariant.CUSTOM` is selected specify
+        directory containing results.
         :return: Returns evaluation results analysis for each batch of each model
         subset and each model variant.
         """
@@ -305,11 +361,16 @@ class PredictionsAnalyzer:
             evaluation_variants = self.evaluation_variants
 
         for evaluation_variant in tqdm(evaluation_variants):
+            variant_subdir = evaluation_variant.value
+            if evaluation_variant == ModelEvaluationRunVariant.CUSTOM:
+                # In case custom evaluation variant is selected, use the provided directory.
+                variant_subdir = evaluation_variant_dir
+
             # Run through all model variants.
             variant_base_dir = (
                 base_dir
                 + "/"
-                + evaluation_variant.value
+                + variant_subdir
                 + PredictionsAnalyzer.full_evaluation_subdirectory
             )
             print(f"Processing model variant: {evaluation_variant.value}")
@@ -328,19 +389,25 @@ class PredictionsAnalyzer:
             Dict[
                 int,
                 Dict[
-                    BatchSummaryFields,
+                    VisibilityVariants,
                     Dict[
-                        PredictionAnalysisVariants,
-                        Dict[str, torch.Tensor],
+                        BatchSummaryFields,
+                        Dict[
+                            PredictionAnalysisVariants,
+                            Dict[str, torch.Tensor],
+                        ],
                     ],
                 ],
             ],
         ],
     ) -> Dict[
-        BatchSummaryFields,
+        VisibilityVariants,
         Dict[
-            PredictionAnalysisVariants,
-            Dict[str, List[List[Optional[np.ndarray]]]],
+            BatchSummaryFields,
+            Dict[
+                PredictionAnalysisVariants,
+                Dict[str, List[List[Optional[np.ndarray]]]],
+            ],
         ],
     ]:
         """
@@ -352,10 +419,13 @@ class PredictionsAnalyzer:
         :return: Returns reformated results.
         """
         model_variant_reordered: Dict[
-            BatchSummaryFields,
+            VisibilityVariants,
             Dict[
-                PredictionAnalysisVariants,
-                Dict[str, List[List[Optional[np.ndarray]]]],
+                BatchSummaryFields,
+                Dict[
+                    PredictionAnalysisVariants,
+                    Dict[str, List[List[Optional[np.ndarray]]]],
+                ],
             ],
         ] = {}
 
@@ -372,39 +442,54 @@ class PredictionsAnalyzer:
             for batch_id, all_evaluation_variants in sorted_batches:
                 # Iterate each batch and change the order of encapsulation in the dictionary.
                 for (
-                    evaluation_variant,
-                    batch_summary_values,
+                    visibility_variant,
+                    visibility_values,
                 ) in all_evaluation_variants.items():
-                    if evaluation_variant not in model_variant_reordered:
-                        model_variant_reordered[evaluation_variant] = {}
-
+                    if visibility_variant not in model_variant_reordered:
+                        model_variant_reordered[visibility_variant] = {}
                     for (
-                        evaluation_entities_involved,
-                        all_layer_metrics,
-                    ) in batch_summary_values.items():
+                        evaluation_variant,
+                        batch_summary_values,
+                    ) in visibility_values.items():
                         if (
-                            evaluation_entities_involved
-                            not in model_variant_reordered[evaluation_variant]
+                            evaluation_variant
+                            not in model_variant_reordered[visibility_variant]
                         ):
-                            model_variant_reordered[evaluation_variant][
-                                evaluation_entities_involved
+                            model_variant_reordered[visibility_variant][
+                                evaluation_variant
                             ] = {}
 
-                        for layer_name, tensor in all_layer_metrics.items():
-                            array = tensor.detach().cpu().numpy()
-
-                            # Init 2D structure: [model_subset][batch] = value
-                            layer_store = model_variant_reordered[evaluation_variant][
+                        for (
+                            evaluation_entities_involved,
+                            all_layer_metrics,
+                        ) in batch_summary_values.items():
+                            if (
                                 evaluation_entities_involved
-                            ].setdefault(
-                                layer_name,
-                                [
-                                    [None for _ in range(NUM_EVALUATION_BATCHES)]
-                                    for _ in range(NUM_EVALUATION_SUBSETS)
-                                ],
-                            )
+                                not in model_variant_reordered[visibility_variant][
+                                    evaluation_variant
+                                ]
+                            ):
+                                model_variant_reordered[visibility_variant][
+                                    evaluation_variant
+                                ][evaluation_entities_involved] = {}
 
-                            layer_store[model_subset_id][batch_id] = array
+                            for layer_name, tensor in all_layer_metrics.items():
+                                array = tensor.detach().cpu().numpy()
+
+                                # Init 2D structure: [model_subset][batch] = value
+                                layer_store = model_variant_reordered[
+                                    visibility_variant
+                                ][evaluation_variant][
+                                    evaluation_entities_involved
+                                ].setdefault(
+                                    layer_name,
+                                    [
+                                        [None for _ in range(NUM_EVALUATION_BATCHES)]
+                                        for _ in range(NUM_EVALUATION_SUBSETS)
+                                    ],
+                                )
+
+                                layer_store[model_subset_id][batch_id] = array
 
         return model_variant_reordered
 
@@ -496,17 +581,23 @@ class PredictionsAnalyzer:
             Dict[
                 int,
                 Dict[
-                    BatchSummaryFields,
+                    VisibilityVariants,
                     Dict[
-                        PredictionAnalysisVariants,
-                        Dict[str, torch.Tensor],
+                        BatchSummaryFields,
+                        Dict[
+                            PredictionAnalysisVariants,
+                            Dict[str, torch.Tensor],
+                        ],
                     ],
                 ],
             ],
         ],
     ) -> Dict[
-        BatchSummaryFields,
-        Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+        VisibilityVariants,
+        Dict[
+            BatchSummaryFields,
+            Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+        ],
     ]:
         """
         Reformats one model results to one large np.array covering all batch results
@@ -517,33 +608,46 @@ class PredictionsAnalyzer:
         in shape `[num_model_subsets, num_batches, {max_batch_shape}]`.
         """
         padded_model_variant: Dict[
-            BatchSummaryFields,
-            Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+            VisibilityVariants,
+            Dict[
+                BatchSummaryFields,
+                Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+            ],
         ] = {}
 
         # First reformat the results to have model subset and batch ids
         # together with the batch values. Then pad the all the batches
+
+        # for visibility_variant, variant_value in all_model_variant_subsets.items():
         for (
-            evaluation_variant,
-            evaluation_variant_value,
+            visibility_variant,
+            visibility_variant_value,
         ) in PredictionsAnalyzer._reformat_original_results_to_new_order(
             all_model_variant_subsets
         ).items():
-            padded_model_variant[evaluation_variant] = {}
+            padded_model_variant[visibility_variant] = {}
             for (
-                evaluation_entities_involved,
-                entity_values,
-            ) in evaluation_variant_value.items():
-                padded_model_variant[evaluation_variant][
-                    evaluation_entities_involved
-                ] = {}
-                for layer_name, np_arrays_list in entity_values.items():
-                    # Convert all tensors to numpy arrays
-                    padded_model_variant[evaluation_variant][
+                evaluation_variant,
+                evaluation_variant_value,
+            ) in visibility_variant_value.items():
+                # ) in PredictionsAnalyzer._reformat_original_results_to_new_order(
+                #     all_model_variant_subsets
+                # ).items():
+                padded_model_variant[visibility_variant][evaluation_variant] = {}
+                for (
+                    evaluation_entities_involved,
+                    entity_values,
+                ) in evaluation_variant_value.items():
+                    padded_model_variant[visibility_variant][evaluation_variant][
                         evaluation_entities_involved
-                    ][layer_name] = PredictionsAnalyzer._pad_and_merge_batches(
-                        np_arrays_list
-                    )
+                    ] = {}
+                    for layer_name, np_arrays_list in entity_values.items():
+                        # Convert all tensors to numpy arrays
+                        padded_model_variant[visibility_variant][evaluation_variant][
+                            evaluation_entities_involved
+                        ][layer_name] = PredictionsAnalyzer._pad_and_merge_batches(
+                            np_arrays_list
+                        )
 
         return padded_model_variant
 
@@ -556,10 +660,13 @@ class PredictionsAnalyzer:
                 Dict[
                     int,
                     Dict[
-                        BatchSummaryFields,
+                        VisibilityVariants,
                         Dict[
-                            PredictionAnalysisVariants,
-                            Dict[str, torch.Tensor],
+                            BatchSummaryFields,
+                            Dict[
+                                PredictionAnalysisVariants,
+                                Dict[str, torch.Tensor],
+                            ],
                         ],
                     ],
                 ],
@@ -568,8 +675,11 @@ class PredictionsAnalyzer:
     ) -> Dict[
         ModelEvaluationRunVariant,
         Dict[
-            BatchSummaryFields,
-            Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+            VisibilityVariants,
+            Dict[
+                BatchSummaryFields,
+                Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+            ],
         ],
     ]:
         """
@@ -598,8 +708,11 @@ class PredictionsAnalyzer:
         merged_data: Dict[
             ModelEvaluationRunVariant,
             Dict[
-                BatchSummaryFields,
-                Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+                VisibilityVariants,
+                Dict[
+                    BatchSummaryFields,
+                    Dict[PredictionAnalysisVariants, Dict[str, np.ndarray]],
+                ],
             ],
         ],
     ) -> pd.DataFrame:
@@ -611,19 +724,21 @@ class PredictionsAnalyzer:
         """
         rows = []
 
-        for model_variant, all_analyses in merged_data.items():
-            for analysis_name, analysis_results in all_analyses.items():
-                for variant_type, all_layer_results in analysis_results.items():
-                    for layer_name, array in all_layer_results.items():
-                        value = array  # Store raw array, or modify below
-                        rows.append(
-                            {
-                                "model_variant": model_variant,
-                                "analysis_name": analysis_name,
-                                "variant_type": variant_type,
-                                "layer_name": layer_name,
-                                "value": value,
-                            }
-                        )
+        for model_variant, all_visibilities in merged_data.items():
+            for visibility_variant, all_analyses in all_visibilities.items():
+                for analysis_name, analysis_results in all_analyses.items():
+                    for variant_type, all_layer_results in analysis_results.items():
+                        for layer_name, array in all_layer_results.items():
+                            value = array  # Store raw array, or modify below
+                            rows.append(
+                                {
+                                    "model_variant": model_variant,
+                                    "visibility_variant": visibility_variant,
+                                    "analysis_name": analysis_name,
+                                    "variant_type": variant_type,
+                                    "layer_name": layer_name,
+                                    "value": value,
+                                }
+                            )
 
         return pd.DataFrame(rows)

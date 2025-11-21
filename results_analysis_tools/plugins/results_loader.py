@@ -2,6 +2,7 @@
 This scripts serves for loading the analysis results.
 """
 
+import os
 from typing import Dict, List, Tuple, Iterable
 
 from itertools import product
@@ -102,12 +103,15 @@ class ResultsLoader:
             filename = "-".join(filename_parts) + ".pkl"
             path_to_data = base_path + filename
 
-            # Load and annotate
-            dataset = load_pickle_file(path_to_data)
-            for col, val in combo_dict.items():
-                dataset[col] = val
+            if os.path.exists(path_to_data):
+                # Load and annotate
+                dataset = load_pickle_file(path_to_data)
+                for col, val in combo_dict.items():
+                    dataset[col] = val
 
-            all_dfs.append(dataset)
+                all_dfs.append(dataset)
+            else:
+                print(f"File {filename} does not exist. Skipping!")
 
         # Combine into a single DataFrame
         full_df = pd.concat(all_dfs, ignore_index=True)
@@ -165,28 +169,28 @@ class ResultsLoader:
 
         return wandb_results
 
-    def load_evaluation_analyses(self, base_path: str = "") -> pd.DataFrame:
+    def load_evaluation_analyses(
+        self, base_path: str = "", custom_variant: str = ""
+    ) -> pd.DataFrame:
         """
         Loads all analyses of the evaluation results of all model variants.
 
         :param base_path: Path to directory containing all results to load.
         If `""` then load from the default path.
+        :param custom_variant: If specified, only this model variant is loaded.
         :return: Returns dataframe containing all results.
         """
+        variants_to_load = list(ModelEvaluationRunVariant)
+        if custom_variant:
+            # If custom variant specified, only load this one.
+            variants_to_load = [custom_variant]
         return self.load_general_results(
             base_path,
             EvaluationProcessorChoices.PREDICTION_ANALYSIS,
             [
                 (
                     "model_variant",
-                    [
-                        ModelEvaluationRunVariant.SIMPLE_LEAKYTANH,
-                        ModelEvaluationRunVariant.DNN_JOINT,
-                        ModelEvaluationRunVariant.DNN_SEPARATE,
-                        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_5,
-                        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10,
-                        ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5,
-                    ],
+                    variants_to_load,
                 )
             ],
         )

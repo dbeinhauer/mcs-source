@@ -24,14 +24,22 @@ from evaluation_tools.fields.dataset_analyzer_fields import (
 class TemporalEvolutionProcessor:
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
-        self.time_evolution_full_dataset_df = (
-            TemporalEvolutionProcessor._get_all_full_dataset_time_evolution(all_results)
-        )
-        self.time_evolution_subset_dataset_df = (
-            TemporalEvolutionProcessor._get_all_subset_dataset_time_evolution(
-                all_results
+        self.time_evolution_full_dataset_df: pd.DataFrame = None
+        self.time_evolution_subset_dataset_df: pd.DataFrame = None
+
+        # Load all relevant results if they exist.
+        if EvaluationProcessorChoices.FULL_DATASET_ANALYSIS in all_results:
+            self.time_evolution_full_dataset_df = (
+                TemporalEvolutionProcessor._get_all_full_dataset_time_evolution(
+                    all_results
+                )
             )
-        )
+        if EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS in all_results:
+            self.time_evolution_subset_dataset_df = (
+                TemporalEvolutionProcessor._get_all_subset_dataset_time_evolution(
+                    all_results
+                )
+            )
 
     @staticmethod
     def _get_all_full_dataset_time_evolution(

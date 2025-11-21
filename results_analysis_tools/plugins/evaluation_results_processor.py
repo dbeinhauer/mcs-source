@@ -44,6 +44,9 @@ class EvaluationResultsProcessor:
         ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10: "rnn (10 steps)",
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_5: "syn adapt lgn (5 steps)",
         ModelEvaluationRunVariant.SYN_ADAPT_LGN_BACKPROPAGATION_10: "syn adapt lgn (10 steps)",
+        ModelEvaluationRunVariant.DNN_JOINT_POISSON: "dnn joint - poisson loss",
+        ModelEvaluationRunVariant.RNN_BACKPROPAGATION_10_POISSON: "rnn (10 steps) - poisson loss",
+        ModelEvaluationRunVariant.SYN_ADAPT_BACKPROPAGATION_10_POISSON: "syn adapt (10 steps) - poisson loss",
     }
 
     # Grid search experiment names for plotting.
@@ -65,6 +68,8 @@ class EvaluationResultsProcessor:
         "rnn (10 steps)",
         "syn adapt lgn (5 steps)",
         "syn adapt lgn (10 steps)",
+        "invisible_0.5",
+        "invisible_0.9",
     ]
 
     # Desired layer order for plotting.
@@ -84,6 +89,8 @@ class EvaluationResultsProcessor:
         :param all_results: All analyses results dictionary.
         :return: Returns all wandb results.
         """
+        if EvaluationProcessorChoices.WANDB_ANALYSIS not in all_results:
+            return None
         return all_results[EvaluationProcessorChoices.WANDB_ANALYSIS]
 
     @staticmethod
@@ -230,7 +237,7 @@ class EvaluationResultsProcessor:
             df["model_variant"],
             categories=EvaluationResultsProcessor.desired_model_order,
             ordered=True,
-        ).remove_unused_categories()
+        )  # .remove_unused_categories()
         return df
 
     @staticmethod

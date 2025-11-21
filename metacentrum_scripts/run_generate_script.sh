@@ -33,6 +33,9 @@ TRAIN_SUBSET=-1.0
 WANDB_NAME=""
 SIZE_MULTIPLIER=0.1
 EVALUATION_RUN=false
+VISIBLE_NEURONS_RATIO=1.0
+DISTANCE_REGULARIZER=0.0
+SIGMA_REGULARIZER=0.2
 
 # Parse long options
 while [[ $# -gt 0 ]]; do
@@ -93,6 +96,18 @@ while [[ $# -gt 0 ]]; do
         TRAIN_SUBSET="$2"
         shift 2
         ;;
+    --visible_neurons_ratio)
+        VISIBLE_NEURONS_RATIO="$2"
+        shift 2
+        ;;
+    --distance_regularizer)
+        DISTANCE_REGULARIZER="$2"
+        shift 2
+        ;;
+    --sigma_regularizer)
+        SIGMA_REGULARIZER="$2"
+        shift 2
+        ;;
     --wandb_name)
         WANDB_NAME="$2"
         shift 2
@@ -114,7 +129,7 @@ while [[ $# -gt 0 ]]; do
         shift 1
         ;;
     --help)
-        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--wall_time value] [--gpu_mem value] [--size_multiplier value] [--evaluation_run]"
+        echo "Usage: $0 --wandb_name value [--learning_rate value] [--model value] [--num_epochs value] [--subset_variant value] [--num_backprop_steps value] [--neuron_num_layers value] [--neuron_layer_size value] [--neuron_residual] [--neuron_rnn_variant value] [--syn_adapt_use] [--syn_adapt_num_layers value] [--syn_adapt_size value] [--syn_adapt_lgn] [--train_subset value] [--visible_neurons_ratio value] [--wall_time value] [--gpu_mem value] [--size_multiplier value] [--evaluation_run]"
         exit 0
         ;;
     *)
@@ -142,6 +157,9 @@ MODEL_PARAMS="--num_data_workers=8 \\
 --synaptic_adaptation_size=$SYN_ADAPT_SIZE \\
 --synaptic_adaptation_num_layers=$SYN_ADAPT_NUM_LAYERS \\
 --wandb_project_name=$WANDB_NAME \\
+--visible_neurons_ratio=$VISIBLE_NEURONS_RATIO \\
+--distance_regularizer=$DISTANCE_REGULARIZER \\
+--sigma_regularizer=$SIGMA_REGULARIZER \\
 --save_all_predictions"
 
 # Add boolean flags to MODEL_PARAMS if they are set to true

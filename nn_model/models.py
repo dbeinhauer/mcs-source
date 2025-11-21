@@ -20,6 +20,7 @@ from nn_model.layers import (
 )
 from nn_model.neurons import DNNNeuron, SharedNeuronBase, RNNNeuron
 from nn_model.layer_config import LayerConfig
+from nn_model.connection_learning import compute_neural_distances
 
 
 class PrimaryVisualCortexModel(nn.Module):
@@ -112,6 +113,8 @@ class PrimaryVisualCortexModel(nn.Module):
         num_hidden_time_steps: int,
         neuron_type: str,
         weight_initialization: str,
+        parameter_reduction: bool,
+        process_invisible: bool,
         model_modules_kwargs: Dict[str, Optional[Dict]],
     ):
         """
@@ -123,6 +126,8 @@ class PrimaryVisualCortexModel(nn.Module):
         :param neuron_type: type of the neuron model used in the model
         (name from `ModelTypes`).
         :param weight_initialization: type of weight initialization that we want to use.
+        :param parameter_reduction: Reduce the number of trainable model parameters if True.
+        :param process_invisible: Flag whether we want to process invisible neurons.
         :param model_modules_kwargs: kwargs of the used neuronal models (if any) and synaptic
         adaptation models.
         """
@@ -132,7 +137,10 @@ class PrimaryVisualCortexModel(nn.Module):
         # during training and evaluation (in order to learn the dynamics better).
         self.num_hidden_time_steps = num_hidden_time_steps
 
+        # Model properties.
         self.weight_initialization = weight_initialization
+        self.parameter_reduction = parameter_reduction # Whether to apply parameter reduction.
+        self.process_invisible = process_invisible # Whether to process invisible neurons.
 
         # Type of the neuron used in the model.
         self.neuron_type = neuron_type
@@ -160,6 +168,44 @@ class PrimaryVisualCortexModel(nn.Module):
 
         # Init model.
         self._init_model_architecture()
+
+        # Neural distances between all layer pairs (pre, post) that are connected (except LGN).
+        self.neural_distances = self._init_neural_distances()
+
+    def get_weights_per_layer_pair(
+        self, layer_pre: str, layer_post: str
+    ) -> torch.Tensor:
+        """
+        Selects weights between given layer pair.
+
+        :param layer_pre: Presynaptic (input) layer name.
+        :param layer_post: Postsynaptic (output) layer name.
+        :return: Returns weights between the given layer pair, shape [n_neurons_post, n_neurons_pre].
+        """
+        if layer_pre == layer_post:
+            # Self-recurrent connection.
+            return self.layers[layer_post].rnn_cell.weights_hh.weight
+        input_layers = PrimaryVisualCortexModel.layers_input_parameters[layer_post]
+        if layer_pre in nn_model.globals.INHIBITORY_LAYERS:
+            # Inhibitory input layer.
+            return self.layers[layer_post].rnn_cell.weights_ih_inh.weight
+
+        # Excitatory input layer -> find proper slice of the weights.
+        start_index = 0
+        for input_layer_name, _ in input_layers:
+            layer_size = self.layer_sizes[input_layer_name]
+            if input_layer_name == layer_pre:
+                # Found the input layer -> return the proper slice of the weights.
+                end_index = start_index + layer_size
+                return self.layers[layer_post].rnn_cell.weights_ih_exc.weight[
+                    :, start_index:end_index
+                ]
+            else:
+                if input_layer_name not in nn_model.globals.INHIBITORY_LAYERS:
+                    # If the input layer is excitatory, we need to move the start index.
+                    start_index += layer_size
+
+        raise ValueError(f"Layer pair {layer_pre}, {layer_post} not found.")
 
     def switch_to_return_recurrent_state(self):
         """
@@ -312,6 +358,7 @@ class PrimaryVisualCortexModel(nn.Module):
             self.layers_configs[layer].input_constraints,
             self.weight_initialization,
             self.layers_configs[layer].neuron_model,
+            self.parameter_reduction,
         )
 
     def _init_model_architecture(self):
@@ -351,6 +398,20 @@ class PrimaryVisualCortexModel(nn.Module):
         # Training mode. Hidden layers are last steps from targets for each time step.
         # Assign the values in each training step (not in this function).
         return {}
+
+    def _init_neural_distances(self) -> Dict[Tuple[str, str], torch.Tensor]:
+        """
+        Initializes neural distances between all layer pairs (pre, post) that are connected
+        except LGN.
+
+        :return: Returns dictionary of layer pairs and their neural distances.
+        """
+        return {
+            (pre_layer, post_layer): compute_neural_distances(pre_layer, post_layer)
+            for post_layer, input_params in PrimaryVisualCortexModel.layers_input_parameters.items()
+            for pre_layer, _ in input_params
+            if pre_layer not in nn_model.globals.LGN_NEURONS
+        }
 
     def apply_layer_neuron_complexity(
         self, layer: str, input_data: torch.Tensor
@@ -602,17 +663,25 @@ class PrimaryVisualCortexModel(nn.Module):
         self,
         all_outputs: Dict[str, List[torch.Tensor]],
         time_step_outputs,
+        keep_gradients: bool = True,
     ):
         """
         Appends outputs of each output layer to list of outputs of all time steps.
 
         :param all_outputs: outputs of layersFalse of all time steps.
         :param time_step_outputs: outputs of current time step.
+        :param: keep_gradients: Whether to keep gradients for the outputs (whether to keep in cuda).
         """
         for layer, layer_outputs in time_step_outputs.items():
             if layer in PrimaryVisualCortexModel.layers_input_parameters:
                 # For each output layer append output of the current time step.
-                all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
+                # all_outputs[layer].append(layer_outputs.unsqueeze(1).cpu())
+                current_outputs = (
+                    layer_outputs.unsqueeze(1)
+                    if keep_gradients
+                    else layer_outputs.unsqueeze(1).cpu()
+                )
+                all_outputs[layer].append(current_outputs)
 
     def forward(
         self,
@@ -711,11 +780,12 @@ class PrimaryVisualCortexModel(nn.Module):
 
                 if self.training:
                     # In train return all hidden time steps (for back-propagation through time)
-                    self._append_outputs(all_hidden_outputs, hidden_states)
+                    self._append_outputs(
+                        all_hidden_outputs, hidden_states, keep_gradients=self.process_invisible)
 
             if not self.training:
                 # Evaluation mode -> save only predictions of the visible time steps
-                self._append_outputs(all_hidden_outputs, hidden_states)
+                self._append_outputs(all_hidden_outputs, hidden_states, keep_gradients=False)
 
             if self.return_recurrent_state:
                 # If the model is in evaluation mode
@@ -726,7 +796,7 @@ class PrimaryVisualCortexModel(nn.Module):
                     ModelTypes.RNN_JOINT.value,
                     ModelTypes.DNN_JOINT.value,
                 ]:
-                    self._append_outputs(all_recurrent_outputs, recurrent_outputs)
+                    self._append_outputs(all_recurrent_outputs, recurrent_outputs, keep_gradients=False)
                     # TODO: might work for all types
 
         # Clear caches

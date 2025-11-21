@@ -2,7 +2,7 @@
 This code encapsulates the processing of the prediction batched analysis results.
 """
 
-from typing import Dict, Union, List
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -18,16 +18,12 @@ from results_analysis_tools.plugins.evaluation_results_processor import (
 from evaluation_tools.fields.prediction_analysis_fields import (
     BatchSummaryFields,
     EvaluationPairsVariants,
+    VisibilityVariants,
 )
 from evaluation_tools.fields.experiment_parameters_fields import (
-    WandbExperimentVariants,
-    GridSearchRunVariants,
     ModelEvaluationRunVariant,
-    AdditionalExperiments,
 )
 from results_analysis_tools.plugins.wandb_summary_processor import WandbSummaryProcessor
-
-from nn_model.type_variants import LayerType
 import nn_model.globals
 
 
@@ -45,10 +41,13 @@ class BatchPredictionAnalysisProcessor:
     ]
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
-        self.all_batch_evaluation_results = (
-            EvaluationResultsProcessor.get_evaluation_results(all_results)
-        )
-        self.wandb_processor = WandbSummaryProcessor(all_results)
+        self.all_batch_evaluation_results: pd.DataFrame = None
+
+        if EvaluationProcessorChoices.PREDICTION_ANALYSIS in all_results:
+            self.all_batch_evaluation_results = (
+                EvaluationResultsProcessor.get_evaluation_results(all_results)
+            )
+            self.wandb_processor = WandbSummaryProcessor(all_results)
 
     @staticmethod
     def _mean_synchrony(df: pd.DataFrame) -> pd.DataFrame:
@@ -64,6 +63,10 @@ class BatchPredictionAnalysisProcessor:
             model = row["model_variant"]
             layer = row["layer_name"]
             variant = row["variant_type"]
+            visibility = VisibilityVariants.ALL_NEURONS
+            if "visibility_variant" in row:
+                # Check whether visibility variant is defined
+                visibility = row["visibility_variant"]
             sync = row[
                 "value"
             ]  # shape: [num_model_subsets, num_batches, batch_size, time_steps]
@@ -84,9 +87,10 @@ class BatchPredictionAnalysisProcessor:
                             "layer_name": layer,
                             "layer_size": nn_model.globals.MODEL_SIZES[layer],
                             "variant_type": variant,
+                            "visibility_variant": visibility,
                             "subset_index": subset_idx,
                             "time": t,
-                            # Make the synchrony to be a ration of firing neurons from the layer.
+                            # Make the synchrony to be a ratio of firing neurons from the layer.
                             "synchrony": summed_curve[t]
                             / nn_model.globals.MODEL_SIZES[layer],
                         }

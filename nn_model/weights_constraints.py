@@ -1,5 +1,5 @@
 """
-This script defines all classes used as weights constraints. These 
+This script defines all classes used as weights constraints. These
 are typically used for determination of excitatory/inhibitory layer.
 """
 
@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from nn_model.type_variants import WeightTypes
+
 
 @torch.no_grad()
 def _clamp_weight_attr(module: nn.Module, linear_module_name: str, **kwargs):
@@ -25,7 +26,8 @@ def _clamp_weight_attr(module: nn.Module, linear_module_name: str, **kwargs):
     if not isinstance(linear_module, nn.Linear):
         return
 
-    linear_module.weight.clamp_(**kwargs) # in-place version of clamp
+    linear_module.weight.clamp_(**kwargs)  # in-place version of clamp
+
 
 class WeightConstraint:
     """
@@ -74,8 +76,7 @@ class WeightConstraint:
             WeightTypes.EXCITATORY.value,
             WeightTypes.INHIBITORY.value,
         ]
-        _clamp_weight_attr(module, 'weights_hh', **kwargs)
-
+        _clamp_weight_attr(module, "weights_hh", **kwargs)
 
     def input_constraint(self, module: nn.Module):
         """
@@ -84,8 +85,16 @@ class WeightConstraint:
 
         :param module: Module to apply the weight on.
         """
-        _clamp_weight_attr(module, 'weights_ih_exc',  **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value])
-        _clamp_weight_attr(module, "weights_ih_inh", **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value])
+        _clamp_weight_attr(
+            module,
+            "weights_ih_exc",
+            **WeightConstraint.layer_kwargs[WeightTypes.EXCITATORY.value]
+        )
+        _clamp_weight_attr(
+            module,
+            "weights_ih_inh",
+            **WeightConstraint.layer_kwargs[WeightTypes.INHIBITORY.value]
+        )
 
 
 class ExcitatoryWeightConstraint(WeightConstraint):

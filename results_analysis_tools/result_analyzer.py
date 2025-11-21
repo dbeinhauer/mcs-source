@@ -62,11 +62,29 @@ class ResultAnalyzer:
     This class serves for statistical analysis of all processed results.
     """
 
-    def __init__(self, results_to_load: Dict[EvaluationProcessorChoices, str]):
+    def __init__(
+        self,
+        results_to_load: Dict[EvaluationProcessorChoices, str],
+        load_custom_variant: str = "",
+    ):
+        """
+        :param results_to_load: _description_
+        :param load_custom_variant: if specified, load only custom variant from prediction analysis.
+        """
 
         # Loads all analysis results.
         self.results_loader = ResultsLoader(results_to_load)
-        self.all_results = self.results_loader.load_all_results()
+        self.all_results: Dict[EvaluationProcessorChoices, pd.DataFrame] = {}
+        if load_custom_variant != "":
+            # Load only the results for the selected custom variant.
+            self.all_results = {
+                EvaluationProcessorChoices.PREDICTION_ANALYSIS: self.results_loader.load_evaluation_analyses(
+                    custom_variant=load_custom_variant
+                )
+            }
+        else:
+            # Load all results from default analyses (better in case we want to compare multiple models).
+            self.all_results = self.results_loader.load_all_results()
 
         # All plugins for results analysis:
         self.all_plugins = {
@@ -323,4 +341,13 @@ if __name__ == "__main__":
         EvaluationProcessorChoices.WANDB_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.WANDB_ANALYSIS.value}/results.pkl",
         EvaluationProcessorChoices.PREDICTION_ANALYSIS: f"{nn_model.globals.PROJECT_ROOT}{EVALUATION_RESULTS_BASE}/{EvaluationProcessorChoices.PREDICTION_ANALYSIS.value}/",
     }
-    result_analyzer = ResultAnalyzer(analysis_paths)
+    result_analyzer = ResultAnalyzer(
+        analysis_paths, load_custom_variant="invisible_0.5"
+    )
+    model_variant = "invisible_0.5"
+    plot_data = result_analyzer.prepare_dataframe_for_plot(
+        PlottingVariants.SEPARATE_TEMPORAL_BEHAVIOR_TARGET_PREDICTION,
+        synchrony_curve_kwargs={
+            "model_variants": [model_variant],
+        },
+    )

@@ -5,6 +5,16 @@ This script defines all enums of variants (layers, weights, models, etc.) used i
 from enum import Enum
 
 
+class LayerParent(Enum):
+    """
+    All possible layers.
+    """
+
+    LGN = "LGN"
+    L4 = "L4"
+    L23 = "L23"
+
+
 class LayerType(Enum):
     """
     All possible layers.
@@ -55,12 +65,22 @@ class ModelTypes(Enum):
     DNN_SEPARATE = "dnn_separate"
     RNN_JOINT = "rnn_joint"
     RNN_SEPARATE = "rnn_separate"
-    
+
+
+class LossTypes(Enum):
+    """
+    All possible loss types.
+    """
+
+    MSE = "mse"
+    POISSON = "poisson"
+
+
 class RNNTypes(Enum):
     """
     All possible RNN types.
     """
-    
+
     LSTM = "lstm"
     GRU = "gru"
 
@@ -107,17 +127,19 @@ class LayerConstraintFields(Enum):
 
     SIZE = "size"
     TYPE = "type"
+    NAME = "name"
+    TIMESTEP = "timestep"
 
 
 class PredictionTypes(Enum):
     """
-    All variants of predictions that are provided by the model 
+    All variants of predictions that are provided by the model
     (to distinguish between the predictions).
     """
 
     # General model prediction -> full sequence prediction (without resetting).
     FULL_PREDICTION = "full_prediction"
-    # Predictions where we reset the hidden states based on the target 
+    # Predictions where we reset the hidden states based on the target
     # (same approach as in train).
     TRAIN_LIKE_PREDICTION = "train_like_prediction"
     # Predictions of the outer RNN (not working currently).
@@ -158,6 +180,7 @@ class PathDefaultFields(Enum):
     SELECTION_RESULTS_DIR = "selection_results_dir"
     FULL_EVALUATION_DIR = "full_evaluation_dir"
     NEURON_MODEL_RESPONSES_DIR = "neuron_model_responses_dir"
+    VISIBLE_NEURONS_DIR = "visible_neurons_dir"
 
 
 class PathPlotDefaults(Enum):
@@ -178,3 +201,14 @@ class EvaluationMeanVariants(Enum):
     LAYER_MEAN = "layer_mean"
     NEURON_MEAN = "neuron_mean"
     IMAGE_MEAN = "image_mean"
+
+
+class EvaluationMetricVariants(Enum):
+    """
+    All variants of evaluated subsets.
+    """
+
+    FULL_METRIC = "full_metric"
+    VISIBLE_METRIC = "visible_metric"
+    INVISIBLE_METRIC = "invisible_metric"
+    LAYER_SPECIFIC = "layer_specific_metric"

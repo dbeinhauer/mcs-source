@@ -18,6 +18,7 @@ from nn_model.type_variants import (
     WeightsInitializationTypes,
     NeuronActivationTypes,
     RNNTypes,
+    LossTypes,
 )
 
 from nn_model.logger import LoggerModel
@@ -39,6 +40,7 @@ def init_wandb(
     Initializes Weights and Biases tracking.
 
     :param arguments: Command line arguments.
+    :param project_name: Name of wandb project.
     """
 
     config = {
@@ -64,6 +66,11 @@ def init_wandb(
         "synaptic_adaptation_size": arguments.synaptic_adaptation_size,
         "synaptic_adaptation_num_layers": arguments.synaptic_adaptation_num_layers,
         "synaptic_adaptation_only_lgn": arguments.synaptic_adaptation_only_lgn,
+        "param_red": arguments.parameter_reduction,
+        "loss": arguments.loss,
+        "distance_regularizer": arguments.distance_regularizer,
+        "sigma_regularizer": arguments.sigma_regularizer,
+        "visible_neurons_ratio": arguments.visible_neurons_ratio,
     }
 
     if arguments.debug:
@@ -72,8 +79,14 @@ def init_wandb(
     else:
         os.environ["WANDB_DISABLED"] = "false"
 
+    # Load wandb API key.
+    with open(f"{nn_model.globals.PROJECT_ROOT}/.wandb_api_key", "r") as f:
+        api_key = f.read().strip()
+
+    # Login to W&B using the key
+    wandb.login(key=api_key)
+
     wandb.init(
-        # project=f"V1_spatio_temporal_model_{nn_model.globals.SIZE_MULTIPLIER}",
         project=project_name,
         config=config,
     )
@@ -102,24 +115,34 @@ def init_model_path(arguments) -> str:
         )
 
         only_lgn = "-lgn" if arguments.synaptic_adaptation_only_lgn else ""
+        visible_ratio = (
+            f"_visib-{str(arguments.visible_neurons_ratio)}"
+            if arguments.visible_neurons_ratio < 1.0
+            else ""
+        )
         return "".join(
             [
-                f"model-{int(nn_model.globals.SIZE_MULTIPLIER*100)}",
+                f"model-{nn_model.globals.SIZE_MULTIPLIER*100}",
                 train_subset_string,
                 subset_variant_string,
+                visible_ratio,
                 f"_step-{nn_model.globals.TIME_STEP}",
                 f"_lr-{str(arguments.learning_rate)}",
                 f"_{arguments.model}",
-                f"_optim-steps-{arguments.num_backpropagation_time_steps}",
+                f"_opt-steps-{arguments.num_backpropagation_time_steps}",
+                f"_dis-reg-{arguments.distance_regularizer}",
+                f"-sig-{arguments.sigma_regularizer}",
                 "_neuron",
                 f"-layers-{arguments.neuron_num_layers}",
                 f"-size-{arguments.neuron_layer_size}",
-                f"-activation-{arguments.neuron_activation_function}",
+                # f"-activation-{arguments.neuron_activation_function}",
                 f"-res-{arguments.neuron_residual}",
                 f"_hid-time-{arguments.num_hidden_time_steps}",
-                f"_grad-clip-{arguments.gradient_clip}",
+                # f"_grad-clip-{arguments.gradient_clip}",
                 f"_optim-{arguments.optimizer_type}",
-                f"_weight-init-{arguments.weight_initialization}",
+                # f"_weight-init-{arguments.weight_initialization}",
+                f"_p-red-{arguments.parameter_reduction}",
+                f"_loss-{arguments.loss}",
                 "_synaptic",
                 f"-{arguments.synaptic_adaptation}",
                 f"-size-{arguments.synaptic_adaptation_size}",
@@ -172,7 +195,7 @@ def get_subset_variant_name(subset_path: str, subset_variant: int = -1) -> str:
     if subset_variant != -1:
         # Subset variant specified -> add it for the variant to be loaded.
         splitted_path = subset_path.split(".")
-        return splitted_path[0] + f"_variant_{subset_variant}." + splitted_path[-1]
+        return f"{splitted_path[0]}.{splitted_path[1]}" + f"_variant_{subset_variant}." + splitted_path[-1]
 
     return subset_path
 
@@ -195,10 +218,17 @@ def main(arguments):
     arguments.subset_dir = get_subset_variant_name(
         arguments.subset_dir, arguments.subset_variant
     )
+    nn_model.globals.define_neuron_selection(arguments.subset_dir)
 
     logger = LoggerModel()
     logger.print_experiment_info(arguments)
     model_executer = ModelExecuter(arguments)
+
+    # Log number of trainable parameters
+    parameter_count = sum(
+        p.numel() for p in model_executer.model.parameters() if p.requires_grad
+    )
+    wandb.config.update({"parameter_count": parameter_count})
 
     # Set parameters for the execution.
     execution_setup = set_model_execution_parameters()
@@ -241,7 +271,7 @@ def main(arguments):
     wandb.finish()
 
 
-if __name__ == "__main__":
+def init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Execute model training or evaluation."
     )
@@ -279,9 +309,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--experiment_selection_path",
         type=str,
-        default=nn_model.globals.DEFAULT_PATHS[
-            PathDefaultFields.EXPERIMENT_SELECTION_PATH.value
-        ],
+        default="",
         help="Path to selected experiments used for model analysis during evaluation.",
     )
     parser.add_argument(
@@ -325,6 +353,14 @@ if __name__ == "__main__":
         help="Directory where the results of neuron DNN model on testing range should be stored "
         "(filename is best model name).",
     )
+    parser.add_argument(
+        "--visible_neurons_path",
+        type=str,
+        default=nn_model.globals.DEFAULT_PATHS[
+            PathDefaultFields.VISIBLE_NEURONS_DIR.value
+        ],
+        help="Path to the file containing visible neurons indices (of the already selected subset of neurons).",
+    )
     # Technical setup:
     parser.add_argument(
         "--num_data_workers",
@@ -353,6 +389,25 @@ if __name__ == "__main__":
         default=OptimizerTypes.DEFAULT.value,
         choices=[optimizer_type.value for optimizer_type in OptimizerTypes],
         help="Optimizer type (either default or learning rate specific).",
+    )
+    parser.add_argument(
+        "--loss",
+        type=str,
+        default=LossTypes.POISSON.value,
+        choices=[loss_type.value for loss_type in LossTypes],
+        help="Loss to use during training.",
+    )
+    parser.add_argument(
+        "--distance_regularizer",
+        type=float,
+        default=0.0,
+        help="Strength of distance regularization (0.0 means no regularization).",
+    )
+    parser.add_argument(
+        "--sigma_regularizer",
+        type=float,
+        default=0.2,
+        help="Sigma of the Gaussian used in distance regularization.",
     )
     parser.add_argument(
         "--gradient_clip",
@@ -444,7 +499,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--synaptic_adaptation_num_layers",
         type=int,
-        default=1,
+        default=3,
         help="Number of layers in the synaptic adaptation RNN module.",
     )
     parser.set_defaults(synaptic_adaptation_only_lgn=False)
@@ -452,6 +507,20 @@ if __name__ == "__main__":
         "--synaptic_adaptation_only_lgn",
         action="store_true",
         help="Whether we want to use synaptic adaptation RNN module only on LGN layer.",
+    )
+    # Ratio of visible neurons:
+    parser.add_argument(
+        "--visible_neurons_ratio",
+        type=float,
+        default=1.0,
+        help="Ratio of the visible neurons during the training.",
+    )
+    # Parameter reduction
+    parser.set_defaults(parameter_reduction=False)
+    parser.add_argument(
+        "--parameter_reduction",
+        action="store_true",
+        help="Model will run with reduced number of trainable parameters.",
     )
     # Dataset analysis:
     parser.add_argument(
@@ -499,6 +568,10 @@ if __name__ == "__main__":
         action="store_true",
         help="Start debugging mode.",
     )
+    return parser
 
+
+if __name__ == "__main__":
+    parser = init_parser()
     args = parser.parse_args()
     main(args)

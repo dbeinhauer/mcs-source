@@ -28,12 +28,18 @@ class SynchronyExperimentsProcessor:
     """
 
     def __init__(self, all_results: Dict[EvaluationProcessorChoices, pd.DataFrame]):
-        self.synchrony_full_dataset_df = SynchronyExperimentsProcessor._get_all_full_dataset_separate_experiment_results(
-            all_results
-        )
-        self.synchrony_subset_dataset_df = SynchronyExperimentsProcessor._get_all_subset_dataset_separate_experiment_results(
-            all_results
-        )
+        self.synchrony_full_dataset_df: pd.DataFrame = None
+        self.synchrony_subset_dataset_df: pd.DataFrame = None
+
+        # Load if the results are present.
+        if EvaluationProcessorChoices.FULL_DATASET_ANALYSIS in all_results:
+            self.synchrony_full_dataset_df = SynchronyExperimentsProcessor._get_all_full_dataset_separate_experiment_results(
+                all_results
+            )
+        if EvaluationProcessorChoices.SUBSET_DATASET_ANALYSIS in all_results:
+            self.synchrony_subset_dataset_df = SynchronyExperimentsProcessor._get_all_subset_dataset_separate_experiment_results(
+                all_results
+            )
 
     @staticmethod
     def _get_all_full_dataset_separate_experiment_results(

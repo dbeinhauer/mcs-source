@@ -5,19 +5,26 @@ about the layer and model parameters.
 """
 
 import os
+import pickle
 from pathlib import Path
+
+import numpy as np
+import torch
 
 from nn_model.type_variants import (
     LayerType,
     PathDefaultFields,
-    PathPlotDefaults,
     ModelTypes,
+    LayerParent,
 )
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
 # GPU Devices:
-DEVICE = "cuda"
+if torch.cuda.is_available():
+    DEVICE = "cuda"
+else:
+    DEVICE = "cpu"
 
 # Model Parameters:
 
@@ -34,6 +41,31 @@ TIME_STEP = int(os.getenv("TIME_STEP", DEFAULT_TIME_STEP))
 # Batch sizes:
 TRAIN_BATCH_SIZE = 50
 TEST_BATCH_SIZE = 10
+
+LAYER_TO_PARENT = {
+    LayerType.X_ON.value: LayerParent.LGN.value,
+    LayerType.X_OFF.value: LayerParent.LGN.value,
+    LayerType.V1_EXC_L4.value: LayerParent.L4.value,
+    LayerType.V1_INH_L4.value: LayerParent.L4.value,
+    LayerType.V1_EXC_L23.value: LayerParent.L23.value,
+    LayerType.V1_INH_L23.value: LayerParent.L23.value,
+}
+
+# Layers containing LGN layer.
+LGN_NEURONS = {
+    LayerType.X_ON.value,
+    LayerType.X_OFF.value,
+}
+
+L4_NEURONS = {
+    LayerType.V1_EXC_L4.value,
+    LayerType.V1_INH_L4.value,
+}
+
+L23_NEURONS = {
+    LayerType.V1_EXC_L23.value,
+    LayerType.V1_INH_L23.value,
+}
 
 # Will return values as its names
 EXCITATORY_LAYERS = {
@@ -97,14 +129,22 @@ SEPARATE_MODELS = [
     ModelTypes.RNN_SEPARATE.value,
 ]
 
+DATASET_NAME = "testing_dataset"
+
+# String to represent model size in indices selection (if int then remove zeros).
+# SIZE_MULTIPLIER_STRING = (
+#     int(SIZE_MULTIPLIER * 100) if SIZE_MULTIPLIER % 1 == 0 else SIZE_MULTIPLIER * 100
+# )
+
 # All default input paths that are used in model executer.
 DEFAULT_PATHS = {
     PathDefaultFields.TRAIN_DIR.value: f"{PROJECT_ROOT}/dataset/train_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
     PathDefaultFields.TEST_DIR.value: f"{PROJECT_ROOT}/dataset/test_dataset/compressed_spikes/trimmed/size_{TIME_STEP}",
-    PathDefaultFields.SUBSET_DIR.value: f"{PROJECT_ROOT}/dataset/model_subsets/size_{int(SIZE_MULTIPLIER*100)}.pkl",
+    PathDefaultFields.SUBSET_DIR.value: f"{PROJECT_ROOT}/dataset/model_subsets/size_{SIZE_MULTIPLIER*100}.pkl",
+    PathDefaultFields.VISIBLE_NEURONS_DIR.value: f"{PROJECT_ROOT}/dataset/visible_neurons/",
     PathDefaultFields.MODEL_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/best_models/",
     PathDefaultFields.EXPERIMENT_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/experiments/experiments_subset_10.pkl",
-    PathDefaultFields.NEURON_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER*100)}_subset_10.pkl",
+    PathDefaultFields.NEURON_SELECTION_PATH.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_subsets/neurons/model_size_{int(SIZE_MULTIPLIER * 100)}_subset_10.pkl",
     PathDefaultFields.SELECTION_RESULTS_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/neuron_responses/",
     PathDefaultFields.FULL_EVALUATION_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/full_evaluation_results/",
     PathDefaultFields.NEURON_MODEL_RESPONSES_DIR.value: f"{PROJECT_ROOT}/evaluation_tools/evaluation_results/neuron_model_responses/",
@@ -155,3 +195,78 @@ def rewrite_test_batch_size(new_batch_size: int):
     """
     global TEST_BATCH_SIZE
     TEST_BATCH_SIZE = new_batch_size
+
+
+# with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", "rb") as f:
+#     POS_ORI_DICT = pickle.load(f)
+
+# # with open(DEFAULT_PATHS[PathDefaultFields.SUBSET_DIR.value], 'rb') as f:
+# with open(
+#     "/home/david/source/diplomka_richard_version/mcs-source/testing_dataset/model_subsets/size_10_variant_2.pkl",
+#     "rb",
+# ) as f:
+#     NEURON_SELECTION = pickle.load(f)
+#     NEURON_SELECTION = {
+#         layer: np.array(neuron_selection)
+#         for layer, neuron_selection in NEURON_SELECTION.items()
+#     }
+
+# for layer, xyo in POS_ORI_DICT.items():
+#     subset_filter = NEURON_SELECTION[layer].astype(int)
+#     for attr in xyo.keys():
+#         POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
+#             subset_filter
+#         ].astype(float)
+#         POS_ORI_DICT[layer][attr] = (
+#             torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
+#         )
+
+
+def unflatten_dict(d):
+    """Rebuild nested dict from flattened keys."""
+    result = {}
+    for k, v in d.items():
+        keys = k.split(".")
+        cur = result
+        for sub in keys[:-1]:
+            cur = cur.setdefault(sub, {})
+        cur[keys[-1]] = v
+    return result
+
+
+# Load position and orientation dictionary. TODO: works also in old numpy
+POS_ORI_DICT = unflatten_dict(
+    dict(
+        np.load(
+            f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.npz",
+            allow_pickle=True,
+        )
+    )
+)
+
+# TODO: Comment the following functionalities.
+# with open(f"{PROJECT_ROOT}/testing_dataset/pos_ori_phase_dictionary.pickle", "rb") as f:
+#     POS_ORI_DICT = pickle.load(f)
+
+NEURON_SELECTION = None
+
+
+def define_neuron_selection(subset_dir: str):
+    """
+    Defines the neuron selection from the specified path.
+
+    :param subset_dir: Path to the neuron subset pickle file.
+    """
+    global NEURON_SELECTION, POS_ORI_DICT
+    with open(subset_dir, "rb") as f:
+        NEURON_SELECTION = pickle.load(f)
+
+    for layer, xyo in POS_ORI_DICT.items():
+        subset_filter = np.array(NEURON_SELECTION[layer]).astype(int)
+        for attr in xyo.keys():
+            POS_ORI_DICT[layer][attr] = np.array(POS_ORI_DICT[layer][attr])[
+                subset_filter
+            ].astype(float)
+            POS_ORI_DICT[layer][attr] = (
+                torch.from_numpy(POS_ORI_DICT[layer][attr]).float().to(DEVICE)
+            )

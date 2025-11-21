@@ -2,16 +2,28 @@
 This script serves for random generating of model subsets.
 """
 
+from typing import Dict, Optional, List
 import argparse
 import random
 import pickle
-from nn_model import globals
+from pathlib import Path
 
-SUBSET_DIRECTORY = "model_subsets/"
+import nn_model.globals
+from nn_model.visible_neurons_handler import VisibleNeuronsHandler
+
+SUBSET_DIRECTORY = "generated_subsets/"
 
 
-def generate_random_subset(subset_ratio):
-    original_sizes = globals.ORIGINAL_SIZES
+def generate_random_subset(
+    subset_ratio: float, original_sizes: Dict[str, int]
+) -> Dict[str, List[int]]:
+    """
+    Generates a random subset of indices for each layer based on the specified ratio.
+
+    :param subset_ratio: Ratio of the subset size for each layer (0.0 - 1.0).
+    :param original_sizes: Dictionary containing the original sizes of each layer.
+    :return: Returns a dictionary with layer names as keys and lists of indices as values.
+    """
     subset_dict = {}
 
     for layer_name, layer_size in original_sizes.items():
@@ -23,8 +35,10 @@ def generate_random_subset(subset_ratio):
     return subset_dict
 
 
-def one_subset_generation(subset_ratio, output_file):
-    subset_dict = generate_random_subset(subset_ratio)
+def one_subset_generation(
+    subset_ratio, output_file: Path, original_sizes: Dict[str, int]
+):
+    subset_dict = generate_random_subset(subset_ratio, original_sizes)
 
     with open(output_file, "wb") as f:
         pickle.dump(subset_dict, f)
@@ -54,21 +68,43 @@ def main():
         default=1,
         help="Number of subset variants to generate.",
     )
+    parser.set_defaults(visible_neurons=False)
+    parser.add_argument(
+        "--visible_neurons",
+        action="store_true",
+        help="Whether we want to generate visible neurons subset.",
+    )
 
     args = parser.parse_args()
 
-    ratio_percentage = int(args.subset_ratio * 100)
+    ratio_percentage = args.subset_ratio * 100
+    output_dir, output_filename = "", ""
+    original_sizes = {}
 
-    if args.output_file == "":
-        args.output_file = SUBSET_DIRECTORY + f"size_{ratio_percentage}.pkl"
+    if args.visible_neurons:
+        output_dir, output_filename = VisibleNeuronsHandler.get_visible_indices_path(
+            args.subset_ratio, directory_path=SUBSET_DIRECTORY
+        )
+        original_sizes = nn_model.globals.MODEL_SIZES
+    else:
+        output_dir = SUBSET_DIRECTORY
+        if ratio_percentage % 1 == 0:
+            ratio_percentage = int(ratio_percentage)
+        output_filename = f"size_{ratio_percentage}.pkl"
+        original_sizes = nn_model.globals.ORIGINAL_SIZES
+
+    if not args.output_file:
+        args.output_file = f"{output_dir}/{output_filename}"
 
     for i in range(args.num_subsets):
+        new_output_file = Path(args.output_file)
         if args.num_subsets > 1:
-            args.output_file = (
-                SUBSET_DIRECTORY + f"size_{ratio_percentage}_variant_{i}.pkl"
+            print(args.output_file)
+            new_output_file = new_output_file.with_name(
+                f"{new_output_file.stem}_variant_{i}{new_output_file.suffix}"
             )
-
-        one_subset_generation(args.subset_ratio, args.output_file)
+            # new_output_file = ".".split(args.output_file)[0] + f"_variant_{i}.pkl"
+        one_subset_generation(args.subset_ratio, new_output_file, original_sizes)
 
 
 if __name__ == "__main__":

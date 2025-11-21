@@ -11,25 +11,22 @@ import argparse
 from enum import Enum
 
 import pandas as pd
-import pickle
+
+# import pickle
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-import seaborn as sns
+
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import nn_model.globals
 from nn_model.type_variants import (
-    LayerType,
-    NeuronModulePredictionFields,
-    PathPlotDefaults,
     PathDefaultFields,
-    EvaluationMeanVariants,
 )
-from nn_model.dataset_loader import SparseSpikeDataset  # , different_times_collate_fn
-from nn_model.model_executer import ModelExecuter
+from nn_model.dataset_loader import SparseSpikeDataset
 from nn_model.type_variants import EvaluationFields, PathDefaultFields
 from nn_model.dictionary_handler import DictionaryHandler
 
@@ -404,6 +401,7 @@ class EvaluationProcessor:
         self,
         base_dir: str = "",
         evaluation_variants: List[ModelEvaluationRunVariant] = [],
+        evaluation_subdir: str = "",
     ) -> pd.DataFrame:
         """
         Processes predictions of all model variants for each neuron subset variants
@@ -412,6 +410,7 @@ class EvaluationProcessor:
         :param base_dir: Base directory where all model variants predictions are stored,
         if `""` then use default base.
         :param evaluation_variants: What evaluation variants we are interested, if `[]` then default.
+        :param evaluation_subdir: Optionally specify subdirectory of the evaluation results if `custom` variant.
         :return: Returns processed all models predictions as pandas dataframe for each batch of data.
         """
 
@@ -421,7 +420,9 @@ class EvaluationProcessor:
             base_dir = self.all_model_predictions_base_dir
 
         self.predictions_analyzer.process_all_model_variants_predictions(
-            base_dir, evaluation_variants=evaluation_variants
+            base_dir,
+            evaluation_variants=evaluation_variants,
+            evaluation_variant_dir=evaluation_subdir,
         )
 
         print("Converting to pandas.")
@@ -483,7 +484,9 @@ def main(arguments):
             ]
 
         results = evaluation_processor.run_prediction_processing(
-            arguments.evaluation_results_base_dir, evaluation_variants
+            arguments.evaluation_results_base_dir,
+            evaluation_variants,
+            arguments.evaluation_variant_dir,
         )
 
     if arguments.results_save_path:
@@ -555,6 +558,13 @@ if __name__ == "__main__":
         default="",
         choices=[i.value for i in ModelEvaluationRunVariant._member_map_.values()],
         help="What model variant to process.",
+    )
+    parser.add_argument(
+        "--evaluation_variant_dir",
+        type=str,
+        default="",
+        help="Optionally specify subdirectory in the evaluation results base dir "
+        "(in case `custom` model_evaluation_variant selected).",
     )
 
     args = parser.parse_args()

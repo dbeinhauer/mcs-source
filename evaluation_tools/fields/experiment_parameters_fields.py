@@ -48,6 +48,16 @@ class ModelEvaluationRunVariant(Enum):
     # Synaptic adaptation on only LGN connections.
     SYN_ADAPT_LGN_BACKPROPAGATION_5 = "syn_only_lgn_5_evaluation"
     SYN_ADAPT_LGN_BACKPROPAGATION_10 = "syn_only_lgn_10_evaluation"
+    # Synaptic adaptation
+    SYN_ADAPT = "syn_adapt"
+
+    # Poison Loss Experiments:
+    DNN_JOINT_POISSON = "dnn_joint_poisson"
+    RNN_BACKPROPAGATION_10_POISSON = "rnn_separate_10_poisson"
+    SYN_ADAPT_BACKPROPAGATION_10_POISSON = "syn_adapt_10_poisson"
+
+    # Custom Experiments:
+    CUSTOM = "custom"
 
 
 class AdditionalExperiments(Enum):

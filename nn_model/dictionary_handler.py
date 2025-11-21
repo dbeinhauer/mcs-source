@@ -3,7 +3,7 @@ This script defines class that is used for manipulation with data stored in dict
 Typically for the multiple layers results and variables.
 """
 
-from typing import Tuple, Dict, List, Union, Any, Optional
+from typing import Tuple, Dict, List, Union, Any, Optional, Callable
 
 import torch
 
@@ -20,7 +20,7 @@ class DictionaryHandler:
 
     @staticmethod
     def assign_args_kwargs(
-        call_tuple: Tuple[Any, Optional[Tuple], Optional[Dict]]
+        call_tuple: Tuple[Any, Optional[Tuple], Optional[Dict]],
     ) -> Tuple:
         """
         Assigns call args and kwargs in case they are not defined in the provided call tuple.
@@ -203,3 +203,18 @@ class DictionaryHandler:
             key: DictionaryHandler.apply_function_calls(value, *functions_with_args)
             for key, value in dictionary.items()
         }
+
+    @staticmethod
+    def apply_function(dictionary: Dict, fn: Callable, inplace: bool = False) -> Dict:
+        """
+        Applies the provided function to values of a dict.
+        :param dictionary: The dict which should be used.
+        :param fn: Function to apply.
+        :param inplace: Change the provided dictionary if True, create a new dictionary otherwise.
+        :returns: Dictionary altered by the function.
+        """
+        if not inplace:
+            return {key: fn(value) for key, value in dictionary.items()}
+        for key, value in dictionary.items():
+            dictionary[key] = fn(value)
+        return dictionary

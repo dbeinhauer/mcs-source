@@ -3,11 +3,12 @@ This script defines manipulation with the models and is used to execute
 model training and evaluation.
 """
 
-import re
+from collections import defaultdict
 from typing import Tuple, Dict, List, Optional, Union
 
 import torch.nn
 import torch.optim as optim
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -19,16 +20,20 @@ from nn_model.type_variants import (
     PredictionTypes,
     OptimizerTypes,
     ModelModulesFields,
+    LossTypes,
+    EvaluationMetricVariants,
 )
 from nn_model.dataset_loader import SparseSpikeDataset, different_times_collate_fn
 from nn_model.models import (
     PrimaryVisualCortexModel,
     ModelLayer,
 )
-from nn_model.evaluation_metrics import NormalizedCrossCorrelation
+from nn_model.evaluation_metrics import NormalizedCrossCorrelation, Metric
 from nn_model.evaluation_results_saver import EvaluationResultsSaver
 from nn_model.logger import LoggerModel
 from nn_model.dictionary_handler import DictionaryHandler
+from nn_model.visible_neurons_handler import VisibleNeuronsHandler
+from nn_model.evaluation_metric_handler import EvaluationMetricHandler
 
 
 class ModelExecuter:
@@ -50,10 +55,18 @@ class ModelExecuter:
         self.num_data_workers = arguments.num_data_workers
         self.train_dataset, self.test_dataset = self._init_datasets(arguments)
         self.train_loader, self.test_loader = self._init_data_loaders(arguments)
+        
+        # Strength of distance regularization and visible neurons handler.
+        self.distance_regularizer = arguments.distance_regularizer
+        self.sigma_regularizer = arguments.sigma_regularizer
+
+        self.visible_neurons_handler = VisibleNeuronsHandler(
+            arguments.visible_neurons_ratio
+        )
 
         # Model initialization.
-        self.model = self._init_model(arguments).to(device=nn_model.globals.DEVICE)
-        self.criterion = self._init_criterion()
+        self.model = self._init_model(arguments, self.visible_neurons_handler.is_invisible_part()).to(device=nn_model.globals.DEVICE)
+        self.criterion = self._init_criterion(arguments)
         self.optimizer = self._init_optimizer(
             arguments.optimizer_type, arguments.learning_rate
         )
@@ -66,7 +79,9 @@ class ModelExecuter:
         self.num_backpropagation_time_steps = arguments.num_backpropagation_time_steps
 
         # Evaluation metric.
-        self.evaluation_metrics = NormalizedCrossCorrelation()
+        self.evaluation_metric_handler = EvaluationMetricHandler(
+            NormalizedCrossCorrelation()
+        )
 
         # Placeholder for the best evaluation result value.
         self.best_metric = -float("inf")
@@ -502,7 +517,6 @@ class ModelExecuter:
             output_layers,
             is_test=True,
             model_subset_path=arguments.subset_dir,
-            experiment_selection_path=arguments.experiment_selection_path,
         )
 
         return train_dataset, test_dataset
@@ -538,11 +552,12 @@ class ModelExecuter:
 
         return train_loader, test_loader
 
-    def _init_model(self, arguments) -> PrimaryVisualCortexModel:
+    def _init_model(self, arguments, process_invisible: bool = False) -> PrimaryVisualCortexModel:
         """
         Initializes the model based on the provided arguments.
 
         :param arguments: command line arguments containing model setup info.
+        :param process_invisible: Flag whether we want to process invisible neurons.
         :return: Returns initializes model.
         """
         return PrimaryVisualCortexModel(
@@ -550,19 +565,25 @@ class ModelExecuter:
             arguments.num_hidden_time_steps,
             arguments.model,
             arguments.weight_initialization,
+            arguments.parameter_reduction,
+            process_invisible,
             model_modules_kwargs={
                 **ModelExecuter._get_neuron_model_kwargs(arguments),
                 **ModelExecuter._get_synaptic_adaptation_model_kwargs(arguments),
             },  # Pass kwargs to generate neuron and synaptic adaptation modules.
         )
 
-    def _init_criterion(self):
+    def _init_criterion(self, arguments) -> nn.Module:
         """
         Initializes model criterion.
 
         :return: Returns model criterion (loss function).
         """
-        return torch.nn.MSELoss()
+        if arguments.loss == LossTypes.MSE.value:
+            return torch.nn.MSELoss()
+        elif arguments.loss == LossTypes.POISSON.value:
+            return nn.PoissonNLLLoss(log_input=False, full=True, eps=1e-8)
+        raise ValueError(f"Unsupported loss type: {arguments.loss}")
 
     def _init_exc_inh_specific_learning_rate(self, learning_rate):
         """
@@ -733,19 +754,82 @@ class ModelExecuter:
 
         return predictions, neuron_hidden, synaptic_adaptation_hidden
 
+    def _calculate_distance_loss(self, sigma: float = 0.2) -> torch.Tensor:
+        """
+        Calculates distance-dependent regularizer gaussian loss based on the current model weights.
+        The loss is calculated as:
+            `(1 - exp(-d^2 / (2*sigma^2))) * w^2`
+        where `d` is the distance between the neurons, `w` is the weight of the connection
+
+        :return: Returns distance-dependent regularization loss in format.
+        """
+        # TODO: This function caused significant slow-down in training (it is used while invisible neurons are present).
+        distance_loss = 0
+
+        for (
+            post_layer_name,
+            input_layers,
+        ) in PrimaryVisualCortexModel.layers_input_parameters.items():
+            for pre_layer_name, _ in input_layers + [
+                (post_layer_name, "")
+            ]:  # Add self-recurrent connection.
+                layer_sigma = sigma
+                if pre_layer_name in nn_model.globals.LGN_NEURONS:
+                    # Input layer -> skip
+                    continue
+                if pre_layer_name == post_layer_name:
+                    # Self-recurrent connection -> skip
+                    continue
+                if {pre_layer_name, post_layer_name} in nn_model.globals.L23_NEURONS:
+                    layer_sigma = sigma * 4  # L23 layers are more spread out.
+                pair_weights = torch.transpose(
+                    self.model.get_weights_per_layer_pair(
+                        pre_layer_name, post_layer_name
+                    ),
+                    0,
+                    1,
+                ).cpu()
+                pair_distances = self.model.neural_distances[
+                    (pre_layer_name, post_layer_name)
+                ].cpu()
+                gaussian_weight = 1 - torch.exp(
+                    -(pair_distances**2) / (2 * layer_sigma**2)
+                )
+                weights = pair_weights.flatten()
+                distance_loss += torch.sum(
+                    gaussian_weight * (weights * weights)
+                ).unsqueeze(0)
+
+        return distance_loss
+
     def _calculate_loss(
         self,
         predictions: Dict[str, torch.Tensor],
         targets: Dict[str, torch.Tensor],
-    ):
-        total_loss = torch.zeros(1)
+    ) -> torch.Tensor:
+        """
+        Calculates total loss based on the predictions and targets and distance-dependent weights.
+
+        :param predictions: Predictions of the model.
+        :param targets: Targets of the model.
+        :return: Returns loss combining prediction loss and distance-dependent loss (regularization).
+        """
+        distance_dependent_loss = torch.zeros(1)
+        if self.visible_neurons_handler.is_invisible_part():
+            # In case there are some invisible neurons -> compute distance loss
+            distance_dependent_loss = self._calculate_distance_loss(
+                self.sigma_regularizer
+            )
+        prediction_loss = torch.zeros(1)
         for layer in predictions:
-            total_loss += self.criterion(
-                predictions[layer],
+            prediction_loss += self.criterion(
+                predictions[
+                    layer
+                ].cpu(),
                 targets[layer],
             )
 
-        return total_loss
+        return prediction_loss + self.distance_regularizer * distance_dependent_loss
 
     def _optimizer_step(
         self,
@@ -809,6 +893,10 @@ class ModelExecuter:
             ModelExecuter._init_modules_hidden_states()
         )
         accumulated_loss = 0
+        predictions = {
+            layer: torch.zeros(data[:, 0].shape).to(nn_model.globals.DEVICE)
+            for layer, data in all_hidden_states.items()
+        }
 
         for visible_time in range(
             1, time_length
@@ -818,6 +906,13 @@ class ModelExecuter:
                 visible_time, input_batch, target_batch, all_hidden_states
             )
 
+            # TODO: If neuron subset -> assign visible neurons and let the rest be the predictions.
+            hidden_states = (
+                self.visible_neurons_handler.assign_teacher_forced_responses(
+                    hidden_states, predictions
+                )
+            )
+
             # Perform model forward step.
             predictions, neuron_hidden, synaptic_adaptation_hidden = (
                 self._model_forward_step(
@@ -825,8 +920,19 @@ class ModelExecuter:
                 )
             )
 
+            visible_predictions, _ = (
+                self.visible_neurons_handler.split_visible_invisible_neurons(
+                    predictions
+                )
+            )
+            visible_targets, _ = (
+                self.visible_neurons_handler.split_visible_invisible_neurons(targets)
+            )
+
             # Calculate time step loss.
-            accumulated_loss += self._calculate_loss(predictions, targets)
+            accumulated_loss += self._calculate_loss(
+                visible_predictions, visible_targets
+            )
 
             if (
                 visible_time % self.num_backpropagation_time_steps == 0
@@ -842,6 +948,10 @@ class ModelExecuter:
                 neuron_hidden, synaptic_adaptation_hidden = self._optimizer_step(
                     neuron_hidden, synaptic_adaptation_hidden
                 )
+
+                for layer in predictions:
+                    # Store predictions for the current time step.
+                    predictions[layer] = predictions[layer].detach()
 
                 # Save loss for logs and reset counter.
                 time_loss_sum += accumulated_loss.item()
@@ -918,7 +1028,11 @@ class ModelExecuter:
         NOTE: This function changes internal state of `self.model` object.
         """
         self.model.load_state_dict(
-            torch.load(self.evaluation_results_saver.best_model_path, weights_only=True)
+            torch.load(
+                self.evaluation_results_saver.best_model_path,
+                weights_only=True,
+                map_location=torch.device(nn_model.globals.DEVICE),
+            )
         )
         self.logger.print_best_model_evaluation(self.best_metric)
 
@@ -961,6 +1075,14 @@ class ModelExecuter:
                     for layer, layer_hidden in targets.items()
                 }
             )
+            trial_invisible_hidden = {
+                layer: torch.tensor(0.0).to(nn_model.globals.DEVICE)
+                for layer in trial_hidden.keys()
+            }
+
+            trial_hidden = self.visible_neurons_handler.assign_teacher_forced_responses(
+                trial_hidden, trial_invisible_hidden
+            )
 
             # Initialize hidden states of the neuron and synaptic adaptation modules.
             neuron_hidden, synaptic_adaptation_hidden = (
@@ -977,6 +1099,7 @@ class ModelExecuter:
             )
 
             # Teacher-forced evaluation results.
+            # TODO: Probably broken while using only subset of neurons.
             neuron_hidden, synaptic_adaptation_hidden = (
                 ModelExecuter._init_modules_hidden_states()
             )
@@ -1056,36 +1179,6 @@ class ModelExecuter:
 
         return return_predictions
 
-    def compute_evaluation_score(
-        self, targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor]
-    ) -> Tuple[float, float]:
-        """
-        Computes evaluation score between vectors of all prediction
-        and all target layers.
-
-        Between two vectors that were created by concatenating all predictions and
-        all targets for all output layers.
-
-        :param targets: dictionary of targets for all layers.
-        :param predictions: dictionary of predictions for all layers.
-        :return: Returns tuple of evaluation score (CC_NORM) and Pearson's CC of the predictions.
-        """
-        # Concatenate predictions and targets across all layers.
-        all_predictions = torch.cat(
-            [prediction for prediction in predictions.values()],
-            dim=-1,
-        ).to(nn_model.globals.DEVICE)
-        all_targets = torch.cat([target for target in targets.values()], dim=-1).to(
-            nn_model.globals.DEVICE
-        )
-
-        # Run the calculate function once on the concatenated tensors.
-        cc_norm, cc_abs = self.evaluation_metrics.calculate(
-            all_predictions, all_targets
-        )
-
-        return cc_norm, cc_abs
-
     def evaluation(
         self,
         subset_for_evaluation: int = -1,
@@ -1122,9 +1215,7 @@ class ModelExecuter:
 
         self.model.eval()
 
-        cc_norm_sum = 0.0
-        cc_abs_sum = 0.0
-
+        self.evaluation_metric_handler.reset_all_metrics()
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(tqdm(self.test_loader)):
                 if subset_for_evaluation != -1 and i > subset_for_evaluation:
@@ -1144,19 +1235,26 @@ class ModelExecuter:
                         i, all_predictions, targets
                     )
 
-                cc_norm, cc_abs = self.compute_evaluation_score(
+                all_metrics = self.evaluation_metric_handler.compute_all_evaluation_scores(
                     # Compute evaluation for all time steps except the first step (0-th).
                     {layer: target[:, :, 1:, :] for layer, target in targets.items()},
                     all_predictions[PredictionTypes.FULL_PREDICTION],
+                    self.visible_neurons_handler,
                 )
-                cc_norm_sum += cc_norm
-                cc_abs_sum += cc_abs
+
+                self.evaluation_metric_handler.add_to_sum(all_metrics)
 
                 # Logging of the evaluation results.
-                self.logger.wandb_batch_evaluation_logs(cc_norm, cc_abs)
+                self.logger.wandb_batch_evaluation_logs(all_metrics)
                 if i % print_each_step == 0:
+                    metric_sum = self.evaluation_metric_handler.all_metrics_sum[
+                        EvaluationMetricVariants.FULL_METRIC
+                    ]
                     self.logger.print_current_evaluation_status(
-                        i + 1, cc_norm_sum, cc_abs_sum
+                        i + 1,
+                        metric_sum.cc_norm,
+                        metric_sum.cc_abs,
+                        metric_sum.cc_abs_separate,
                     )
 
         # Decide what was the total number of examples during evaluation.
@@ -1165,11 +1263,10 @@ class ModelExecuter:
             num_examples = len(self.test_loader)
 
         # Average evaluation metrics calculation
-        avg_cc_norm = cc_norm_sum / num_examples
-        avg_cc_abs = cc_abs_sum / num_examples
-        self.logger.print_final_evaluation_results(avg_cc_norm, avg_cc_abs)
+        avg_all_metrics = self.evaluation_metric_handler.divide_from_sum(num_examples)
+        self.logger.print_final_evaluation_results(avg_all_metrics)
 
-        return avg_cc_norm
+        return avg_all_metrics[EvaluationMetricVariants.FULL_METRIC].cc_norm
 
     def evaluate_neuron_models(
         self, start: float = -1.0, end: float = 1.0, step: float = 0.001

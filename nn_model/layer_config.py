@@ -59,24 +59,29 @@ class LayerConfig:
         """
         Determines input weights constraint (chooses between excitatory/inhibitory).
 
-        :return: Returns list of dictionaries with parameters specifying
-        the distribution of input weight types of each input layer.
+        :return: Returns a list of dictionaries with parameters specifying
+        the distribution of input weight types in each input layer.
 
-        The format is same as the expected kwargs for `WeightConstraint` objects.
+        The format is the same as the expected kwargs for `WeightConstraint` objects.
         The order of the dictionaries should be same as the order of the input layers.
 
-        The keys in the dictionaries are:
-            `part_size` (int): size of the input layer.
-            `part_type` (WeightTypes value): type of the layer (exc/inh).
+        The dictionary keys are defined by the `LayerConstraintFields` enum.
+        The items in the dictionaries are:
+            `size` (int): size of the input layer.
+            `type` (WeightTypes value): type of the layer (exc/inh).
+            'name' (LayerType value)
+            'timestep' (TimeStepVariant value)
         """
         return [
             {
                 LayerConstraintFields.SIZE.value: nn_model.globals.MODEL_SIZES[
-                    layer[0]
+                    layer_name
                 ],
-                LayerConstraintFields.TYPE.value: self._get_constraint_type(layer[0]),
+                LayerConstraintFields.TYPE.value: self._get_constraint_type(layer_name),
+                LayerConstraintFields.NAME.value: layer_name,
+                LayerConstraintFields.TIMESTEP.value: timestep,
             }
-            for layer in self.input_layers_parameters
+            for layer_name, timestep in self.input_layers_parameters
         ]
 
     def _get_constraint_type(self, layer_type: str) -> str:
@@ -141,7 +146,7 @@ class LayerConfig:
         if synaptic_activation_model is None:
             # Synaptic adaptation is not defined for this connection.
             return input_tensor, hidden_states
-        
+
         complexity_result = input_tensor.reshape(
             -1, synaptic_activation_model.input_size
         )
