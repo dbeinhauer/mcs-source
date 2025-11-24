@@ -8,6 +8,8 @@ Prague. The thesis is a part of the project from Computational Systems
 Neuroscience Group (CSNG) group from Faculty of Mathematics and Physics in 
 Charles University in Prague.
 
+NOTE: This is the old repository of the project. Project has been already moved to a new repository: https://github.com/CSNG-MFF/BioAlignedRNNs.
+
 # Repository structure
 The structure of the repository is split into several Directories by their
 functionalities. The main part of the code is in the Directory `nn_model/` 
